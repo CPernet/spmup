@@ -39,9 +39,18 @@ end
 
 if ~isempty(spmup_despike_log.despiked_voxels)
     
-    V = spm_vol(spmup_despike_log.P);
-    Y = spm_read_vols(V);
-    Avg = mean(Y,4);
+    if isfield(spmup_despike_log.P)
+        V = spm_vol(spmup_despike_log.P);
+        Y = spm_read_vols(V);
+        Avg = mean(Y,4);
+    else
+        [M,sts] = spm_select(1,'image','select reference image to plot data on',[],pwd,'.*',1);
+        if sts ~=0
+            Avg = spm_read_vols(spm_vol(M));
+        else
+            error('spm u+ stopped - file selection interupted')
+        end
+    end
     
     figure('Name','Despiked Voxels')
     colormap('jet')
@@ -59,8 +68,6 @@ if ~isempty(spmup_despike_log.despiked_voxels)
         title('data points despiked','FontSize',14); 
         pause
     end
-    
-    
 end
 
 
