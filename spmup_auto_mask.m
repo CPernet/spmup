@@ -1,14 +1,14 @@
-function M = spmup_auto_mask(Y,threshold,fig)
+function M = spmup_auto_mask(V,threshold,fig)
 
-% routine to compute a mask from Y, a 4D time-series of images
+% routine to compute a mask from V, a time-series of memory mapped images
 % this gives a similar (but more inclusive) mask than SPM. Data are
-% smoothed and the average is used as a mask above threshold * by all
+% smoothed the the average is used as a mask above threshold * by all
 % voxels that are non zeros differences in the time series
 %
-% FORMAT M = spmup_auto_mask(Y,threshold)
+% FORMAT M = spmup_auto_mask(V,threshold)
 %
-% INPUT  Y, a 4D time-series of images
-%        threshold, the percentage of signal to keep (default = 0.2)
+% INPUT  V memory mapped images (see spm_vol)
+%        threshold the percentage of signal to keep (default = 0.2)
 %        fig 'on' or 'off' (default) to image the mask and average image
 %
 % OUTPUT M the mask image
@@ -25,6 +25,10 @@ elseif nargin == 3
     threshold = varargin{2};
     fig = varagin{3};
 end
+
+
+% get the data
+Y = spm_read_vols(V);
 
 % compute the mean of normalized smoothed data
 % by filling small holes we are more inclusive
