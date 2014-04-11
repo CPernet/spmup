@@ -159,31 +159,31 @@ for s=1:size(SPM.Sess,2) % for each session
             images = spm_read_vols(V);
             T2P = NaN(V(1).dim); % time to peak image
             voxels = find(~isnan(squeeze(images(:,:,:,1))));
-%             f = waitbar(0,'Estimating time to peak voxel-wise','name','HRF BOOST');
-%             for v=1:length(voxels)
-%                 waitbar(v/length(voxels));
-%                 [x,y,z] = ind2sub(size(squeeze(images(:,:,:,1))),voxels(v));
-%                 
-%                 if type == 2
-%                     Model = SPM.xBF.bf * [images(x,y,z,1) images(x,y,z,2)]';
-%                 elseif type == 3
-%                     Model = SPM.xBF.bf * [images(x,y,z,1) images(x,y,z,2) images(x,y,z,3)]';
-%                 end
-%                 
-%                 if images(x,y,z,1) > 0
-%                     T2P(voxels(v)) = BFtime(find(Model==max(Model)));
-%                 else
-%                     T2P(voxels(v)) = BFtime(find(Model==min(Model)));
-%                 end
-%             end
-%             close(f)
+            f = waitbar(0,'Estimating time to peak voxel-wise','name','HRF BOOST');
+            for v=1:length(voxels)
+                waitbar(v/length(voxels));
+                [x,y,z] = ind2sub(size(squeeze(images(:,:,:,1))),voxels(v));
+                
+                if type == 2
+                    Model = SPM.xBF.bf * [images(x,y,z,1) images(x,y,z,2)]';
+                elseif type == 3
+                    Model = SPM.xBF.bf * [images(x,y,z,1) images(x,y,z,2) images(x,y,z,3)]';
+                end
+                
+                if images(x,y,z,1) > 0
+                    T2P(voxels(v)) = BFtime(find(Model==max(Model)));
+                else
+                    T2P(voxels(v)) = BFtime(find(Model==min(Model)));
+                end
+            end
+            close(f)
             newV = spm_create_vol(V(1));
             [path,file,ext] = fileparts(V(1).fname);
             newV.fname = [path filesep 'hrf_boost' filesep 'T2P' num2str(index) ext];
             newV.descrip = sprintf('time to peak image of %s',V(1).descrip);
             out = spm_write_vol(newV,T2P);
-%            Mask = logical((T2P>=PeakDelays(1)).*(T2P<=PeakDelays(2)));
-            Mask = ~isnan(squeeze(images(:,:,:,1)));
+            Mask = logical((T2P>=PeakDelays(1)).*(T2P<=PeakDelays(2)));
+%            Mask = ~isnan(squeeze(images(:,:,:,1)));
 %             figure; for z=1:V(1).dim(3)
 %                 imagesc(squeeze(Mask(:,:,z))); pause(0.2);
 %             end
