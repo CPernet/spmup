@@ -28,7 +28,7 @@ end
 [path,file,ext] = fileparts(SPM_file);
 cd(path);
 clear V;
-Mask = spm_read_vols(spm_vol([pwd filesep 'mask.img']));
+Mask = spm_read_vols(spm_vol([pwd filesep 'mask.nii']));
 
 % apply mask on data
 for n=1:SPM.nscan
