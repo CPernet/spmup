@@ -1,4 +1,4 @@
-function spm_cfg_preproc
+function spmup_cfg
 % SPM Configuration file for toolbox 'Old Segment'
 %______________________________________________________________________
 % Copyright (C) 2005-2012 Wellcome Trust Centre for Neuroimaging
