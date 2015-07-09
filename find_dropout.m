@@ -23,7 +23,7 @@ function find_dropout
 % get the 2nd level analysis
 [fname,pname]=uigetfile('*SPM.mat','Select 2nd level design matrix');
 cd(pname); current = pwd;
-V = spm_vol('mask.img');
+V = spm_vol('mask.nii');
 mask = spm_read_vols(V);
 load(fullfile(pname,fname));
 
@@ -39,10 +39,10 @@ data = zeros([V.dim N]);
 for subject=1:N
     cd(folder{subject});
     try
-        data(:,:,:,subject) = spm_read_vols(spm_vol('mask.img'));
+        data(:,:,:,subject) = spm_read_vols(spm_vol('mask.nii'));
     catch
         cd ..
-        data(:,:,:,subject) = spm_read_vols(spm_vol('mask.img'));
+        data(:,:,:,subject) = spm_read_vols(spm_vol('mask.nii'));
     end
 end
 
@@ -67,12 +67,13 @@ for v = 1:V.dim(3)
 end
 
 % check compared to the group if some subject stand out
-bad_subjects = detect_outliers(sum(record)');
+% record = nb of slices present per subject
+bad_subjects = detect_outliers(sum(record)'); % tells if a subject has doesn't contribute to the mask
 if isempty(bad_subjects)
-    disp('all subjects show similar slice overalp')
+    disp('all subjects show similar slice overalp in z direction')
 else
     for s=1:length(bad_subjects)
-        fprintf('compared to the group, subject %g \n %s \n is noticeably badly normalized \n',bad_subjects(s), folder{bad_subjects(s)});
+        fprintf('compared to the group, subject %g \n %s \n is noticeably badly normalized in z \n',bad_subjects(s), folder{bad_subjects(s)});
     end
 end
 disp(' ')
@@ -82,10 +83,85 @@ figure; subplot(1,5,1:4);
 imagesc(record); colormap('gray')
 xlabel('subjects','Fontsize',14)    
 ylabel('slices','Fontsize',14)    
-title('bad slices per subject','Fontsize',14)    
-subplot(1,5,5); imagesc(squeeze(mask(round(V.dim(1)/2), round(V.dim(2)/2), :))==0)    
+title('bad slices (z) per subject','Fontsize',14)    
+subplot(1,5,5); tmp = (sum(squeeze(sum(mask,1)),1))';
+imagesc(tmp == 0)   
 title('Current mask','Fontsize',14)    
 saveas(gcf, 'mask_drop_outz.eps','psc2'); 
+
+
+%% slice by slice find differences (in y direction)
+record = zeros(V.dim(2),N);
+for v = 1:V.dim(2)
+    current_data = squeeze(final(:,v,:));
+    number_subjects(v) = max(current_data(:));
+    if number_subjects(v) ~=N % which subject is not participating
+        for subject = 1:N
+            if isempty(find(squeeze(data(:,v,:,subject))))
+                record(v,subject) = 1;
+            end
+        end
+    end
+end
+
+% check compared to the group if some subject stand out
+% record = nb of slices present per subject
+bad_subjects = detect_outliers(sum(record)'); % tells if a subject has doesn't contribute to the mask
+if isempty(bad_subjects)
+    disp('all subjects show similar slice overalp in y direction')
+else
+    for s=1:length(bad_subjects)
+        fprintf('compared to the group, subject %g \n %s \n is noticeably badly normalized in y \n',bad_subjects(s), folder{bad_subjects(s)});
+    end
+end
+disp(' ')
+
+figure; subplot(1,5,1:4);
+imagesc(record); colormap('gray')
+xlabel('subjects','Fontsize',14)    
+ylabel('slices','Fontsize',14)    
+title('bad slices (y) per subject','Fontsize',14)    
+subplot(1,5,5); tmp = sum(squeeze(sum(mask,1)),2);
+imagesc(tmp == 0)   
+title('Current mask','Fontsize',14)    
+saveas(gcf, 'mask_drop_outy.eps','psc2'); 
+
+%% slice by slice find differences (in x direction)
+record = zeros(V.dim(1),N);
+for v = 1:V.dim(1)
+    current_data = squeeze(final(v,:,:));
+    number_subjects(v) = max(current_data(:));
+    if number_subjects(v) ~=N % which subject is not participating
+        for subject = 1:N
+            if isempty(find(squeeze(data(v,:,:,subject))))
+                record(v,subject) = 1;
+            end
+        end
+    end
+end
+
+% check compared to the group if some subject stand out
+% record = nb of slices present per subject
+bad_subjects = detect_outliers(sum(record)'); % tells if a subject has doesn't contribute to the mask
+if isempty(bad_subjects)
+    disp('all subjects show similar slice overalp in x direction')
+else
+    for s=1:length(bad_subjects)
+        fprintf('compared to the group, subject %g \n %s \n is noticeably badly normalized in x \n',bad_subjects(s), folder{bad_subjects(s)});
+    end
+end
+disp(' ')
+
+figure; subplot(1,5,1:4);
+imagesc(record); colormap('gray')
+xlabel('subjects','Fontsize',14)    
+ylabel('slices','Fontsize',14)    
+title('bad slices (x) per subject','Fontsize',14)    
+subplot(1,5,5); tmp = sum(squeeze(sum(mask,2)),2);
+imagesc(tmp == 0)    
+title('Current mask','Fontsize',14)    
+saveas(gcf, 'mask_drop_outx.eps','psc2'); 
+
 
 %% volume by volume find differences in total overalp
 
@@ -97,7 +173,7 @@ end
 
 bad_subjects = detect_outliers(C);
 for s=1:length(bad_subjects)
-    fprintf('compared to the group, subject %g \n %s \n has too good overlap (likely biasing the mask) \n',bad_subjects(s), folder{bad_subjects(s)});
+        fprintf('compared to the group, subject %g \n %s \n has a very good overlap, maybe biasing the mask \n',bad_subjects(s), folder{bad_subjects(s)});
 end
 disp(' '); disp('Percentages of overlap = '); disp(num2str(C')); disp(' ')
 disp('find dropout done')
