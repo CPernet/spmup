@@ -51,7 +51,7 @@ DS.help    = {'Despike time series by applying a median smoother'};
 spmup_jobs          = cfg_exbranch;
 spmup_jobs.tag      = 'spmup_cfg';
 spmup_jobs.name     = 'SPM Utility Plus toolbox';
-spmup_jobs.values      = {AP DS};
+spmup_jobs.val      = {AO DS};
 spmup_jobs.help     = {'Sets of utilities to get the most of your mass-univariate analyses'};
 % spmup_jobs.prog     = @spmup_run;
 
