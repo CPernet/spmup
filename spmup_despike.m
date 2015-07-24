@@ -15,6 +15,8 @@ function spmup_despike(varargin)
 %       flags defines options to be used
 %             'flags.auto_mask','off' or 'on' if M is not provided, auto_mask is
 %             'on' but if set to 'off' the user is prompted to select a mask
+%             'flags.method' is 'median' or 'lowess' - in both cases the
+%             span is function of the autocorrelation
 %
 % OUTPUT spmup_despike_log is saved onto disk where the data are
 %        spmup_despike_log can be reviewed using spmup_review_despike_log
@@ -48,6 +50,14 @@ function spmup_despike(varargin)
 % --------------------------------------------------------------------------
 % Copyright (c) SPM U+ toolbox
 
+if exist('nansum','file') ~= 2
+    error('you do not have stats toolbox to perform this operation, sorry')
+end
+
+if exist('smooth','file') ~= 2
+    error('you need the curve fiiting toolbox to perform this operation, sorry')
+end
+
 %% check inputs
 
 % defaults
@@ -77,13 +87,13 @@ elseif nargin == 3
     end
     
     if isfield(varargin{3},'method')
-        if strcmp(varargin(3).method,'median') || strcmp(varargin(3).method,'curve')
+        if strcmp(varargin(3).method,'median') || strcmp(varargin(3).method,'lowess')
             flags.method = varargin(3).method;
         else
-            error('flags.method must be ''median'' or ''curve''');
+            error('flags.method must be ''median'' or ''lowess''');
         end
         
-        if strcmp(varargin(3).method,'curve')
+        if strcmp(varargin(3).method,'lowess')
             error('oops curve fitting is not implemented yet')
          end
     end
@@ -93,7 +103,7 @@ end
 %% get data and mask 
 % memory mapped data
 if get_data == 1;
-    [P,sts] = spm_select(Inf,'image','select the time seires',[],pwd,'.*',1);
+    [P,sts] = spm_select(Inf,'image','select the time series',[],pwd,'.*',1);
 else
     P = varargin{1};
 end
@@ -213,15 +223,11 @@ if sum(outlying_volumes) ~=0
                         end
                         newdata(N) = data(N);
                         
-                    % N/30 points curve fitting (1st order)
+                    % N/30 points curve fitting 
                     % ------------------------------------
-                    elseif strcmp(flags.method,'curve')
-                        
-                        % f(t) = a+b*t+c*t^2+cumsum(d*sin((2*pi*t)/T)+e*cos((2*pi*t)/T))
-                        % T duration of the time series
-                        % a,b,c,d,e are minimized for v(t)-f(t)
-                        % TO DO - use fminsearch on that function
-                        
+                    elseif strcmp(flags.method,'lowess')
+
+                        newdata = smooth(data,window,'rloess');
                     end
                     
                     
@@ -282,7 +288,7 @@ end
 %% write the data
 for v=1:size(Y,4)
     disp('writing data')
-    V(v).descrip = 'spmu+ despiked';
+    V(v).descrip = 'spmup despiked';
     [pathstr,name,ext]= fileparts(V(v).fname);
     V(v).fname = [pathstr filesep 'despiked_' name ext];
     spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
