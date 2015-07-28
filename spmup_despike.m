@@ -1,6 +1,6 @@
 function despiked = spmup_despike(varargin)
 % 
-% SPM U+ routine to 'despike' fMRI time-series in a similar way as AFNI does
+% SPM UP routine to 'despike' fMRI time-series in a similar way as AFNI does
 % Note is requires the statistics toolbox (nansum, icdf are called)
 %
 % FORMAT spmup_despike
