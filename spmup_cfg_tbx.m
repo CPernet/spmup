@@ -29,6 +29,17 @@ select_mask.num     = [1 1];
 select_mask.filter  = 'image';
 select_mask.ufilter = '.*';
 
+% ------------------------
+% generic mat selection
+% -----------------------
+select_mat          = cfg_files;
+select_mat.tag     = 'select_mat';
+select_mat.name    = 'MAT file';
+select_mat.help    = {'Select SPM.mat'};
+select_mat.num     = [1 1];
+select_mat.filter  = 'mat';
+select_mat.ufilter = '^SPM\.mat$';
+
 % ---------------------------------------------------------------------
 % auto orient menu - select image to get M from
 % ---------------------------------------------------------------------
@@ -42,10 +53,11 @@ reorient_matrix.num     = [1  1];
 % ---------------------------------------------------------------------
 % despiking menu
 % ---------------------------------------------------------------------
-despike_options         = cfg_branch;
-despike_options.tag     = 'despike_options';
-despike_options.name    = 'Options';
-despike_options.val     = {select_mask};
+despike_option         = cfg_branch;
+despike_option.tag     = 'despike_options';
+despike_option.name    = 'Options';
+despike_option.help    = {'Choose a brain mask in which voxels will be despiked'};
+despike_option.val     = {select_mask};
 
 % ---------------------------------------------------------------------
 % 1st level QA
@@ -54,6 +66,18 @@ despike_options.val     = {select_mask};
 % ---------------------------------------------------------------------
 % hrf boost
 % ---------------------------------------------------------------------
+boost_temporal_val         = cfg_entry;
+boost_temporal_val.tag     = 'boost_temporal_val';
+boost_temporal_val.name    = 'Temporal Range';
+boost_temporal_val.strtype = 'r';
+boost_temporal_val.num     = [1  1];
+boost_temporal_val.def     = @(val)boost_default_shift; 
+
+boost_option         = cfg_branch;
+boost_option.tag     = 'boost_option';
+boost_option.name    = 'Temporal range';
+boost_option.help    = {'enter the default range of time dispersion allowed (default = 2 sec)'};
+boost_option.val     = {boost_temporal_val};
 
 % ---------------------------------------------------------------------
 % percentage signal change
@@ -75,18 +99,25 @@ orient_br.help    = {'Orient images using a simple affine registration to the te
 orient_br.prog    = @spmup_reorient;
 orient_br.vout    = @orient_out;
 
-
-
 despike_br         = cfg_exbranch;
 despike_br.tag     = 'despiking';
 despike_br.name    = 'Despking';
-despike_br.val     = {select_images despike_options};
+despike_br.val     = {select_images despike_option};
 despike_br.help    = {'Despike time series by applying a median smoother or a locally'
     'weighted smoother (lowess). Time series can be noisy with spikes'
     'and temporal smoothing can lead to better estimates'};
 despike_br.prog = @spmup_despike;
 despike_br.vout = @despike_out;
 
+boost_br         = cfg_exbranch;
+boost_br.tag     = 'boost';
+boost_br.name    = 'Hrf boost';
+boost_br.val     = {select_mat boost_option}; 
+boost_br.help    = {'Hrf boost combined the beta parameters of the hrf with 1st and'
+    'or the 2nd derivatives to create a boosted version which reflects the ''true'' '
+    'height from the full model - for details see Pernet (2014) Front. Neurosci 8, 1 '
+    '<doi: 10.3389/fnins.2014.00001> '};
+boost_br.prog = @spmup_boost;
 
 
 % ---------------------------------------------------------------------
@@ -95,7 +126,7 @@ despike_br.vout = @despike_out;
 spmup          = cfg_choice;
 spmup.tag      = 'spmup_cfg';
 spmup.name     = 'SPM Utility Plus toolbox';
-spmup.values   = {orient_br despike_br};
+spmup.values   = {orient_br despike_br boost_br};
 spmup.help     = {'Sets of utilities to get the most of your mass-univariate analyses'};
 
 end
@@ -116,8 +147,15 @@ function new_files = spmup_despike(job)
 new_files = spmup_despike(job.select_images, job.select_mask, job.despike_options);
 end
 
-function dep = despike_out
+function dep = despike_out(job)
 dep            = cfg_dep;
 dep.sname      = sprintf('Despiked images');
 end
 
+function spmup_boost(job)
+spmup_hrf_boost(job.select_mat, job.boost_option);
+end
+
+function val = boost_default_shift
+val = 2; % seconds around the hrf model peak
+end

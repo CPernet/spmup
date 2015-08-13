@@ -13,15 +13,19 @@ function spmup_hrf_boost(varargin)
 %       shift is time shift allowed around the hrf peak - default is 2.5
 %
 % OUTPUT created in /hrf_boost
-%        beta_XXXX.hrd and .img corresponding to the boosted hrf
-%        con_XXXX.hrd and .img that combined hrf regressors
+%        beta_XXXX corresponding to the boosted hrf
+%        con_XXXX combined boosted hrf regressors
 %
 % Cyril Pernet April 2014
-% --------------------------
-% Copyright (c) SPMU+ toolbox
+% Updated August 2015 to handle .nii + batch input
+% -----------------------------------------------
+% Copyright (C) spmup team 2015
+
+defaults = spm_get_defaults;
+img_ext = defaults.images.format;
 
 current = pwd;
-shift = 2.5;
+shift = 2;
 if nargin == 0
     [t,sts] = spm_select(1,'mat','Select 1st level SPM file');
     if sts == 0
@@ -34,9 +38,14 @@ elseif nargin == 2
     shift = varargin{2};
 end
 
+if iscell(t); t = cell2mat(t); end
+if iscell(shift); shift = cell2mat(t); end
+if isstruct(shift); shift = getfield(shift,cell2mat(fieldnames(shift))); end
+
 % check the design 
 % ------------------
 load(t);
+
 if strcmp(SPM.xBF.name,'hrf (with time and dispersion derivatives)')
     type = 3;
 elseif strcmp(SPM.xBF.name,'hrf (with time derivative)')  
@@ -93,56 +102,56 @@ for s=1:size(SPM.Sess,2) % for each session
             % name
             if index < 10
                 name = sprintf('boost_beta_000%g',index);
-                im(1,:) = [pwd filesep sprintf('beta_000%g.img',index)];
-                im(2,:) = [pwd filesep sprintf('beta_000%g.img',index+1)];
+                im(1,:) = [pwd filesep sprintf('beta_000%g.%s',index,img_ext)];
+                im(2,:) = [pwd filesep sprintf('beta_000%g.%s',index+1,img_ext)];
                 if type == 3
-                    im(3,:) = [pwd filesep sprintf('beta_000%g.img',index+2)];
+                    im(3,:) = [pwd filesep sprintf('beta_000%g.%s',index+2,img_ext)];
                 end
             elseif (index>=10) && (index<100)
-                name = sprintf('boost_beta_00%g',index);
-                im(1,:) = [pwd filesep sprintf('beta_00%g.img',index)];
-                im(2,:) = [pwd filesep sprintf('beta_00%g.img',index+1)];
+                name = sprintf('boost_beta_00%g',index,img_ext);
+                im(1,:) = [pwd filesep sprintf('beta_00%g.%s',index,img_ext)];
+                im(2,:) = [pwd filesep sprintf('beta_00%g.%s',index+1,img_ext)];
                 if type == 3
-                    im(3,:) = [pwd filesep sprintf('beta_00%g.img',index+2)];
+                    im(3,:) = [pwd filesep sprintf('beta_00%g.%s',index+2,img_ext)];
                 end
             elseif (index>=100) && (index<1000)
-                name = sprintf('boost_beta_0%g',index);
-                im(1,:) = [pwd filesep sprintf('beta_0%g.img',index)];
-                im(2,:) = [pwd filesep sprintf('beta_0%g.img',index+1)];
+                name = sprintf('boost_beta_0%g',index,img_ext);
+                im(1,:) = [pwd filesep sprintf('beta_0%g.%s',index,img_ext)];
+                im(2,:) = [pwd filesep sprintf('beta_0%g.%s',index+1,img_ext)];
                 if type == 3
-                    im(3,:) = [pwd filesep sprintf('beta_0%g.img',index+2)];
+                    im(3,:) = [pwd filesep sprintf('beta_0%g.%s',index+2,img_ext)];
                 end
             elseif (index>=1000) && (index<10000)
-                name = sprintf('boost_beta_%g',index);
-                im(1,:) = [pwd filesep sprintf('beta_%g.img',index)];
-                im(2,:) = [pwd filesep sprintf('beta_%g.img',index+1)];
+                name = sprintf('boost_beta_%g',index,img_ext);
+                im(1,:) = [pwd filesep sprintf('beta_%g.%s',index,img_ext)];
+                im(2,:) = [pwd filesep sprintf('beta_%g.%s',index+1,img_ext)];
                 if type == 3
-                    im(3,:) = [pwd filesep sprintf('beta_%g.img',index+2)];
+                    im(3,:) = [pwd filesep sprintf('beta_%g.%s',index+2,img_ext)];
                 end
             end
             
             % dirty update for these special cases
             if index == 9 
-                im(1,:) = [pwd filesep sprintf('beta_000%g.img',index)];
-                im(2,:) = [pwd filesep sprintf('beta_00%g.img',index+1)];
+                im(1,:) = [pwd filesep sprintf('beta_000%g.%s',index,img_ext)];
+                im(2,:) = [pwd filesep sprintf('beta_00%g.%s',index+1,img_ext)];
                 if type == 3
-                    im(3,:) = [pwd filesep sprintf('beta_00%g.img',index+2)];
+                    im(3,:) = [pwd filesep sprintf('beta_00%g.%s',index+2,img_ext)];
                 end
             end
  
             if index == 99 
-                im(1,:) = [pwd filesep sprintf('beta_00%g.img',index)];
-                im(2,:) = [pwd filesep sprintf('beta_0%g.img',index+1)];
+                im(1,:) = [pwd filesep sprintf('beta_00%g.%s',index,img_ext)];
+                im(2,:) = [pwd filesep sprintf('beta_0%g.%s',index+1,img_ext)];
                 if type == 3
-                    im(3,:) = [pwd filesep sprintf('beta_0%g.img',index+2)];
+                    im(3,:) = [pwd filesep sprintf('beta_0%g.%s',index+2,img_ext)];
                 end
             end
             
             if index == 999
-                im(1,:) = [pwd filesep sprintf('beta_0%g.img',index)];
-                im(2,:) = [pwd filesep sprintf('beta_%g.img',index+1)];
+                im(1,:) = [pwd filesep sprintf('beta_0%g.%s',index,img_ext)];
+                im(2,:) = [pwd filesep sprintf('beta_%g.%s',index+1,img_ext)];
                 if type == 3
-                    im(3,:) = [pwd filesep sprintf('beta_%g.img',index+2)];
+                    im(3,:) = [pwd filesep sprintf('beta_%g.%s',index+2,img_ext)];
                 end
             end
             
@@ -159,7 +168,7 @@ for s=1:size(SPM.Sess,2) % for each session
             images = spm_read_vols(V);
             T2P = NaN(V(1).dim); % time to peak image
             voxels = find(~isnan(squeeze(images(:,:,:,1))));
-            f = waitbar(0,'Estimating time to peak voxel-wise','name','HRF BOOST');
+            f = waitbar(0,'Estimating time to peak voxel-wise','name',['HRF BOOST ' num2str(index)]);
             for v=1:length(voxels)
                 waitbar(v/length(voxels));
                 [x,y,z] = ind2sub(size(squeeze(images(:,:,:,1))),voxels(v));
@@ -258,9 +267,11 @@ if isfield(SPM,'xCon')
             % load boosted parameters
             for i=1:length(columns)
                 if columns(i) < 10
-                    im(i,:) = [pwd filesep sprintf('boost_beta_000%g.img',columns(i))];
-                else
-                    im(i,:) = [pwd filesep sprintf('boost_beta_00%g.img',columns(i))];
+                    im(i,:) = [pwd filesep sprintf('boost_beta_000%g.%s',columns(i),img_ext)];
+                elseif columns(i) < 10
+                    im(i,:) = [pwd filesep sprintf('boost_beta_00%g.%s',columns(i),img_ext)];
+                elseif columns(i) < 100
+                    im(i,:) = [pwd filesep sprintf('boost_beta_0%g.%s',columns(i),img_ext)];
                 end
             end
             V = spm_vol(im);
