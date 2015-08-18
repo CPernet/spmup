@@ -99,6 +99,7 @@ for s=1:size(SPM.Sess,2) % for each session
     for n = 1:length(SPM.Sess(s).U) % for each condition
         for c = 1:length(SPM.Sess(s).U(n).name) % for each regressor in this condition
             
+            clear im
             % name
             if index < 10
                 name = sprintf('boost_beta_000%g',index);
@@ -108,21 +109,21 @@ for s=1:size(SPM.Sess,2) % for each session
                     im(3,:) = [pwd filesep sprintf('beta_000%g.%s',index+2,img_ext)];
                 end
             elseif (index>=10) && (index<100)
-                name = sprintf('boost_beta_00%g',index,img_ext);
+                name = sprintf('boost_beta_00%g',index);
                 im(1,:) = [pwd filesep sprintf('beta_00%g.%s',index,img_ext)];
                 im(2,:) = [pwd filesep sprintf('beta_00%g.%s',index+1,img_ext)];
                 if type == 3
                     im(3,:) = [pwd filesep sprintf('beta_00%g.%s',index+2,img_ext)];
                 end
             elseif (index>=100) && (index<1000)
-                name = sprintf('boost_beta_0%g',index,img_ext);
+                name = sprintf('boost_beta_0%g',index);
                 im(1,:) = [pwd filesep sprintf('beta_0%g.%s',index,img_ext)];
                 im(2,:) = [pwd filesep sprintf('beta_0%g.%s',index+1,img_ext)];
                 if type == 3
                     im(3,:) = [pwd filesep sprintf('beta_0%g.%s',index+2,img_ext)];
                 end
-            elseif (index>=1000) && (index<10000)
-                name = sprintf('boost_beta_%g',index,img_ext);
+            elseif index>=1000
+                name = sprintf('boost_beta_%g',index);
                 im(1,:) = [pwd filesep sprintf('beta_%g.%s',index,img_ext)];
                 im(2,:) = [pwd filesep sprintf('beta_%g.%s',index+1,img_ext)];
                 if type == 3
@@ -168,20 +169,20 @@ for s=1:size(SPM.Sess,2) % for each session
             images = spm_read_vols(V);
             T2P = NaN(V(1).dim); % time to peak image
             voxels = find(~isnan(squeeze(images(:,:,:,1))));
+            [x,y,z] = ind2sub(size(squeeze(images(:,:,:,1))),voxels);
             f = waitbar(0,'Estimating time to peak voxel-wise','name',['HRF BOOST ' num2str(index)]);
             for v=1:length(voxels)
                 waitbar(v/length(voxels));
-                [x,y,z] = ind2sub(size(squeeze(images(:,:,:,1))),voxels(v));
                 
                 if type == 2
-                    Model = SPM.xBF.bf * [images(x,y,z,1) images(x,y,z,2)]';
+                    Model = SPM.xBF.bf * [images(x(v),y(v),z(v),1) images(x(v),y(v),z(v),2)]';
                 elseif type == 3
-                    Model = SPM.xBF.bf * [images(x,y,z,1) images(x,y,z,2) images(x,y,z,3)]';
+                    Model = SPM.xBF.bf * [images(x(v),y(v),z(v),1) images(x(v),y(v),z(v),2) images(x(v),y(v),z(v),3)]';
                 end
                 
-                if images(x,y,z,1) > 0
+                if images(x(v),y(v),z(v),1) > 0 % if positive beta take the max
                     T2P(voxels(v)) = BFtime(find(Model==max(Model)));
-                else
+                else % take the min
                     T2P(voxels(v)) = BFtime(find(Model==min(Model)));
                 end
             end
@@ -192,7 +193,7 @@ for s=1:size(SPM.Sess,2) % for each session
             newV.descrip = sprintf('time to peak image of %s',V(1).descrip);
             out = spm_write_vol(newV,T2P);
             Mask = logical((T2P>=PeakDelays(1)).*(T2P<=PeakDelays(2)));
-%            Mask = ~isnan(squeeze(images(:,:,:,1)));
+%             Mask = ~isnan(squeeze(images(:,:,:,1)));
 %             figure; for z=1:V(1).dim(3)
 %                 imagesc(squeeze(Mask(:,:,z))); pause(0.2);
 %             end
@@ -266,12 +267,14 @@ if isfield(SPM,'xCon')
         if length(test) == length(columns) % constrast involving combination of hrf only
             % load boosted parameters
             for i=1:length(columns)
-                if columns(i) < 10
+                if columns(i) < 10 
                     im(i,:) = [pwd filesep sprintf('boost_beta_000%g.%s',columns(i),img_ext)];
-                elseif columns(i) < 10
+                elseif (columns(i) >= 10) && (columns(i) < 100)
                     im(i,:) = [pwd filesep sprintf('boost_beta_00%g.%s',columns(i),img_ext)];
-                elseif columns(i) < 100
+                elseif (columns(i) >= 100) && (columns(i) < 1000)
                     im(i,:) = [pwd filesep sprintf('boost_beta_0%g.%s',columns(i),img_ext)];
+                elseif columns(i) >= 1000
+                    im(i,:) = [pwd filesep sprintf('boost_beta_%g.%s',columns(i),img_ext)];
                 end
             end
             V = spm_vol(im);
