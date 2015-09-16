@@ -133,6 +133,7 @@ for s=1:size(SPM.Sess,2) % for each session
             
             % dirty update for these special cases
             if index == 9 
+                name = sprintf('boost_beta_000%g',index);
                 im(1,:) = [pwd filesep sprintf('beta_000%g.%s',index,img_ext)];
                 im(2,:) = [pwd filesep sprintf('beta_00%g.%s',index+1,img_ext)];
                 if type == 3
@@ -141,6 +142,7 @@ for s=1:size(SPM.Sess,2) % for each session
             end
  
             if index == 99 
+                name = sprintf('boost_beta_00%g',index);
                 im(1,:) = [pwd filesep sprintf('beta_00%g.%s',index,img_ext)];
                 im(2,:) = [pwd filesep sprintf('beta_0%g.%s',index+1,img_ext)];
                 if type == 3
@@ -149,6 +151,7 @@ for s=1:size(SPM.Sess,2) % for each session
             end
             
             if index == 999
+                name = sprintf('boost_beta_0%g',index);
                 im(1,:) = [pwd filesep sprintf('beta_0%g.%s',index,img_ext)];
                 im(2,:) = [pwd filesep sprintf('beta_%g.%s',index+1,img_ext)];
                 if type == 3
