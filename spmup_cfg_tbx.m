@@ -8,7 +8,18 @@ function spmup = spmup_cfg_tbx
 if ~isdeployed, addpath(fullfile(spm('dir'),'toolbox','spmup')); end
 
 % ------------------------
-% generic image selection
+% generic T1 image selection
+% -----------------------
+select_T1         = cfg_files;
+select_T1.tag     = 'select_T1';
+select_T1.name    = 'T1 file';
+select_T1.help    = {'Select T1 to process'};
+select_T1.num     = [1 0];
+select_T1.filter  = 'image';
+select_T1.ufilter = '.*';
+
+% ------------------------
+% generic images selection
 % -----------------------
 select_images         = cfg_files;
 select_images.tag     = 'select_images';
@@ -63,6 +74,53 @@ despike_option.val     = {select_mask};
 % 1st level QA
 % ---------------------------------------------------------------------
 
+realignQA_motion         = cfg_menu;
+realignQA_motion.tag     = 'realign_QA_motion';
+realignQA_motion.name    = 'Check motion outliers';
+realignQA_motion.labels = {'On'
+                           'Off'}';
+realignQA_motion.values = {1 0};
+realignQA_motion.def    = @(val)realignQA_motion_default;
+
+realignQA_globals        = cfg_menu;
+realignQA_globals.tag    = 'realign_QA_globals';
+realignQA_globals.name   = 'Check globals outliers';
+realignQA_globals.labels = {'On'
+                            'Off'}';
+realignQA_globals.values = {1 0};
+realignQA_globals.def    = @(val)realignQA_motion_default;
+
+realignQA_distance       = cfg_menu;
+realignQA_distance.tag   = 'realign_QA_distance';
+realignQA_distance.name  = 'Compute distance to the mean';
+realignQA_distance.labels = {'On'
+                             'Off'}';
+realignQA_distance.values = {1 0};
+realignQA_distance.def    = @(val)realignQA_motion_default;
+
+realignQA_movie          = cfg_menu;
+realignQA_movie.tag      = 'realign_QA_movie';
+realignQA_movie.name     = 'Create movies a realigned data';
+realignQA_movie.labels = {'On'
+                          'Off'}';
+realignQA_movie.values = {1 0};
+realignQA_movie.def    = @(val)realignQA_movie_default;
+
+% realignQA_AC           = cfg_entry;
+% realignQA_AC.tag       = 'realignQA_AC';
+% realignQA_AC.name      = 'Center coordinate for movie';
+% realignQA_AC.help      = {'The coordinate from which axial, coronal and sagital movies are created'
+%                           'Leaving NaN lead to do it from the centre of the volume'};
+% realignQA_AC.num       = [1 1 1];
+% realignQA_AC.val       = {NaN NaN NAN};
+
+realignQA_option         = cfg_branch;
+realignQA_option.tag     = 'realignQA_option';
+realignQA_option.name    = 'First Level QA Options';
+realignQA_option.help    = {'Select one or more options'};
+realignQA_option.val     = {realignQA_motion realignQA_globals realignQA_distance realignQA_movie};
+
+
 % ---------------------------------------------------------------------
 % hrf boost
 % ---------------------------------------------------------------------
@@ -106,9 +164,18 @@ despike_br.val     = {select_images despike_option};
 despike_br.help    = {'Despike time series by applying a median smoother or a locally'
     'weighted smoother (lowess). Time series can be noisy with spikes'
     'and temporal smoothing can lead to better estimates'};
-despike_br.prog = @spmup_despike;
+despike_br.prog = @spmupdespike;
 despike_br.vout = @despike_out;
 
+RealginQA_br         = cfg_exbranch;
+RealginQA_br.tag     = 'QA1';
+RealginQA_br.name    = 'Realignement QA';
+RealginQA_br.val     = {select_images realignQA_option}; 
+RealginQA_br.help    = {'Check for motion outliers and globals'
+                        'Select realgned images from one session'};
+RealginQA_br.prog    = @spmuprealign_qa;
+RealginQA_br.vout    = @realign_qa_out;
+ 
 boost_br         = cfg_exbranch;
 boost_br.tag     = 'boost';
 boost_br.name    = 'Hrf boost';
@@ -126,7 +193,7 @@ boost_br.prog = @spmup_boost;
 spmup          = cfg_choice;
 spmup.tag      = 'spmup_cfg';
 spmup.name     = 'SPM Utility Plus toolbox';
-spmup.values   = {orient_br despike_br boost_br};
+spmup.values   = {orient_br despike_br RealginQA_br boost_br};
 spmup.help     = {'Sets of utilities to get the most of your mass-univariate analyses'};
 
 end
@@ -143,7 +210,7 @@ dep            = cfg_dep;
 dep.sname      = sprintf('Orientation matrix from image %g',job.reorient_matrix);
 end
 
-function new_files = spmup_despike(job)
+function new_files = spmupdespike(job)
 new_files = spmup_despike(job.select_images, job.select_mask, job.despike_options);
 end
 
@@ -152,10 +219,27 @@ dep            = cfg_dep;
 dep.sname      = sprintf('Despiked images');
 end
 
+function newfiles = spmuprealign_qa(job)
+new_files = spmup_realign_qa(job.select_images, job.realignQA_option);
+end
+
+function dep = realign_qa_out(job)
+dep            = cfg_dep;
+dep.sname      = sprintf('Motion and outliers parameters');
+end
+
 function spmup_boost(job)
 spmup_hrf_boost(job.select_mat, job.boost_option);
 end
 
 function val = boost_default_shift
 val = 2; % seconds around the hrf model peak
+end
+
+function val = realignQA_motion_default
+val = 1; 
+end
+
+function val = realignQA_movie_default
+val = 0; 
 end

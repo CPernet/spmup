@@ -1,4 +1,4 @@
-function spmup_first_level_qa(varargin)
+function new_files = spmup_first_level_qa(varargin)
 
 % routine calling spmup_realign_qa and spmup_normalize_qa
 %
@@ -19,7 +19,7 @@ function spmup_first_level_qa(varargin)
 %                   --> compute the distance of each volume to the mean
 %       flags.movie = 'off' (default) or 'on'
 %       flags.AC = [46 64 37];
-%                   --> generate three movies along the x, y, z planes defined based on the AC point
+%                   --> generate three movies along the x, y, z planes defined based on the [0 0 0] point
 %                   --> if flags.AC is empty, the user is asked to input this coordinate
 %       flags.average = 'on' (default) or 'off'
 %                   --> create the average of normalized images
@@ -30,8 +30,9 @@ function spmup_first_level_qa(varargin)
 %                       normalized) and the normalized images - plot the outlines
 %
 % Cyril Pernet February 2014
+% v2 updated to work with the batch Sept 2015
 % --------------------------------------------------------------------------
-% Copyright (c) SPM U+ toolbox
+% Copyright (C) spmup team 2015
 
 % defaults
 spm('defaults','FMRI')
@@ -86,10 +87,10 @@ for f=1:size(folder,2)
     fprintf('processing data in %s \n',folder{f});
     
     % motion test
-    spmup_realign_qa(Normalized{f},flags)
+    new_files{f} = spmup_realign_qa(Normalized{f},flags);
     
     % normalization test
-    spmup_normalize_qa(flags,Normalized{f},T1)
+    spmup_normalize_qa(flags,Normalized{f},T1);
 end
 cd(current)
 disp('1st level QA done')

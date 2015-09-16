@@ -17,15 +17,17 @@ function spmup_normalize_qa(flags,Normalized,T1)
 %             flags.movie = 'on';
 %             flags.AC = [x,y,z]; 
 %                   --> generate three movies along the x, y, z plabes defined based on the AC point
-%                   --> if flags.AC is empty, the user is asked to input this coordinate
+%                   --> if flags.AC is empty, the [0,0,0] coordinate is
+%                   used (default behaviour from batch mode)
 %       Normalized is a matrix with the full name of files (see spm_select)
 %       T1 is a vector with the full name of the normalized T1 file
 %
 % see also spm_select 
 %
-%  Cyril Pernet January 2013
+% Cyril Pernet January 2013
+% v2 updated September 2015 to run with batch
 % --------------------------------------------------------------------------
-% Copyright (c) SPM U+ toolbox
+% Copyright (C) spmup team 2015
 
 
 spm('Defaults','fmri')
@@ -86,8 +88,13 @@ cd(folder);
 %% make average file
 if strcmp(flags.average, 'on')
      disp('creating average normalized image')
-     Images = spm_read_vols(V);
-     Average = mean(Images,4);
+     try
+         Images = spm_read_vols(V);
+         Average = mean(Images,4);
+     catch
+         % if memory too smnall, run per slice
+         X = spm_slice_vol(V,A,dim,hold);
+     end
      [folder,name,ext] = fileparts(V(1).fname);
      V(1).fname = [folder filesep 'normalized_mean_image' ext];
      spm_write_vol(V(1),Average);

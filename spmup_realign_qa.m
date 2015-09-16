@@ -1,4 +1,4 @@
-function spmup_realign_qa(P,flags)
+function new_files = spmup_realign_qa(P,flags)
 
 % implement different quality control 'tools' for
 % fMRI realigned data using SPM
@@ -23,9 +23,10 @@ function spmup_realign_qa(P,flags)
 %
 % see also spm_select spm_globals
 %
-%  Cyril Pernet January 2013
+% Cyril Pernet January 2013
+% v2 added the new_files to work with the batch
 % --------------------------------------------------------------------------
-% Copyright (c) SPM U+ toolbox
+% Copyright (C) spmup team 2015
 
 %% validate inputs
 spm('Defaults','fmri')
@@ -39,11 +40,30 @@ def_flags.movie = 'on';
 if nargin == 0;
     flags = def_flags;
 end
+
 % update flags fields
-if ~isfield(flags,'motion_parameters'); flags.motion_paramters = 'off'; end
+if ~isfield(flags,'motion_parameters'); flags.motion_parameters = 'off'; end
 if ~isfield(flags,'globals'); flags.globals = 'off'; end
 if ~isfield(flags,'volume_distance'); flags.volume_distance = 'off'; end
 if ~isfield(flags,'movie'); flags.movie = 'off'; end
+
+% similar fields coming from the batch
+if isfield(flags,'realign_QA_motion')
+    if flags.realign_QA_motion == 1; flags.motion_parameters = 'on'; else flags.motion_parameters = 'off'; end
+end
+    
+if isfield(flags,'realign_QA_globals')
+    if flags.realign_QA_globals == 1; flags.globals = 'on'; else flags.globals = 'off'; end
+end
+
+if isfield(flags,'realign_QA_distance')
+    if flags.realign_QA_distance ==1; flags.volume_distance = 'on'; else flags.volume_distance = 'off'; end
+end
+
+if isfield(flags,'realign_QA_movie')
+    if flags.realign_QA_movie ==1; flags.movie = 'on'; end
+end
+
 
 % check P
 if nargin <= 1
@@ -53,14 +73,15 @@ if nargin <= 1
     end
 end
 
+if iscell(P); P = cell2mat(P); end
 [folder,name,ext] = fileparts(P(1,:));
 cd(folder); average = dir('mean*.img');
 
 % if distance we need the mean image
 if strcmp(flags.volume_distance,'on')
     if isempty(average)
-        disp('mean image not found')
-        average = spm_select(1,'image','select mean image');
+        disp('mean image not found - computing one .. ')
+        average = mean(spm_read_vols(spm_vol(P)),4);
     else
         average =  [folder filesep average.name];
     end
@@ -68,21 +89,13 @@ end
 
 % if movie we need AC
 if strcmp(flags.movie,'on')
-    if ~isfield(flags,'AC') && strcmp(flags.volume_distance,'off')
-        % get mean image
-        if isempty(average)
-            disp('mean image not found')
-            average = spm_select(1,'image','select mean image');
-        else
-            average =  [folder filesep average.name];
-        end
+    if ~isfield(flags,'AC') && isempty(average)
+        disp('mean image not found - computing one .. ')
+        average = mean(spm_read_vols(spm_vol(P)),4);
     end
-    % display
-    spm_image('init',average)
-    flags.AC = spm_input('enter a AC voxel coordinates',1);
-    close all
+    flags.AC = [size(average,1)/2, size(average,2)/2, size(average,3)/2];
 end
-    
+
  
 
 %% look at motion parameters
@@ -213,6 +226,9 @@ elseif strcmp(flags.motion_parameters,'off') && strcmp(flags.globals,'on')
     multiple_regressors = [motion_param goutlier_matrix];
 end
 save multiple_regressors.txt multiple_regressors -ascii
+if nargout
+    new_files = [pwd filesep 'multiple_regressors.txt'];
+end
 
 
 %% check distances to the mean and volume to volume
@@ -256,6 +272,11 @@ if strcmp (flags.movie, 'on')
         V = spm_vol(P);
     end
     Images = spm_read_vols(V);
+    if isnan(AC)
+       AC(1) = size(Images,1) / 2;
+       AC(2) = size(Images,2) / 2;
+       AC(3) = size(Images,3) / 2;
+    end
     X = squeeze(Images(flags.AC(1),:,:,:));
     Y = squeeze(Images(:,flags.AC(2),:,:));
     Z = squeeze(Images(:,:,flags.AC(3),:));
