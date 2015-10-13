@@ -1,29 +1,36 @@
-function spmup_hrf_boost(varargin)
+function files_out = spmup_hrf_boost(varargin)
 
-% this function takes a SPM.mat and related files
-% to create boosted beta parameters and con images
-% if the hrf doesn't fit properly the data, some
-% information can be recovered using the 1st and 2nd 
-% derivatives - 
+% this function takes a SPM.mat and related files to create boosted beta 
+% parameters and con images if the hrf doesn't fit properly the data, some
+% information can be recovered using the 1st and 2nd derivatives - most of
+% the time is boosts the hrf value but it can also reduce it if there are
+% strong shape differences - 
 %
-% FORMAT spmup_hrf_boost
-%        spmup_hrf_boost(SPM_location,shift)
+% Ref.  Pernet CR (2014) Misconceptions in the vuse of the General Linear
+% Model applied to functional MRI: a tutorial for junior neuro-imagers.
+% Front. Neurosci. 8:1. doi: 10.3389/fnins.2014.00001 
+%
+% FORMAT files_out = spmup_hrf_boost
+%        files_out = spmup_hrf_boost(SPM_location,shift)
 %
 % INPUT SPM_location is the full name of the SPM.mat
 %       shift is time shift allowed around the hrf peak - default is 2.5
+%             if 0 use, no masking is applied (ie we likely fit noise) 
 %
-% OUTPUT created in /hrf_boost
+% OUTPUT files_out list files created in /hrf_boost
 %        beta_XXXX corresponding to the boosted hrf
 %        con_XXXX combined boosted hrf regressors
 %
 % Cyril Pernet April 2014
 % Updated August 2015 to handle .nii + batch input
-% Updated October 2015 fixing data handling
-% -----------------------------------------------
+% Updated October 2015 fixing data handling + mkae output for batch
+% -----------------------------------------------------------------
 % Copyright (C) spmup team 2015
 
+newbeta  = '';
+newcon   = '';
 defaults = spm_get_defaults;
-img_ext = defaults.images.format;
+img_ext  = defaults.images.format;
 
 current = pwd;
 shift = 2;
@@ -234,7 +241,7 @@ for s=1:size(SPM.Sess,2) % for each session
             
             % Only change values within Mask
             boosted_hrf = squeeze(images(:,:,:,1)); % beta hrf
-            boosted_hrf(Mask) = boosted_values(Mask);
+            boosted_hrf(Mask) = boosted_values(Mask); % only update inside the mask
 %             figure; for z=1:V(1).dim(3)
 %                 imagesc(boosted_hrf(:,:,z)); pause(0.2);
 %             end
@@ -243,8 +250,9 @@ for s=1:size(SPM.Sess,2) % for each session
             newV = spm_create_vol(V(1));
             [path,file,ext] = fileparts(V(1).fname);
             newV.fname = [path filesep 'hrf_boost' filesep name ext];
+            newbeta(i,:) = [path filesep 'hrf_boost' filesep name ext];
             newV.descrip = sprintf('Boosted version of %s',V(1).descrip);
-            out = spm_write_vol(newV,boosted_hrf);
+            spm_write_vol(newV,boosted_hrf);
             fprintf('boost_%s done \n',file);
             
             % update index for the next hrf
@@ -273,6 +281,7 @@ if isfield(SPM,'xCon')
     disp('--------------------------------')
     cd hrf_boost/
     
+    index = 1;
     for c = 1:length(SPM.xCon) % for each contrast
         columns = find(SPM.xCon(c).c); % check columns
         test = intersect(columns,hrf_indices);
@@ -305,12 +314,16 @@ if isfield(SPM,'xCon')
             newV = spm_create_vol(V(1));
             [path,file,ext] = fileparts(SPM.xCon(c).Vcon.fname);
             newV.fname = [pwd filesep 'boost_' file ext];
+            newcon(index,:) = [pwd filesep 'boost_' file ext];
             newV.descrip = sprintf('Boosted version of %s',SPM.xCon(c).Vcon.descrip);
-            out = spm_write_vol(newV,boosted_con);
+            spm_write_vol(newV,boosted_con); index = index + 1;
             fprintf('boost_%s done \n',SPM.xCon(c).Vcon.fname);
         end
     end
 end
+
+files_out{1} = newbeta;
+files_out{2} = newcon;
 
 cd(current)
 disp('------------------')

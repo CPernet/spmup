@@ -225,11 +225,9 @@ new_files = spmup_realign_qa(job.select_images, job.realignQA_option);
 end
 
 function dep = realign_qa_out(job)
-for k=1:numel(job.data)
-    dep            = cfg_dep;
-    dep.sname      = sprintf('Motion and outliers parameters');
-    dep.src_output = substruct('.','sess', '()',{k}, '.','multiple_regressors');
-end
+dep            = cfg_dep;
+dep.sname      = sprintf('Motion and outliers parameters');
+dep.src_output = substruct('.','sess', '()',{k}, '.','multiple_regressors');
 end
 
 function newfiles = spmup_boost_in(job)
@@ -239,7 +237,6 @@ end
 function dep = spmup_boost_out(job)
 dep            = cfg_dep;
 dep.sname      = sprintf('Boosted parameters and contrasts');
-% dep.src_output =
 end
 
 % some defaults values
