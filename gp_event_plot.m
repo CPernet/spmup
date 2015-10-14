@@ -6,7 +6,7 @@ function Y = gp_event_plot(varargin)
 %               --> called via GUI, use the workspace to get varargin
 %
 %        Y = gp_event_plot(Coordinate,GpSPM,flag)
-%               --> manual call allwong to obtain sets of responses
+%               --> manual call allwing to obtain sets of responses
 %
 % INPUT Coordinate a 3*n set of voxel coordinates in MNI space
 %       GpSPM the full (with path) name of the group analysis SPM.mat
@@ -20,7 +20,8 @@ function Y = gp_event_plot(varargin)
 %        in a new window.
 %
 % Cyril Pernet 13 Dec 2013.
-
+% also now plot fitted data if boosted images are used and further
+% plit the results per condition - Oct 2015
 %% check inputs
 
 flag = [];
@@ -42,6 +43,7 @@ if nargin == 0
         tmp = inv(xSPM.Vspm.mat);
         Coordinate = tmp(1:3,:)*[xyz' 1]'; % change to voxel space
     end
+    cd(xSPM.swd);
     
 elseif nargin ==2 || nargin ==3
     xyz = varargin{1};
@@ -76,6 +78,7 @@ GpSPM = SPM; V = spm_vol(GpSPM.xY.P);
 
 %-Get coef and reconstruct the response
 %-----------------------------------------------------------------------
+disp('collecting data for all subjects ... '); clear tmp
 for i=1:size(V,1) % for each subject
     
     % get the SPM.mat of this image
@@ -85,7 +88,7 @@ for i=1:size(V,1) % for each subject
         try
             load SPM
         catch SPM_not_located
-            cd .. % if data in a subdir
+            cd .. % if data in the dir above
             load SPM
         end
     catch SPM_not_located
@@ -102,8 +105,25 @@ for i=1:size(V,1) % for each subject
         % the coef of the input image
         coef{i,c} = spm_get_data(V{i},Coordinate(:,c));
         
-        % from here get the event related response
-        response{i,c} = SPM.xBF.bf(:,1)*coef{i,c};
+        if strncmp(name,'boost',5)
+            % compute the overall fitted response
+            if strcmp(SPM.xBF.name,'hrf (with time derivative)') 
+                tmp(1) = spm_get_data([SPM.swd filesep name(7:end) ext],Coordinate(:,c));
+                add_one = num2str(eval(name(end-3:end)) + 1); newname = [name(7:end-length(add_one)) add_one];
+                tmp(2) = spm_get_data([SPM.swd filesep newname ext],Coordinate(:,c));
+                response{i,c} = SPM.xBF.bf(:,[1 2])*tmp';
+            else % necesarilly time and dispersion
+                tmp(1) = spm_get_data([SPM.swd filesep name(7:end) ext],Coordinate(:,c));
+                add_one = num2str(eval(name(end-3:end)) + 1); newname = [name(7:end-length(add_one)) add_one];
+                tmp(2) = spm_get_data([SPM.swd filesep newname ext],Coordinate(:,c));
+                add_two = num2str(eval(name(end-3:end)) + 2); newname = [name(7:end-length(add_two)) add_two];
+                tmp(3) = spm_get_data([SPM.swd filesep newname ext],Coordinate(:,c));
+                response{i,c} = SPM.xBF.bf(:,[1 2 3])*tmp';
+            end
+        else
+            % from here get the event related response
+            response{i,c} = SPM.xBF.bf(:,1)*coef{i,c};
+        end
     end
 end
 clear Y tmp
@@ -111,15 +131,49 @@ cd(current);
 
 %% outputs
 
+disp('computing mean response and bootstrap 95% CI')
 Y.individual_responses = response;
 Y.individual_parameters = coef;
 Y.coordinate = Coordinate;
 
-for c=1:size(Coordinate,2)
-    for i=1:size(V,1)
-        tmp(:,:,i) = response{i,c};
+% compute the mean response per condition
+load SPM; index = 1;
+for n=1:size(SPM.xX.name)
+    if ~strncmp(SPM.xX.name{n},'subject',7)
+        cname{index} = SPM.xX.name{n};
+        index = index+1;
     end
-    Y.average{c} = mean(tmp,3);
+end
+Ncond = index-1;
+
+clear tmp;
+for c=1:size(Coordinate,2)
+    % get all responses peer subjects
+    for i=1:size(V,1)
+        vv(i,:) = Y.individual_responses{i,c}; 
+    end
+    
+    % get all response per condition and average
+    for s =1:(size(V,1)/Ncond)
+        for i=1:Ncond
+            tmp{i}(:,:,s) = response{(s+i-1),c};
+        end
+    end
+end
+
+% now average across coordinates and subjects
+for n=1:Ncond
+    data = tmp{n}; data = squeeze(mean(data,2)); % average coordinates
+    Y.average.condition{n}.name = cname{n};
+    Y.average.condition{n}.response = mean(data,2); % average subjects
+    
+    % bootstrap avweraging the other way around to keep voxel variance
+    data = tmp{n}; boot_data = NaN(size(data,1), size(data,2), 599);
+    for b=1:599
+        boot_data(:,:,b) = mean(data(:,:,randi(size(data,3),size(data,3),1)),3); % average over subjects
+    end
+    boot_data = sort(squeeze(mean(boot_data,2)),2); % average voxels and sort resamples
+    Y.average.condition{n}.CI = [boot_data(:,15) boot_data(:,584)];
 end
 
 if nargout == 0
@@ -128,6 +182,23 @@ end
 
 %% plot
 if nargout == 0 
+    figure('Name','Gp level evoked response'); hold on;
+    vect = [1:size(Y.average.condition{1}.response)];
+    mycolors = jet; mycolors = mycolors(1:64/Ncond:end,:);
+    for n=1:Ncond
+        plot(Y.average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:));
+        plot(Y.average.condition{n}.CI(:,1),'LineWidth',2,'Color',mycolors(n,:));
+        plot(Y.average.condition{n}.CI(:,2),'LineWidth',2,'Color',mycolors(n,:));
+        fillhandle = patch([vect fliplr(vect)], [Y.average.condition{n}.CI(:,1)' fliplr(Y.average.condition{n}.CI(:,2)')], mycolors(n,:));
+        set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);
+    end
+    grid on; xlabel('PST'); ylabel('Evoked Response');
+    if Ncond == 1
+        title(sprintf('Average response\n at coord [%g %g %g]=%g [%g %g]',xyz(1),xyz(2),xyz(3)),'FontSize',10);
+    else
+        title(sprintf('Average responses across conditions \n at coord [%g %g %g]',xyz(1),xyz(2),xyz(3)),'FontSize',10);
+    end
+
     spm_results_ui('Clear',Fgraph);
     figure(Fgraph);
     subplot(2,2,4);
@@ -135,23 +206,18 @@ if nargout == 0
     sv = sort(mean(v(randi(size(V,1),size(V,1),599))));
     L = mean(v)-sv(15); H = sv(584)-mean(v);
     bar(1,mean(v)); hold on; errorbar(1,mean(v),L,H,'LineWidth',3);
-    axis([0.5 1.5 0 sv(584)+10/100*sv(584)])
+    axis([0.5 1.5 sv(15)-10/100*sv(15) sv(584)+10/100*sv(584)])
     title(sprintf('Average event related value and 95%% CI \n %g [%g %g]',mean(v), sv(15),sv(584)));
 
-    subplot(2,2,3); plot(Y.average{1},'LineWidth',3); 
-    for i=1:size(V,1); vv(i,:) = Y.individual_responses{i,1}; end
-    clear tmp; for b=1:599
-        tmp(:,:,b) = vv(randi(size(V,1),size(V,1),1),:);
+    subplot(2,2,3); hold on
+    for n=1:Ncond
+        plot(Y.average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:));
     end
-    svv = sort(squeeze(mean(tmp,1)),2); clear tmp; tmp = [1:size(svv,1)];
-    hold on; plot(svv(:,15),'--','LineWidth',2); plot(svv(:,584),'--','LineWidth',2);
     grid on; xlabel('PST'); ylabel('Event related resp.');
-    title(['Average response across subjects'],'FontSize',10);
+    if Ncond == 1
+        title(['Average response'],'FontSize',10);
+    else
+        title(['Average responses per conditions'],'FontSize',10);
+    end
     
-    figure('Name','Gp level event related response')
-    plot(Y.average{1},'LineWidth',3); hold on; plot(svv(:,15),'r','LineWidth',2); plot(svv(:,584),'r','LineWidth',2);
-    fillhandle = patch([tmp fliplr(tmp)], [svv(:,15)' fliplr(svv(:,584)')], [1 0 0]);
-    set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);
-    grid on; xlabel('PST'); ylabel('Event related resp.');
-    title(sprintf('Average response across subjects \n at coord [%g %g %g]=%g [%g %g]',xyz(1),xyz(2),xyz(3),mean(v), sv(15),sv(584)),'FontSize',10);
 end
