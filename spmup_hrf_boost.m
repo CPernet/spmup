@@ -23,7 +23,7 @@ function files_out = spmup_hrf_boost(varargin)
 %
 % Cyril Pernet April 2014
 % Updated August 2015 to handle .nii + batch input
-% Updated October 2015 fixing data handling + mkae output for batch
+% Updated October 2015 fixing data handling + make output for batch
 % -----------------------------------------------------------------
 % Copyright (C) spmup team 2015
 
