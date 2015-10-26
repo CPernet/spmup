@@ -242,10 +242,9 @@ for s=1:size(SPM.Sess,2) % for each session
             % Only change values within Mask
             boosted_hrf = squeeze(images(:,:,:,1)); % beta hrf
             boosted_hrf(Mask) = boosted_values(Mask); % only update inside the mask
-
-            % cleanup
-            Mask = spm_read_vols(spm_vol([SPM.swd filesep 'mask.' img_ext]));
-            boosted_hrf = boosted_hrf.*Mask;
+%             figure; for z=1:V(1).dim(3)
+%                 imagesc(boosted_hrf(:,:,z)); pause(0.2);
+%             end
             
             % save file
             newV = spm_create_vol(V(1));
