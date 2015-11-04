@@ -1,5 +1,5 @@
 function despiked = spmup_despike(varargin)
-% 
+%
 % SPM UP routine to 'despike' fMRI time-series in a similar way as AFNI does
 % Note is requires the statistics toolbox (nansum, icdf are called)
 %
@@ -11,21 +11,21 @@ function despiked = spmup_despike(varargin)
 %
 % INPUT if none the user is prompted
 %       P the names of the fMRI images (time-series) or the 4D matrix of data
-%       M the name of the mask or the 3D binary matrix 
+%       M the name of the mask or the 3D binary matrix
 %       flags defines options to be used
 %             - flags.auto_mask,'off' or 'on' if M is not provided, auto_mask is
 %              'on' but if set to 'off' the user is prompted to select a mask
 %             - flags.method is 'median' or any of the option of the 'smooth'
-%                matlab function - in all cases the span is function of the 
+%                matlab function - in all cases the span is function of the
 %                autocorrelation unless window is specified
-%             - flags.window defines the number of consecutive images to use      
-%               to despike the data ; for instance flags.method = 'median'          
-%               and flags.window = 3 means that each data point is 1st              
-%               substituted by a moving 3 points median and the resulting fit       
+%             - flags.window defines the number of consecutive images to use
+%               to despike the data ; for instance flags.method = 'median'
+%               and flags.window = 3 means that each data point is 1st
+%               substituted by a moving 3 points median and the resulting fit
 %               is used to determine outliers (see below)
 %
-% OUTPUT despiked is either the list of despiked images save onto disk or 
-%                 the despiked data, matching the input P 
+% OUTPUT despiked is either the list of despiked images save onto disk or
+%                 the despiked data, matching the input P
 %        spmup_despike_log is saved onto disk where the data are
 %        spmup_despike_log can be reviewed using spmup_review_despike_log
 %        spmup_despike_log is structure with the fields:
@@ -37,23 +37,23 @@ function despiked = spmup_despike(varargin)
 %        - class a 4d binary matrix indicating despiked voxels
 %
 %        the new dataset with the spikes removed is also written in the
-%        data folder with the prefix 'despiked_' if no input or P is a 
-%        series of names given as input                    
+%        data folder with the prefix 'despiked_' if no input or P is a
+%        series of names given as input
 %
 % --------------------------------------------------------------------------
 % First, one look for outlier voxels based on the Median Absolute Deviation
 % Here the MAD is median absolute value of time series minus trend.
 % The trend is optained using son_detrend (2nd order polynomial)
-% Outliers are then those voxels with values outside 
+% Outliers are then those voxels with values outside
 % k = alphav * sqrt(pi/2) * MAD  --- this is the similar to AFNI 3dToutcount
 % <http://afni.nimh.nih.gov/pub/dist/doc/program_help/3dToutcount.html>
 %
 % Second, if some volume outliers are found, data are despiked.
-% Note that the despiking is not based on the results of the above, some 
+% Note that the despiking is not based on the results of the above, some
 % voxels from volume not seen as outliers can still be despiked.
-% The data are 1st smoothed either with a median filter (using the window 
+% The data are 1st smoothed either with a median filter (using the window
 % parameter- see flag options) or using a smooth curve(see flag options)
-% and then we look for outliers in the residuals and the data are 
+% and then we look for outliers in the residuals and the data are
 % interpolated. Although the smooting method is different, the detection of
 % spikes and interpolation follows AFNI 3dDespike
 % <http://afni.nimh.nih.gov/pub/dist/doc/program_help/3dDespike.html>
@@ -91,7 +91,7 @@ elseif nargin == 2;
 elseif nargin == 3
     get_data = 0;
     get_mask = 0;
-
+    
     if isfield(varargin{3},'auto_mask')
         if strcmp(varargin(3).auto_mask,'on') || strcmp(varargin(3).auto_mask,'off')
             flags.auto_mask = varargin(3).auto_mask;
@@ -124,13 +124,13 @@ elseif nargin == 3
     end
 end
 
-disp('running spmup_despike ...')                                                
-disp('-------------------------')    
+disp('running spmup_despike ...')
+disp('-------------------------')
 
-%% get data and mask 
+%% get data and mask
 % memory mapped data
 if get_data == 1;
-    [P,sts] = spm_select(Inf,'image','select the time seires',[],pwd,'.*',1);
+    [P,sts] = spm_select(Inf,'image','select the time series',[],pwd,'.*',1);
     V = spm_vol(P);
     % bypass orientation check
     N = numel(V);
@@ -165,7 +165,7 @@ end
 if get_mask == 1;
     [M,sts] = spm_select(1,'image','select the mask',[],pwd,'.*',1);
     if sts ~=0
-       Mask = spm_read_vols(spm_vol(M));
+        Mask = spm_read_vols(spm_vol(M));
     else
         error('spm u+ stopped - mask selection interupted')
     end
@@ -183,7 +183,7 @@ elseif get_mask == 0 && strcmp(flags.auto_mask,'off')
     end
 else
     disp('generating a mask')
-    Mask = spmup_auto_mask(Y);
+    Mask = spmup_auto_mask(V);
 end
 
 % figure('Name','Mask')
@@ -194,7 +194,7 @@ end
 %     pause
 % end
 
-%% this part is similar to 3dToutcount 
+%% this part is similar to 3dToutcount
 % http://afni.nimh.nih.gov/pub/dist/doc/program_help/3dToutcount.html
 
 disp('looking for outlier volumes')
@@ -206,18 +206,18 @@ alphav = icdf('Normal',1-(0.001/N),0,1);
 for x=1:size(Y,1)
     for y=1:size(Y,2)
         index = find(Mask(x,y,:));
-        if ~isempty(index) 
-        clean_data = spm_detrend(squeeze(Y(x,y,:,:)),2); % detrend
-        M = repmat(nanmedian(clean_data,2),1,N); % medians of the time-series
-        MAD = nanmedian(abs(clean_data-M),2); % Median absolute deviation of the time series
-        k = (alphav * sqrt(pi/2)) .* MAD; % how far is far away
-        up = repmat(nanmean(clean_data,2)+k,1,N);
-        down = repmat(nanmean(clean_data,2)-k,1,N);
-        class(x,y,:,:) = (clean_data > up) + (clean_data < down); % threshold
+        if ~isempty(index)
+            clean_data = spm_detrend(squeeze(Y(x,y,:,:)),2); % detrend
+            M = repmat(nanmedian(clean_data,2),1,N); % medians of the time-series
+            MAD = nanmedian(abs(clean_data-M),2); % Median absolute deviation of the time series
+            k = (alphav * sqrt(pi/2)) .* MAD; % how far is far away
+            up = repmat(nanmean(clean_data,2)+k,1,N);
+            down = repmat(nanmean(clean_data,2)-k,1,N);
+            class(x,y,:,:) = (clean_data > up) + (clean_data < down); % threshold
         end
     end
 end
- 
+
 % compute the proportion of outliers per volume
 Nb_voxels = nansum(Mask(:));
 for im=1:N
@@ -238,36 +238,9 @@ class = NaN(size(Y));
 despiked_voxels = [];
 
 if sum(outlying_volumes) ~=0
-    disp('Mow despiking data ... ');
+    disp('Now despiking data ... ');
     
-    % define window size
-    if isfield(flags,'window')
-        window = flags.window;
-        if window < 3 % need at least 3 points
-            window = 3;
-        end
-    else % window is the distance between 0 lag and next lag showing max autocorrelation
-        W = NaN(size(Y,1),size(Y,2),size(Y,3));
-        try
-            [xc,lag] = xcov(data,floor(numel(data)*0.5)); % use xcov as it removes mean from data
-            [v,df] = findpeaks(xc);
-            [m,loc] = max(v);
-            window = df(loc+1)-df(loc);
-        catch
-            [xc,lag] = xcov(data); % if data very noisy or no signal need to increase search space
-            [v,df] = findpeaks(xc);
-            [m,loc] = max(v);
-            window = df(loc+1)-df(loc);
-        end
-        % figure; plot(lag,xc,'k',lag(df),xc(df),'kv','MarkerFaceColor','r')
-        % grid on; xlabel('Time'); title('Auto-covariance')
-        if window < 3 % need at least 3 points
-            window = 3;
-        end
-        W(x,y,z) = window;
-    end
-    
-    index = 1; 
+    index = 1;
     tot = size(Y,1)*size(Y,2)*size(Y,3);
     f = waitbar(0,'Percentage done','name','Despiking');
     for x=1:size(Y,1)
@@ -275,13 +248,42 @@ if sum(outlying_volumes) ~=0
             for z=1:size(Y,3) % smooth the data voxel wise
                 waitbar((index)/tot); index = index+1;
                 if Mask(x,y,z) ~= 0 || ~isnan(Mask(x,y,z))
+                    
                     data = squeeze(Y(x,y,z,:))';
                     newdata = zeros(size(data));
+                    
+                    % define window size
+                    if isfield(flags,'window')
+                        window = flags.window;
+                        if window < 3 % need at least 3 points
+                            window = 3;
+                        end
+                    else % window is the distance between 0 lag and next lag showing max autocorrelation
+                        W = NaN(size(Y,1),size(Y,2),size(Y,3));
+                        try
+                            [xc,lag] = xcov(data,floor(numel(data)*0.5)); % use xcov as it removes mean from data
+                            [v,df] = findpeaks(xc);
+                            [m,loc] = max(v);
+                            window = df(loc+1)-df(loc);
+                        catch
+                            [xc,lag] = xcov(data); % if data very noisy or no signal need to increase search space
+                            [v,df] = findpeaks(xc);
+                            [m,loc] = max(v);
+                            window = df(loc+1)-df(loc);
+                        end
+                        % figure; plot(lag,xc,'k',lag(df),xc(df),'kv','MarkerFaceColor','r')
+                        % grid on; xlabel('Time'); title('Auto-covariance')
+                        
+                        % need at least 3 points
+                        if isempty(window); window = 3; end
+                        if window < 3; window = 3; end
+                        W(x,y,z) = window;
+                    end
                     
                     % median smoothing
                     % ------------------
                     if strcmp(flags.method,'median')
-                                                
+                        
                         % beginning
                         for p=1:floor(window/2)
                             newdata(p) = nanmedian([repmat(data(1),1,ceil(window/2)-p) data(1:p) data(p+1:p+floor(window/2))]);
@@ -298,10 +300,10 @@ if sum(outlying_volumes) ~=0
                         end
                         newdata(N) = data(N);
                         
-                    % smooth function
-                    % --------------------------
-                    else                       
-                         newdata = smooth(data,window,flags.method);
+                        % smooth function
+                        % --------------------------
+                    else
+                        newdata = smooth(data,window,flags.method);
                     end
                     
                     % MAD of the residuals
@@ -341,7 +343,7 @@ if sum(outlying_volumes) ~=0
         tmp = squeeze(class(:,:,:,im));
         despiked_voxels(im) = (nansum(tmp(:))./Nb_voxels)*100;
     end
-
+    
     figure('Name','Despiking')
     subplot(2,2,[1 2]);
     plot(outlying_voxels,'LineWidth',3); grid on;
@@ -361,7 +363,7 @@ else
     plot(outlying_voxels,'LineWidth',3); grid on;
     xlabel('volumes','Fontsize',12); axis tight
     ylabel('percentage of outlying voxels','Fontsize',12);
-    title('Volume Outlier detection - No despiking performed','Fontsize',14); 
+    title('Volume Outlier detection - No despiking performed','Fontsize',14);
     drawnow; saveas(gcf, 'despiking - volume outlier detection.eps','psc2'); close(gcf)
 end
 
