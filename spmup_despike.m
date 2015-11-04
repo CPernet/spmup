@@ -263,13 +263,21 @@ if sum(outlying_volumes) ~=0
                         try
                             [xc,lag] = xcov(data,floor(numel(data)*0.5)); % use xcov as it removes mean from data
                             [v,df] = findpeaks(xc);
-                            [m,loc] = max(v);
-                            window = df(loc+1)-df(loc);
+                            if length(v)>2
+                                [m,loc] = max(v);
+                                window = df(loc+1)-df(loc);
+                            else
+                                window = 3;
+                            end
                         catch
                             [xc,lag] = xcov(data); % if data very noisy or no signal need to increase search space
                             [v,df] = findpeaks(xc);
-                            [m,loc] = max(v);
+                            if length(v)>2
+                                [m,loc] = max(v);
                             window = df(loc+1)-df(loc);
+                            else
+                                window = 3;
+                            end
                         end
                         % figure; plot(lag,xc,'k',lag(df),xc(df),'kv','MarkerFaceColor','r')
                         % grid on; xlabel('Time'); title('Auto-covariance')
@@ -387,14 +395,16 @@ if ischar(P)
     spmup_despike_log.P = P;
 end
 spmup_despike_log.flags = flags;
-if ~isfield(flags,'window')
-    spmup_despike_log.window = W;
-    V(1).descrip = 'spmu+ window size';
-    [pathstr,name,ext]= fileparts(V(v).fname);
-    V(1).fname = [pathstr filesep 'window' ext];
-    spm_write_vol(V(1),W);
-else
-    spmup_despike_log.window = window;
+try
+    if ~isfield(flags,'window')
+        spmup_despike_log.window = W;
+        V(1).descrip = 'spmu+ window size';
+        [pathstr,name,ext]= fileparts(V(v).fname);
+        V(1).fname = [pathstr filesep 'window' ext];
+        spm_write_vol(V(1),W);
+    else
+        spmup_despike_log.window = window;
+    end
 end
 spmup_despike_log.outlying_voxels = outlying_voxels;
 spmup_despike_log.outlying_volumes = outlying_volumes;
