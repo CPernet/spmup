@@ -59,7 +59,7 @@ reorient_matrix.tag     = 'reorient_matrix';
 reorient_matrix.name    = 'Reorientation Matrix';
 reorient_matrix.help    = {'From which image to you want to reorientation matrix from? (default = 1)'};
 reorient_matrix.strtype = 'r';
-reorient_matrix.num     = [1  1];
+reorient_matrix.num     = [1 1];
 
 % ---------------------------------------------------------------------
 % despiking menu
@@ -128,7 +128,7 @@ boost_temporal_val         = cfg_entry;
 boost_temporal_val.tag     = 'boost_temporal_val';
 boost_temporal_val.name    = 'Temporal Range';
 boost_temporal_val.strtype = 'r';
-boost_temporal_val.num     = [1  1];
+boost_temporal_val.num     = [1 1];
 boost_temporal_val.def     = @(val)boost_default_shift; 
 
 boost_option         = cfg_branch;

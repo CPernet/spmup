@@ -124,6 +124,15 @@ for i=1:size(V,1) % for each subject
             % from here get the event related response
             response{i,c} = SPM.xBF.bf(:,1)*coef{i,c};
         end
+        
+        if c==1
+            times = [0:SPM.xBF.dt:(length(SPM.xBF.bf)-1)*SPM.xBF.dt];
+        else
+            checktime = [0:SPM.xBF.dt:(length(SPM.xBF.bf)-1)*SPM.xBF.dt];
+            if sum(checktime ~= times) ~=0
+                times = [];
+            end
+        end
     end
 end
 clear Y tmp
@@ -182,22 +191,27 @@ end
 
 %% plot
 if nargout == 0 
-    figure('Name','Gp level evoked response'); hold on;
-    vect = [1:size(Y.average.condition{1}.response)];
+    figure('Name','Gp level evoked response','units','normalized','outerposition',[0 0 1 1]);
+    set(gcf,'Color','w','InvertHardCopy','off'); colormap('gray'); hold on;
+    if isempty(times)
+        times = [1:size(Y.average.condition{1}.response)];
+    end
     mycolors = jet; mycolors = mycolors(1:64/Ncond:end,:);
     for n=1:Ncond
-        plot(Y.average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:));
-        plot(Y.average.condition{n}.CI(:,1),'LineWidth',2,'Color',mycolors(n,:));
-        plot(Y.average.condition{n}.CI(:,2),'LineWidth',2,'Color',mycolors(n,:));
-        fillhandle = patch([vect fliplr(vect)], [Y.average.condition{n}.CI(:,1)' fliplr(Y.average.condition{n}.CI(:,2)')], mycolors(n,:));
-        set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);
+        plot(times,Y.average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:));
+        plot(times,Y.average.condition{n}.CI(:,1),'LineWidth',2,'Color',mycolors(n,:));
+        plot(times,Y.average.condition{n}.CI(:,2),'LineWidth',2,'Color',mycolors(n,:));
+        fillhandle(n) = patch([times fliplr(times)], [Y.average.condition{n}.CI(:,1)' fliplr(Y.average.condition{n}.CI(:,2)')], mycolors(n,:));
+        set(fillhandle(n),'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);
     end
-    grid on; xlabel('PST'); ylabel('Evoked Response');
+    grid on; xlabel('PST (sec)','FontSize',14); 
+    ylabel('Evoked Response (A.U.)','FontSize',14);
     if Ncond == 1
-        title(sprintf('Average response\n at coord [%g %g %g]=%g [%g %g]',xyz(1),xyz(2),xyz(3)),'FontSize',10);
+        title(sprintf('Average response\n at coord [%g %g %g]=%g [%g %g]',xyz(1),xyz(2),xyz(3)),'FontSize',16);
     else
-        title(sprintf('Average responses across conditions \n at coord [%g %g %g]',xyz(1),xyz(2),xyz(3)),'FontSize',10);
+        title(sprintf('Average responses per conditions \n at coord [%g %g %g]',xyz(1),xyz(2),xyz(3)),'FontSize',16);
     end
+    legend(fillhandle,cname,'Location','SouthEast'); axis tight
 
     spm_results_ui('Clear',Fgraph);
     figure(Fgraph);
@@ -211,9 +225,9 @@ if nargout == 0
 
     subplot(2,2,3); hold on
     for n=1:Ncond
-        plot(Y.average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:));
+        plot(times,Y.average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:));
     end
-    grid on; xlabel('PST'); ylabel('Event related resp.');
+    grid on; xlabel('PST'); ylabel('Event related resp.'); axis tight
     if Ncond == 1
         title(['Average response'],'FontSize',10);
     else
