@@ -13,11 +13,16 @@ function Y = gp_event_plot(varargin)
 %       flag indicates the coordinate space 'mm' or 'voxel', if not
 %       specified user is prompted
 %
-% OUTPUT Y a cell array of size n containing the group level event related 
-%        response
+% OUTPUT Y a structure with parameters information
+%        Y.individual_responses = the fitted data per subject;
+%        Y.individual_parameters = the coefficient (betas/cons) per subject;
+%        Y.coordinate = the coordinate(s) used
+%        Y.average.condition{n}.name = condition name(s);
+%        Y.average.condition{n}.response = average response over subjects
+%        Y.average.condition{n}.CI = 95% boostrap CI of the average reponse
 %        
-%        If no outpout if specificied (ie GUI), it also plots the response
-%        in a new window.
+%        If no outpout Y is returned in ther workshaoce as gp_event and 
+%        plots response(s) in a new window
 %
 % Cyril Pernet 13 Dec 2013.
 % also now plot fitted data if boosted images are used and further
