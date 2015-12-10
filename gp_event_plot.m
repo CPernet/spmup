@@ -23,7 +23,7 @@ function Y = gp_event_plot(varargin)
 %        Y.individual_responses = the fitted data per subejct;
 %        Y.individual_parameters = the coeffient (betas) per subject;
 %        Y.individual_adjusted_parameters = the coeffient adjusted by the
-%        model (this is what you see in SPM, from where starts come from)
+%                                    model (this is where stats come from)
 %        Y.coordinate = the coordinate(s) used
 %        Y.average.condition{n}.name = condition name(s);
 %        Y.average.condition{n}.response = average response over subjects
@@ -192,11 +192,13 @@ Y.individual_adjusted_parameters = adjusted_coef;
 Y.individual_adjusted_responses = adjusted_response;
 
 % compute the mean response per condition
-index = 1;
+index = 1; repeated_measure = 'no';
 for n=1:size(GpSPM.xX.name)
     if ~strncmp(GpSPM.xX.name{n},'subject',7)
         cname{index} = GpSPM.xX.name{n};
         index = index+1;
+    else
+		repeated_measure = 'yes';
     end
 end
 Ncond = index-1;
@@ -210,12 +212,27 @@ for c=1:size(Coordinate,2)
     end
     
     % get all response per condition and average
-    for s =1:(size(V,1)/Ncond)
+	% for repeated measure designs this goes
+    if strcmp(repeated_measure,'yes')
+        for s =1:(size(V,1)/Ncond)
+            for i=1:Ncond
+                tmp{i}(:,:,s) = response{(s+i-1),c};
+                adjusted_tmp{i}(:,:,s) = adjusted_response{(s+i-1),c};
+            end
+        end
+        
+        % for other designs that do not repeat within subjects we have
+    else
+        S = size(V,1)/Ncond;
+        index1 = 1; index2 = S;
         for i=1:Ncond
-            tmp{i}(:,:,s) = response{(s+i-1),c};
-            adjusted_tmp{i}(:,:,s) = adjusted_response{(s+i-1),c};
+            tmp{i}(:,:,index1:index2) = response{(index1:index2),c};
+            adjusted_tmp{i}(:,:,index1:index2) = adjusted_response{index1:index2,c};
+            index1 = index1+S;
+            index2 = index2+S;
         end
     end
+	
 end
 
 % now average across coordinates and subjects
@@ -317,5 +334,4 @@ if nargout == 0
     else
         title(['Average adjusted responses per conditions'],'FontSize',10);
     end
-    
 end
