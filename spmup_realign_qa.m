@@ -211,26 +211,6 @@ if strcmp(flags.globals,'on')
 
 end
 
-%% update the motion parameter file
-
-if strcmp(flags.motion_parameters,'on') && strcmp(flags.globals,'on')
-    % check a volume is not indexed twice
-    out = [moutlier_matrix goutlier_matrix]; 
-    for j=1:size(out,2); w(j) = find(out(:,j)==1); end
-    [ww,index]=unique(w); out = zeros(n,length(index));
-    for j=1:size(out,2); out(ww(j),index(j)) = 1; end
-    multiple_regressors = [motion_param out];
-elseif strcmp(flags.motion_parameters,'on') && strcmp(flags.globals,'off')
-    multiple_regressors = [motion_param moutlier_matrix];
-elseif strcmp(flags.motion_parameters,'off') && strcmp(flags.globals,'on')
-    multiple_regressors = [motion_param goutlier_matrix];
-end
-save multiple_regressors.txt multiple_regressors -ascii
-if nargout
-    new_files = [pwd filesep 'multiple_regressors.txt'];
-end
-
-
 %% check distances to the mean and volume to volume
 if strcmp(flags.volume_distance, 'on')
     
@@ -253,17 +233,58 @@ if strcmp(flags.volume_distance, 'on')
         end
     end
       
-    figure('Name','Mean square distances betwen volumes');
+     % interquartile range
+    y=sort(distance_between);
+    j=floor(length(distance_between)/4 + 5/12);
+    g=(length(distance_between)/4)-j+(5/12);
+    ql=(1-g).*y(j)+g.*y(j+1); % lower quartile
+    k=length(distance_between)-j+1;
+    qu=(1-g).*y(k)+g.*y(k-1); % higher quartile
+    value=qu-ql; % inter-quartile range
+    
+    % robust outliers
+    M = median(distance_between);
+    k=(17.63*n-1-23.64)/(7.74*n-1-3.71); % Carling's k (use n-1 because 1st image doesn't count)
+    dist_outliers=distance_between<(M-k*value) | distance_between>(M+k*value);
+    
+    figure('Name','Mean square distances between volumes','Visible','Off');
+    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized', 'outerposition',[0 0 1 1]); 
     subplot(2,1,1); plot([1:n],distance_to_mean,'o','LineWidth',3);
+    hold on; plot([1:n],distance_to_mean,'r','LineWidth',3);
     axis tight; grid on; xlabel('scans'); ylabel('square difference');
     title('Mean square distance to the average','FontSize',14);
-    subplot(2,1,2); plot([1:n],[NaN; distance_between],'o','LineWidth',3);
-    hold on;  plot(distance_between,'r','LineWidth',2);
+    subplot(2,1,2); plot([1:n-1],[distance_between],'o','LineWidth',3);
+    hold on;  plot([distance_between],'r','LineWidth',2);
+    plot(dist_outliers.*(max(distance_between)-mean(distance_between))+mean(distance_between),'or','LineWidth',2);
     axis tight; grid on; xlabel('scans'); ylabel('square difference');
     title('Volume to volume mean square distance','FontSize',14);
     saveas(gcf,'distances.fig','fig'); close(gcf)
     
+    if sum(dist_outliers) > 0
+        dist_outliers_matrix = zeros(size(motion_param,1),sum(dist_outliers));
+        dist_outliers = [0;dist_outliers]; indices = find(dist_outliers);
+        for i=1:sum(dist_outliers)
+            dist_outliers_matrix(indices(i),i) = 1;
+        end
+    else
+        dist_outliers_matrix = [];
+    end
+ 
 end
+
+%% update the motion parameter file
+
+out = [moutlier_matrix goutlier_matrix dist_outliers_matrix]; 
+if ~isempty(out)
+    % check a volume is not indexed twice
+    for j=1:size(out,2); w(j) = find(out(:,j)==1); end
+    [~,index]=unique(w); out = out(:,index);
+    multiple_regressors = [motion_param out];
+else
+    multiple_regressors = [motion_param];
+end
+save multiple_regressors.txt multiple_regressors -ascii
+
 
 %% make movies
 if strcmp (flags.movie, 'on')
