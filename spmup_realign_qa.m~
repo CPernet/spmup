@@ -36,7 +36,7 @@ current = pwd;
 def_flags.motion_parameters = 'on';
 def_flags.globals = 'on';
 def_flags.volume_distance = 'on';
-def_flags.movie = 'off';
+def_flags.movie = 'on';
 if nargin == 0;
     flags = def_flags;
 end
@@ -69,16 +69,13 @@ end
 if nargin <= 1
     % if globals, or distance, or movies we need P
     if strcmp(flags.globals,'on') || strcmp(flags.volume_distance,'on') || strcmp(flags.movie,'on')
-        [P,check] = spm_select(Inf,'image','select realigned images');
-        if check == 0
-            return
-        end
+        P = spm_select(Inf,'image','select realigned images');
     end
 end
 
 if iscell(P); P = cell2mat(P); end
 [folder,name,ext] = fileparts(P(1,:));
-cd(folder); average = dir('mean*.nii');
+cd(folder); average = dir('mean*.img');
 
 % if distance we need the mean image
 if strcmp(flags.volume_distance,'on')
@@ -104,10 +101,7 @@ end
 %% look at motion parameters
 if strcmp(flags.motion_parameters,'on')
     
-    motion_file = dir('rp*.txt'); % SPM
-    if isempty(motion_file)
-        motion_file = dir('*_mcf.par'); % FSL
-    end
+    motion_file = dir('rp*.txt');
     motion_param = load(motion_file.name);
     [n,p]=size(motion_param);
     
@@ -152,8 +146,7 @@ if strcmp(flags.motion_parameters,'on')
     end
     
     % figure
-    figure('Name','Motion outlier detection','Visible','On');
-    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized', 'outerposition',[0 0 1 1]); 
+    figure('Name','Motion outlier detection');
     subplot(3,2,1); plot(temp_motion(:,1:3),'LineWidth',3);
     axis tight; grid on; title('Translation','Fontsize',14)
     xlabel('scans'); ylabel('mm');
@@ -170,9 +163,7 @@ if strcmp(flags.motion_parameters,'on')
     plot(m_outliers.*max(delta),'or','LineWidth',3);
     axis tight; grid on; title('Mean square displacement','FontSize',14);
     xlabel('scans'); ylabel('displacement');
-    try
-        saveas(gcf, 'motion outlier detection.fig','fig'); close(gcf)
-    end
+    saveas(gcf, 'motion outlier detection.fig','fig'); close(gcf)
 
 end
 
@@ -213,16 +204,12 @@ if strcmp(flags.globals,'on')
     end
     
     % figure
-    figure('Name','Globals outlier detectio','Visible','On');
-    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized', 'outerposition',[0 0 1 1]); 
+    figure('Name','Globals outlier detection');
     plot(glo,'LineWidth',3); hold on; plot(g_outliers.*(max(glo)-mean(glo))+mean(glo),'or','LineWidth',2);
     grid on; axis tight; title('Global intensity','FontSize',14); xlabel('scans'); ylabel('mean intensity')
-    try
-        saveas(gcf, 'globals outlier detection.fig','fig'); close(gcf)
-    end
+    saveas(gcf, 'globals outlier detection.fig','fig'); close(gcf)
 
 end
-
 
 %% check distances to the mean and volume to volume
 if strcmp(flags.volume_distance, 'on')
@@ -245,7 +232,7 @@ if strcmp(flags.volume_distance, 'on')
             distance_between(i) = sum(dist(~isnan(dist)))/numel(~isnan(dist));
         end
     end
-    
+      
      % interquartile range
     y=sort(distance_between);
     j=floor(length(distance_between)/4 + 5/12);
@@ -260,7 +247,7 @@ if strcmp(flags.volume_distance, 'on')
     k=(17.63*n-1-23.64)/(7.74*n-1-3.71); % Carling's k (use n-1 because 1st image doesn't count)
     dist_outliers=distance_between<(M-k*value) | distance_between>(M+k*value);
     
-    figure('Name','Mean square distances between volumes','Visible','On');
+    figure('Name','Mean square distances between volumes','Visible','Off');
     set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized', 'outerposition',[0 0 1 1]); 
     subplot(2,1,1); plot([1:n],distance_to_mean,'o','LineWidth',3);
     hold on; plot([1:n],distance_to_mean,'r','LineWidth',3);
@@ -271,9 +258,7 @@ if strcmp(flags.volume_distance, 'on')
     plot(dist_outliers.*(max(distance_between)-mean(distance_between))+mean(distance_between),'or','LineWidth',2);
     axis tight; grid on; xlabel('scans'); ylabel('square difference');
     title('Volume to volume mean square distance','FontSize',14);
-    try
-        saveas(gcf,'distances.fig','fig'); close(gcf)
-    end
+    saveas(gcf,'distances.fig','fig'); close(gcf)
     
     if sum(dist_outliers) > 0
         dist_outliers_matrix = zeros(size(motion_param,1),sum(dist_outliers));
@@ -284,7 +269,7 @@ if strcmp(flags.volume_distance, 'on')
     else
         dist_outliers_matrix = [];
     end
-    
+ 
 end
 
 %% update the motion parameter file
@@ -303,9 +288,6 @@ save multiple_regressors.txt multiple_regressors -ascii
 if nargout
     new_file = [pwd filesep 'multiple_regressors.txt'];
 end
-
-
-
 
 %% make movies
 if strcmp (flags.movie, 'on')
@@ -358,4 +340,3 @@ end
 
 cd(current)
 disp('realign QA done');
-
