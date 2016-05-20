@@ -1,4 +1,4 @@
-function M = spmup_auto_mask(V,threshold,fig)
+function M = spmup_auto_mask(varargin)
 
 % routine to compute a mask from V, a time-series of memory mapped images
 % this gives a similar (but more inclusive) mask than SPM. Data are
@@ -13,8 +13,8 @@ function M = spmup_auto_mask(V,threshold,fig)
 %
 % OUTPUT M the mask image
 %
-% Cyril Pernet v2 parallelized smoothing
-% --------------------------------------
+% Cyril Pernet v1 17-Feb-2014
+% ----------------------------
 % Copyright (c) SPMU+ toolbox
 
 threshold = 0.2;
@@ -26,14 +26,21 @@ elseif nargin == 3
     fig = varagin{3};
 end
 
+
+% get the data
+if isstruct(varargin{1})    
+    Y = spm_read_vols(V);
+else
+    Y = varargin{1};
+end
+
 % compute the mean of normalized smoothed data
 % by filling small holes we are more inclusive
-Ys = NaN(size(V,1),V(1).dim(1),V(1).dim(2),V(1).dim(3));
-parfor im=1:size(V,1)
-    Ys(im,:,:,:) = smooth3(squeeze(spm_read_vols(V(im)))); 
+for im=1:size(Y,4)
+    Ys(im,:,:,:) = smooth3(squeeze(Y(:,:,:,im))); 
 end
-Ys = (Ys-nanmin(Ys(:)));
-Ys = Ys ./ nanmax(Ys(:)); 
+Ys = (Ys-min(Ys(:)));
+Ys = Ys ./ max(Ys(:)); 
 Avg = squeeze(mean(Ys,1));
 
 % mask is any non 0 difference between successive scan for average values
@@ -54,4 +61,5 @@ if strcmp(fig,'on')
         axis square; pause
     end
 end
+
 
