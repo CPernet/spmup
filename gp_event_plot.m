@@ -275,9 +275,11 @@ Y.individual_parameters = coef;
 Y.individual_responses = response;
 Y.individual_adjusted_parameters = adjusted_coef;
 Y.individual_adjusted_responses = adjusted_response;
+
 if exist('estimated_time_to_peak','var')
     Y.individual_estimated_time_to_peak = estimated_time_to_peak;
 end
+
 if exist('beta_coef','var')
     Y.individual_beta_coef = beta_coef;
 end
@@ -331,7 +333,34 @@ for n=1:Ncond
         end
         Y.average.condition{n}.CI = [boot_data(:,15) boot_data(:,584)];
     end
+
+    % Bayesian Bootstrap
+% sample with replcament from Dirichlet
+% sampling = number of observations, e.g. participants
+% n=size(Y,2);
+% bb = zeros(size(Y,1),Nb);
+% parfor boot=1:Nb % bootstrap loop
+%     theta = exprnd(1,[n,1]);
+%     weigths = theta ./ repmat(sum(theta,1),n,1);
+%     resample = (datasample(Y',n,'Replace',true,'Weights',weigths))';
+%     bb(:,boot) = mean(resample,2);
+% end
+% 
+% sorted_data = sort(bb,2); % sort bootstrap estimates
+% upper_centile = floor(prob_coverage*size(sorted_data,2)); % upper bound
+% nCIs = size(sorted_data,2) - upper_centile;
+% HDI = zeros(2,size(Y,1));
     
+% ci = 1:nCIs;
+% ciWidth = sorted_data(:,ci+upper_centile) - sorted_data(:,ci); % all centile distances
+% [~,J] = min(ciWidth,[],2);
+% r = size(sorted_data,1);
+% I = (1:r)';
+% index = I+r.*(J-1); % linear index
+% HDI(1,:) = sorted_data(index);
+% index = I+r.*(J+upper_centile-1); % linear index
+% HDI(2,:) = sorted_data(index);
+   
     tmp = cell2mat(Y.individual_adjusted_parameters(index:index+N-1)');
     data = cell2mat(Y.individual_adjusted_responses(index:index+N-1)');
     if numel(size(data)) == 3
