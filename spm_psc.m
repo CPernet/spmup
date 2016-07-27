@@ -45,12 +45,11 @@ for subject = 1:size(SPMs,1)
     cd(path); load(file)
     
     %% 1 get the max of ideal trial in the super sampled design matrix
-    
+    xBF.order = SPM.xBF.order;
     if isempty(SF)
         xBF.dt = SPM.xBF.dt;
         xBF.name = SPM.xBF.name;
         xBF.length = SPM.xBF.length;
-        xBF.order = SPM.xBF.order;
         xBF = spm_get_bf(xBF);
         if strcmp(SPM.xBF.name,'hrf (with time derivative)') 
             event = xBF.bf*[1 1]';
@@ -63,7 +62,7 @@ for subject = 1:size(SPMs,1)
     end
     
     %% 2 if derivative(s) present - compute the boosted hrf
-    if ~isdir('hrf_boost')
+    if xBF.order>1 && ~isdir('hrf_boost')
         spmup_hrf_boost([SPM.swd filesep 'SPM.mat'])
     end
     
@@ -80,9 +79,10 @@ for subject = 1:size(SPMs,1)
             columns = SPM.Sess.Fc(c).i; % which columns for this condition
             hrf_param = [1:3:length(columns)]; % in case we have parametric regressors
             for h=1:length(hrf_param)
-                regressors = columns(hrf_param(h) + [0 1 2]);
-                combined_regressor = X(:,regressors)*[1 1 1]'; % using all functions this is the hrf model
-                for l=1:3 % load beta files
+                regressors = columns(hrf_param(h) + (0:(xBF.order-1)));
+                combined_regressor = X(:,regressors)*ones(xBF.order,1); % using all functions this is the hrf model
+
+                for l=1:xBF.order % load beta files
                     if regressors(l)<10
                         name = ['beta_000' num2str(regressors(l)) '.img,1'];
                     else
@@ -91,9 +91,14 @@ for subject = 1:size(SPMs,1)
                     beta{l} = spm_read_vols(spm_vol([pwd filesep name]));
                 end
                 % now combine beta values - scaled by the new regressor
-                H  = sqrt(((beta{1}.*beta{1}).*sum(X(:,regressors(1)).^2))+...
-                    ((beta{2}.*beta{2}).*sum(X(:,regressors(2)).^2))+...
-                    ((beta{3}.*beta{3}).*sum(X(:,regressors(3)).^2)));
+%                 H  = sqrt(((beta{1}.*beta{1}).*sum(X(:,regressors(1)).^2))+...
+%                     ((beta{2}.*beta{2}).*sum(X(:,regressors(2)).^2))+...
+%                     ((beta{3}.*beta{3}).*sum(X(:,regressors(3)).^2)));
+                H = 0;
+                for l=1:xBF.order
+                    H = H + ((beta{l}.*beta{1}).*sum(X(:,regressors(l)).^2));
+                end
+                H = sqrt(H);
                 % keep the sign of beta hrf
                 beta_sign = beta{1} ./ abs(beta{1});
                 
