@@ -83,17 +83,10 @@ for subject = 1:size(SPMs,1)
                 combined_regressor = X(:,regressors)*ones(xBF.order,1); % using all functions this is the hrf model
 
                 for l=1:xBF.order % load beta files
-                    if regressors(l)<10
-                        name = ['beta_000' num2str(regressors(l)) '.img,1'];
-                    else
-                        name = ['beta_00' num2str(regressors(l)) '.img,1'];
-                    end
+                    name = [SPM.Vbeta(regressors(l)).fname ',1'];
                     beta{l} = spm_read_vols(spm_vol([pwd filesep name]));
                 end
                 % now combine beta values - scaled by the new regressor
-%                 H  = sqrt(((beta{1}.*beta{1}).*sum(X(:,regressors(1)).^2))+...
-%                     ((beta{2}.*beta{2}).*sum(X(:,regressors(2)).^2))+...
-%                     ((beta{3}.*beta{3}).*sum(X(:,regressors(3)).^2)));
                 H = 0;
                 for l=1:xBF.order
                     H = H + ((beta{l}.*beta{1}).*sum(X(:,regressors(l)).^2));
@@ -101,23 +94,16 @@ for subject = 1:size(SPMs,1)
                 H = sqrt(H);
                 % keep the sign of beta hrf
                 beta_sign = beta{1} ./ abs(beta{1});
-                
+
                 % finally get the PSC
                 last_column = size(SPM.xX.X,2);
-                if last_column<10
-                    name = ['beta_000' num2str(last_column) '.img,1'];
-                else
-                    name = ['beta_00' num2str(last_column) '.img,1'];
-                end
+                name = [SPM.Vbeta(last_column).fname ',1'];
+                [~,~,ext] = fileparts(SPM.Vbeta(last_column).fname); % nii or img
                 V = spm_vol([pwd filesep name]);
                 constant = spm_read_vols(V);
                 PSC = beta_sign .* (H.*SF./constant.*100);
                 % write as a matrix and as an image using column number
-                if regressors(1)< 10
-                    V.fname = [pwd filesep 'PSC' filesep 'PSC_000' num2str(regressors(1)) '.img'];
-                else
-                    V.fname = [pwd filesep 'PSC' filesep 'PSC_00'  num2str(regressors(1)) '.img'];
-                end
+                V.fname = fullfile(pwd,'PSC',[sprintf('PSC_%04d',regressors(1)) ext]);
                 V.descrip = 'Percentage signal change image';
                 V.private.descrip = 'Percentage signal change image';
                 spm_write_vol(V,PSC);
