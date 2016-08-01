@@ -89,7 +89,7 @@ for subject = 1:size(SPMs,1)
                 % now combine beta values - scaled by the new regressor
                 H = 0;
                 for l=1:xBF.order
-                    H = H + ((beta{l}.*beta{1}).*sum(X(:,regressors(l)).^2));
+                    H = H + ((beta{l}.*beta{l}).*sum(X(:,regressors(l)).^2));
                 end
                 H = sqrt(H);
                 % keep the sign of beta hrf
