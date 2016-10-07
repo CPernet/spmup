@@ -9,11 +9,11 @@ function out = spmup_ACPC(varargin)
 %        spmup_ACPC(P1,P2)
 %
 % INPUT empty - will ask to select images 
-%       P a sing;e image name or an array (see spm_select)
+%       P a single image name or an array (see spm_select)
 %         if P is an array, it will iterate through images
 %       P1, P2 expect P1 a single image (source) and P2 an array
-%         with 2 imputs, it computes how to align P1 to the template
-%         and applies the trandform to all images in P2 (P1 can be e.g.
+%         with 2 inputs, it computes how to align P1 to the template
+%         and applies the transform to all images in P2 (P1 can be e.g.
 %         the mean image coming out of realign)
 %
 % OUTPUT out is simple text telling you if the script work or not

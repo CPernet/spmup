@@ -1,13 +1,30 @@
-function spmup_resize
+function spmup_resize(P,bb,vs)
 
-% routine that resize an image to match the desired template
-% taken from
+% routine that resize an image to match the desired bounding box and voxel
+% size
+%
+% FORMAT: spmup_resize(P,bb,vs)
+% IMPUT:  P is a cell string with images to resize (see spm_select)
+%         bb is the bounding box (default is [-78 -112 -70; 78 76 86])
+%         cs is the voxelo size (default is [2 2 2])
+%
+% Cyril Pernet - The university of Edinburgh
+% -----------------------------------------------------------------------
+% Copyright (C) spmup team 2016
 
-% get bonding box and voxel size
-bb = [-78 -112 -70; 78 76 86];
-vs = [2 2 2];
+if nargin ==0
+    help spmup_resize
+    return
+end
 
-vols = spm_vol(img_to_resize);
+% defaults
+if nargin == 1
+    bb = [-78 -112 -70; 78 76 86];
+    vs = [2 2 2];
+end
+
+% resize
+vols = spm_vol(P);
 for v=1:size(vols,1)
     V = vols(v);
     bbmn = bb(1,:);
