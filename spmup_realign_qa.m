@@ -315,9 +315,9 @@ if strcmp (flags.movie, 'on')
     end
     Images = spm_read_vols(V);
     if isnan(AC)
-       AC(1) = size(Images,1) / 2;
-       AC(2) = size(Images,2) / 2;
-       AC(3) = size(Images,3) / 2;
+       AC(1) = round(size(Images,1) / 2);
+       AC(2) = round(size(Images,2) / 2);
+       AC(3) = round(size(Images,3) / 2);
     end
     X = squeeze(Images(flags.AC(1),:,:,:));
     Y = squeeze(Images(:,flags.AC(2),:,:));
