@@ -282,14 +282,21 @@ if strcmp(flags.method,'median')
     
 else  % smooth function
     disp('using matlab smoother ... this iterate per voxel and takes lots of time')
-    
-    index = find(Mask);
+       
+    if isempty(Mask)
+        index = find(squeeze(Y(:,:,:,end)));
+    else
+        index = find(Mask);
+    end
     YY = cell(1,length(index));
+    ZZ = cell(1,length(index));
+    
     try
         parpool('local',feature('numCores')-1); % use all available core -1
     catch
         matlabpool('local',feature('numCores')-1); % use all available core -1
     end
+    
     parfor i=1:length(index)
         [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(i));
         data = squeeze(Y(x,y,z,:))';
@@ -298,8 +305,13 @@ else  % smooth function
         % define window size
         window = R(x,y,z); % need at least 3 points
         if window < 3; window = 3; end
-        newdata = smooth(data,window,flags.method);
-        
+        if strcmp(flags.method,'moving')
+            newdata = smooth(data,window)';
+        else
+            newdata = smooth(data,window,flags.method)';
+        end
+        ZZ{i} = newdata;
+            
         % MAD of the residuals
         res = data-newdata;
         MAD = nanmedian(abs(res - repmat(nanmedian(res),1,N)));
@@ -321,12 +333,19 @@ else  % smooth function
             
             % reverse s2 to the real data
             YY{i} = (s2*SIGMA)+newdata;
+        else
+            YY{i} = data;
         end
     end
-    clear Y
+    
+    try
+        parpool close 
+    catch
+        matlabpool close
+    end
 end
 
-%% quick QA
+%% quick QA and reformating
 if strcmp(flags.method,'median')
     Despiked_QA = sum((YY == Y),4);
 else
@@ -337,6 +356,8 @@ else
         if ~isnan(Despiked_QA(x,y,z))
             Y(x,y,z,:) = YY{i};
         end
+        despiked(x,y,z,:) = YY{i};
+        filtered(x,y,z,:) = ZZ{i};
     end
 end
 
@@ -369,8 +390,6 @@ if ischar(P)
            spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
        end
    end
-else
-    despiked = YY;
 end
 
 %% write the report

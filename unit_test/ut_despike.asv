@@ -92,41 +92,5 @@ title('average difference spmup - medfilt1 among different time courses')
 hold on; grid on; axis tight; ylabel('difference in filter (unit % data range)')
 
 %% do additional testing for other smoother - just to check the function works
- flags.method = 'moving';
+ flags.method = [];
  [despiked2,filtered2]  = spmup_despike(Data,[],flags);
-
-%  figure
-% subplot(2,2,1);
-% plot(squeeze(Data(1,1,1,:)),'*','LineWidth',2);
-% hold on; grid on; axis tight
-% plot(squeeze(despiked2(1,1,1,:)),'r','LineWidth',2);
-% title('1 time course with spmup desipked version');
-% subplot(2,2,2);
-% plot(squeeze(Data(1,1,1,:)),'*','LineWidth',2);
-% hold on; grid on; axis tight
-% plot(squeeze(FilteredData(1,1,1,:)),'k','LineWidth',3);
-% plot(squeeze(filtered2(1,1,1,:)),'--r','LineWidth',2);
-% title('Data with filtered versions (medfilt1 / spmup)');
-% 
-% index = 1;
-% for x=1:5
-%     for y=1:5
-%         for z=1:5
-%             despikedM(index,:) = squeeze(despiked2(x,y,y,:)); 
-%             filteredM(index,:) =  squeeze(filtered2(x,y,y,:)); 
-%             index = index+1;
-%         end
-%     end
-% end
-% 
-% subplot(2,2,3);
-% plot(mean(DataM,1),'*','LineWidth',2);
-% hold on; grid on; axis tight
-% plot(mean(despikedM,1),'r','LineWidth',2);
-% title('mean time course with spmup desipked version');
-% subplot(2,2,4);
-% plot(mean(DataM,1),'*','LineWidth',2);
-% hold on; grid on; axis tight
-% plot(nanmean(FilteredM,1),'k','LineWidth',3);
-% plot(nanmean(filteredM,1),'--r','LineWidth',2);
-% title('Data with filtered versions (medfilt1 / spmup)');

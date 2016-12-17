@@ -83,7 +83,7 @@ if isfield(options.preprocess,'despiking')
             [~,file,ext]=fileparts(BIDS.subjects(s).func(run).filename);
             pth = [options.outdir filesep BIDS.subjects(s).name filesep 'run' num2str(run) filesep file];
             in = [pth filesep file];
-            cd(pth); spmup_despike(in,[],flags); 
+            cd(pth); spmup_despike(in,[],flags);
             delete(in); cd(BIDS_dir);
         end
     end
