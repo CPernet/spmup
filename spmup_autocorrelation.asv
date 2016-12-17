@@ -69,17 +69,14 @@ R = R(1:p,:)'; % [R(end-p+2:end,:) ; R(1:p,:)]'; for a full window
 
 %% now the slow part
 autocorrelation_window = NaN(n,1);
-parfor v=1:n
-    if sum(R(v,:)) == 0
-        autocorrelation_window(v) = 0;
-    else
-        [~,locs]=findpeaks(R(v,:));
-        [~,maxloc]=max(R(v,:));
-        [~,closestpeak]=min(locs-maxloc);
-        closestpeak = locs(closestpeak);
-        [~,minloc]=min(R(v,maxloc:closestpeak));
-        autocorrelation_window(v) = minloc-maxloc;
-    end
+par
+for v=1:n
+    [~,locs]=findpeaks(R(v,:));
+    [~,maxloc]=max(R(v,:));
+    [~,closestpeak]=min(locs-maxloc);
+    closestpeak = locs(closestpeak);
+    [~,minloc]=min(R(v,maxloc:closestpeak));
+    autocorrelation_window(v) = minloc-maxloc;
 end
 
 %% reformat as input

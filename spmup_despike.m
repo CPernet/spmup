@@ -1,4 +1,4 @@
-function despiked = spmup_despike(varargin)
+function [despiked,filtered] = spmup_despike(varargin)
 %
 % SPM UP routine to 'despike' fMRI time-series in a similar way as AFNI does
 % Note is requires the statistics toolbox (nansum, icdf are called)
@@ -46,6 +46,11 @@ function despiked = spmup_despike(varargin)
 % spikes and interpolation follows AFNI 3dDespike
 % <http://afni.nimh.nih.gov/pub/dist/doc/program_help/3dDespike.html>
 % Finaly, data are written with the prefix despiked_  and a log file
+%
+% The prefered method is 'median' and window = []; this implies that the
+% window size if based on the autocorrelation rather than fixed and the
+% computation in fast because performed per window size - by contrast
+% smoother option rely on estimates per voxel and this is much slower
 % --------------------------------------------------------------------------
 %
 % Cyril Pernet Decembre 2016
@@ -186,116 +191,202 @@ end
 % although the smooting method is different, the detection of spike and interpolation
 % follows 3dDespike http://afni.nimh.nih.gov/pub/dist/doc/program_help/3dDespike.html
 
-despiked_voxels = [];
 if ~isfield(flags,'window') || isempty(flags.window)
     R = spmup_autocorrelation(V,Mask);
+else
+    R = ones(size(Y,1),size(Y,2),size(Y,3)).*flags.window;
 end
 
 disp('smoothing data')
-index = find(Mask);
-YY = cell(1,length(index));
-parfor i=1:length(index)
-    [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(1));
-    data = squeeze(Y(x,y,z,:))';
-    newdata = zeros(size(data));
-    
-    % define window size
-    window = R(x,y,z); % need at least 3 points
-    if window < 3; window = 3; end
-    
-    % median smoothing
-    % ------------------
-    if strcmp(flags.method,'median')
+if strcmp(flags.method,'median')
+    % doesn't matter how fast is the autocorr coef - min is 3 TR to smooth
+    index = unique(R(:)); index(index<=2) = 3;
+    index(isnan(index))=[]; index = unique(index);
+    if nargout == 2; filtered = NaN(size(Y)); end
+    YY = NaN(size(Y));
+    for i=1:length(index)
+        if index(i) == 3
+            [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],find(R<=index(i)));
+        else
+            [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],find(R==index(i)));
+        end
+        
+        if ischar(P)
+            data = spm_get_data(V,[x y z]');
+            data = data'; newdata = zeros(size(data));
+        else
+            data = NaN(length(x),N);
+            for coord = 1:length(x)
+                data(coord,:) = squeeze(Y(x(coord),y(coord),z(coord),:));
+            end
+            newdata = zeros(size(data));
+        end
         
         % beginning
-        for p=1:floor(window/2)
-            newdata(p) = nanmedian([repmat(data(1),1,ceil(window/2)-p) data(1:p) data(p+1:p+floor(window/2))]);
+        for p=1:floor(index(i)/2)
+            % newdata(:,p) = nanmedian([repmat(data(:,1),1,ceil(index(i)/2)-p) data(:,1:p) data(:,p+1:p+floor(index(i)/2))],2);
+            A = nanmedian([repmat(data(:,1),1,ceil(index(i)/2)-p) data(:,1:p) data(:,p+1:p+floor(index(i)/2))],2);
+            B = nanmedian([repmat(data(:,1),1,ceil(index(i)/2)-p) data(:,1:p) data(:,p+1:p+floor(index(i)/2))],2);
         end
         % middle
-        for p=(floor(window/2)+1):(N-floor(window/2))
-            newdata(p) = nanmedian(data((p-floor(window/2)):(p+floor(window/2))));
+        for p=(floor(index(i)/2)+1):(N-floor(index(i)/2))
+            newdata(:,p) = nanmedian(data(:,(p-floor(index(i)/2)):(p+floor(index(i)/2))),2);
         end
         % end
         last = 1;
-        for p=(N-floor(window/2)+1):(N-1) % don't do last data point
-            newdata(p) = nanmedian([data(p-ceil(window/2):p-1) repmat(data(p),1,floor(window/2)-last)]);
+        for p=(N-floor(index(i)/2)+1):(N-1) % don't do last data point
+            newdata(:,p) = nanmedian([data(:,p-ceil(index(i)/2):p-1) repmat(data(:,p),1,floor(index(i)/2)-last)],2);
             last = last+1;
         end
-        newdata(N) = data(N);
+        newdata(:,N) = data(:,N);
         
-        % smooth function
-        % --------------------------
-    else
-        newdata = smooth(data,window,flags.method);
-    end
-    
-    % MAD of the residuals
-    res = data-newdata;
-    MAD = nanmedian(abs(res - repmat(nanmedian(res),1,N)));
-    SIGMA = sqrt(pi/2)*MAD;
-    s = res/SIGMA;
-    
-    %  * Values with s > c1 are replaced with a value that yields
-    %     a modified s' = c1+(c2-c1)*tanh((s-c1)/(c2-c1)).
-    %  * c1 is the threshold value of s for a 'spike' [default c1=2.5].
-    %  * c2 is the upper range of the allowed deviation from the curve:
-    %     s=[c1..infinity) is mapped to s'=[c1..c2)   [default c2=4].
-    
-    if SIGMA ~=0 % i.e. not res / 0
+        % MAD of the residuals
+        res = data-newdata;
+        MAD = nanmedian(abs(res - repmat(nanmedian(res,2),1,N)),2);
+        SIGMA = sqrt(pi/2).*MAD;
+        s = res./repmat(SIGMA,1,N);
+        
+        %  * Values with s > c1 are replaced with a value that yields
+        %     a modified s' = c1+(c2-c1)*tanh((s-c1)/(c2-c1)).
+        %  * c1 is the threshold value of s for a 'spike' [default c1=2.5].
+        %  * c2 is the upper range of the allowed deviation from the curve:
+        %     s=[c1..infinity) is mapped to s'=[c1..c2)   [default c2=4].
+        
         out = find(s > 2.5);
         c1 = 2.5; c2=4; s2 = s;
         for p=1:length(out)
             s2(out(p)) = c1+(c2-c1)*tanh((s(out(p))-c1)/(c2-c1));
         end
-        
         % reverse s2 to the real data
-        YY{i} = (s2*SIGMA)+newdata;
+        s2 = (s2.*repmat(SIGMA,1,N))+newdata;
+        % we can use indices here and remove that coord loop ?
+        for coord = 1:size(x,1)
+            if nargout == 2
+                filtered(x(coord),y(coord),z(coord),:) = newdata(coord,:); 
+            end
+            
+            YY(x(coord),y(coord),z(coord),:) = s2(coord,:);
+            % when SIGMA = 0 we have NaN -> back to original
+            if isnan(s2(coord,1))
+                YY(x(coord),y(coord),z(coord),:) = Y(x(coord),y(coord),z(coord),:);
+            end
+        end
     end
-end
-
-Despiked_QA = NaN(size(Y,1),size(Y,2),size(Y,3));
-for i=1:index
-    [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(1));
-    Despiked_QA(x,y,z) = sum(YY{i} ~= squeeze(Y(x,y,z,:))')/size(Y,4).*100;
-    if ~isnan(Despiked_QA(x,y,z))
-        Y(x,y,z,:) = YY{i};
-    end
-end
-clear YY
-
     
+    % quick cleanup
+    if ~isempty(Mask)
+        for v=1:size(Y,4)
+        Y(:,:,:,v) = Y(:,:,:,v).*Mask;
+        end
+    end
+    
+else  % smooth function
+    disp('using matlab smoother ... this iterate per voxel and takes lots of time')
+    
+    index = find(Mask);
+    YY = cell(1,length(index));
+    try
+        parpool('local',feature('numCores')-1); % use all available core -1
+    catch
+        matlabpool('local',feature('numCores')-1); % use all available core -1
+    end
+    parfor i=1:length(index)
+        [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(i));
+        data = squeeze(Y(x,y,z,:))';
+        newdata = zeros(size(data));
+        
+        % define window size
+        window = R(x,y,z); % need at least 3 points
+        if window < 3; window = 3; end
+        newdata = smooth(data,window,flags.method);
+        
+        % MAD of the residuals
+        res = data-newdata;
+        MAD = nanmedian(abs(res - repmat(nanmedian(res),1,N)));
+        SIGMA = sqrt(pi/2)*MAD;
+        s = res/SIGMA;
+        
+        %  * Values with s > c1 are replaced with a value that yields
+        %     a modified s' = c1+(c2-c1)*tanh((s-c1)/(c2-c1)).
+        %  * c1 is the threshold value of s for a 'spike' [default c1=2.5].
+        %  * c2 is the upper range of the allowed deviation from the curve:
+        %     s=[c1..infinity) is mapped to s'=[c1..c2)   [default c2=4].
+        
+        if SIGMA ~=0 % i.e. not res / 0
+            out = find(s > 2.5);
+            c1 = 2.5; c2=4; s2 = s;
+            for p=1:length(out)
+                s2(out(p)) = c1+(c2-c1)*tanh((s(out(p))-c1)/(c2-c1));
+            end
+            
+            % reverse s2 to the real data
+            YY{i} = (s2*SIGMA)+newdata;
+        end
+    end
+    clear Y
+end
+
+%% quick QA
+if strcmp(flags.method,'median')
+    Despiked_QA = sum((YY == Y),4);
+else
+    Despiked_QA = NaN(size(Y,1),size(Y,2),size(Y,3));
+    for i=1:length(index)
+        [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(i));
+        Despiked_QA(x,y,z) = sum(YY{i} ~= squeeze(Y(x,y,z,:))')/size(Y,4).*100;
+        if ~isnan(Despiked_QA(x,y,z))
+            Y(x,y,z,:) = YY{i};
+        end
+    end
+end
+
+% figure('Name','QA')
+% colormap('hot')
+% for z=1:size(Despiked_QA,3)
+%     imagesc(flipud(Despiked_QA(:,:,z)'));
+%     axis square; title(['Slice ' num2str(z)])
+%     pause
+% end
+
+
 %% write and return the data
 if ischar(P)
-    for v=1:size(Y,4)
-        disp('writing data')
-        V(v).descrip = 'spmup despiked';
-        [pathstr,name,ext]= fileparts(V(v).fname);
-        V(v).fname = [pathstr filesep 'despiked_' name ext];
-        despiked{v} = V(v).fname;
-        spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
-    end
-    
-    if size(P,1) == 1
-        [pth,file,ext]=fileparts(P);
-        V4 = spm_file_merge(V,[pth filesep 'despiked_' file ext]);
-    end
+   disp('writing data')
+   if size(P,1) ~= 1
+       [pathstr,name,ext]= fileparts(V(1).fname);
+       fname = [pathstr filesep 'despiked_' name ext];
+       for v=1:size(Y,4)
+           V(v).descrip = 'spmup despiked';
+           V(v).fname=fname;
+           spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
+       end
+   else
+       for v=1:size(Y,4)
+           V(v).descrip = 'spmup despiked';
+           [pathstr,name,ext]= fileparts(V(v).fname);
+           V(v).fname = [pathstr filesep 'despiked_' name ext];
+           despiked{v} = V(v).fname;
+           spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
+       end
+   end
 else
     despiked = YY;
 end
-    
+
 %% write the report
 disp('saving spmup_despike_log')
 if ischar(P)
     spmup_despike_log.P = P;
 end
 spmup_despike_log.flags = flags;
+
 try
     if ~isfield(flags,'window') || isempty(spmup_despike_log.window)
         spmup_despike_log.window = R;
-        V(1).descrip = 'spmup window size';
+        V(1).descrip = 'spmup Despiked_QA';
         [pathstr,name,ext]= fileparts(V(v).fname);
-        V(1).fname = [pathstr filesep 'window' ext];
-        spm_write_vol(V(1),W);
+        V(1).fname = [pathstr filesep 'Despiked_QA' ext];
+        spm_write_vol(V(1),Despiked_QA);
     else
         spmup_despike_log.window = window;
     end
