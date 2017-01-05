@@ -1,38 +1,44 @@
 function [despiked,filtered] = spmup_despike(varargin)
 %
-% SPM UP routine to 'despike' fMRI time-series in a similar way as AFNI does
-% Note is requires the statistics toolbox (nansum, icdf are called)
+% SPM UP routine to 'despike' fMRI time-series in a similar way as AFNI
+% does Note is requires the statistics toolbox (nansum, icdf are called)
 %
 % FORMAT spmup_despike
-%        spmup_despike(P)
-%        spmup_despike(P,M)
-%        spmup_despike(P,M,flags)
+%        spmup_despike(P) spmup_despike(P,M) spmup_despike(P,M,flags)
 %        spmup_despike(P,[],flags)
 %
 % INPUT if none the user is prompted
-%       P the names of the fMRI images (time-series) or the 4D matrix of data
-%       M the name of the mask or the 3D binary matrix
-%       flags defines options to be used
-%             - flags.auto_mask,'off' or 'on' if M is not provided, auto_mask is
-%              'on' but if set to 'off' the user is prompted to select a mask
-%             - flags.method is 'median' or any of the option of the 'smooth'
+%       P the names of the fMRI images (time-series) or the 4D matrix of
+%       data M the name of the mask or the 3D binary matrix flags defines
+%       options to be used
+%             - flags.auto_mask,'off' or 'on' if M is not provided,
+%             auto_mask is
+%              'on' but if set to 'off' the user is prompted to select a
+%              mask
+%             - flags.method is 'median' or any of the option of the
+%             'smooth'
 %                matlab function - in all cases the span is function of the
 %                autocorrelation unless window is specified
-%             - flags.window defines the number of consecutive images to use
+%             - flags.window defines the number of consecutive images to
+%             use
 %               to despike the data ; for instance flags.method = 'median'
 %               and flags.window = 3 means that each data point is 1st
-%               substituted by a moving 3 points median and the resulting fit
-%               is used to determine outliers (see below)
+%               substituted by a moving 3 points median and the resulting
+%               fit is used to determine outliers (see below)
+%             - flags.skip defines the number of initial images to skip
+%               often despiking is the 1st step in preprocessing and
+%               therefore some initial scans needs to be discarded because
+%               the series hasn't reach staty-state (unless prescan
+%               normalizalise)
 %
 % OUTPUT despiked is either the list of despiked images save onto disk or
 %                 the despiked data, matching the input P
 %        spmup_despike_log is saved onto disk where the data are
 %        spmup_despike_log can be reviewed using spmup_review_despike_log
-%        spmup_despike_log is structure with the fields:
-%        - P the list of files (data) analyzed
-%        - flags the flags used
-%        - despiked_voxels the proportion of despiked voxels per volume
-%        - class a 4d binary matrix indicating despiked voxels
+%        spmup_despike_log is structure with the fields: - P the list of
+%        files (data) analyzed - flags the flags used - despiked_voxels the
+%        proportion of despiked voxels per volume - class a 4d binary
+%        matrix indicating despiked voxels
 %
 %        the new dataset with the spikes removed is also written in the
 %        data folder with the prefix 'despiked_' if no input or P is a
@@ -49,7 +55,7 @@ function [despiked,filtered] = spmup_despike(varargin)
 %
 % The prefered method is 'median' and window = []; this implies that the
 % window size if based on the autocorrelation rather than fixed and the
-% computation in fast because performed per window size - by contrast
+% computation is fast because performed per window size - by contrast
 % smoother option rely on estimates per voxel and this is much slower
 % --------------------------------------------------------------------------
 %
@@ -59,10 +65,6 @@ function [despiked,filtered] = spmup_despike(varargin)
 
 if exist('nansum','file') ~= 2
     error('you do not have stats toolbox to perform this operation, sorry')
-end
-
-if exist('smooth','file') ~= 2
-    error('you need the curve fitting toolbox to perform this operation, sorry')
 end
 
 %% check inputs
@@ -76,7 +78,7 @@ flags = struct('auto_mask','on','method','median');
 if nargin == 1
     get_data = 0;
     
-elseif nargin == 2;
+elseif nargin == 2
     get_data = 0;
     get_mask = 0;
     flags.auto_mask = 'off';
@@ -115,6 +117,15 @@ elseif nargin == 3
             error('the window parameter must be a real number')
         end
     end
+    
+    if isfield(varargin{3},'skip')
+        flags.skip = varargin{3}.skip;
+        if ~isempty(flags.skip) && ~isnumeric(flags.skip)
+            error('the skip parameter must be a real number')
+        end
+    else
+        flags.skip = 0;
+    end
 end
 
 disp('running spmup_despike ...')
@@ -122,8 +133,11 @@ disp('-------------------------')
 
 %% get data and mask
 % memory mapped data
-if get_data == 1;
+if get_data == 1
     [P,sts] = spm_select(Inf,'image','select the time series',[],pwd,'.*',1);
+    if sts == 0 || isempty(P)
+        disp('spmup_despike aborted'); return
+    end
     V = spm_vol(P);
     % bypass orientation check
     N = numel(V);
@@ -137,6 +151,7 @@ else
     P = varargin{1};
     if ischar(P)
         V = spm_vol(P);
+        V(1:flags.skip) = []; % remove initial volumes
         N = numel(V);
         Y = zeros([V(1).dim(1:3),N]);
         for i=1:N
@@ -155,7 +170,7 @@ end
 
 
 % memory mapped mask
-if get_mask == 1;
+if get_mask == 1
     [M,sts] = spm_select(1,'image','select the mask',[],pwd,'.*',1);
     if sts ~=0
         Mask = spm_read_vols(spm_vol(M));
@@ -176,20 +191,14 @@ elseif get_mask == 0 && strcmp(flags.auto_mask,'off')
     end
 else
     disp('generating a mask')
-    Mask = spmup_auto_mask(V);
+    Mask = spmup_auto_mask(V());
 end
 
-% figure('Name','Mask')
-% colormap('gray')
-% for z=1:size(Mask,3)
-%     imagesc(flipud(Mask(:,:,z)'));
-%     axis square; title(['Slice ' num2str(z)])
-%     pause
-% end
 
 %% now do the despiking
-% although the smooting method is different, the detection of spike and interpolation
-% follows 3dDespike http://afni.nimh.nih.gov/pub/dist/doc/program_help/3dDespike.html
+% although the smooting method is different, the detection of spike and
+% interpolation follows 3dDespike
+% http://afni.nimh.nih.gov/pub/dist/doc/program_help/3dDespike.html
 
 if ~isfield(flags,'window') || isempty(flags.window)
     R = spmup_autocorrelation(V,Mask);
@@ -224,7 +233,9 @@ if strcmp(flags.method,'median')
         
         % beginning
         for p=1:floor(index(i)/2)
-            % newdata(:,p) = nanmedian([repmat(data(:,1),1,ceil(index(i)/2)-p) data(:,1:p) data(:,p+1:p+floor(index(i)/2))],2);
+            % newdata(:,p) =
+            % nanmedian([repmat(data(:,1),1,ceil(index(i)/2)-p) data(:,1:p)
+            % data(:,p+1:p+floor(index(i)/2))],2);
             A = nanmedian([repmat(data(:,1),1,ceil(index(i)/2)-p) data(:,1:p) data(:,p+1:p+floor(index(i)/2))],2);
             B = nanmedian([repmat(data(:,1),1,ceil(index(i)/2)-p) data(:,1:p) data(:,p+1:p+floor(index(i)/2))],2);
         end
@@ -262,7 +273,7 @@ if strcmp(flags.method,'median')
         % we can use indices here and remove that coord loop ?
         for coord = 1:size(x,1)
             if nargout == 2
-                filtered(x(coord),y(coord),z(coord),:) = newdata(coord,:); 
+                filtered(x(coord),y(coord),z(coord),:) = newdata(coord,:);
             end
             
             YY(x(coord),y(coord),z(coord),:) = s2(coord,:);
@@ -276,13 +287,13 @@ if strcmp(flags.method,'median')
     % quick cleanup
     if ~isempty(Mask)
         for v=1:size(Y,4)
-        Y(:,:,:,v) = Y(:,:,:,v).*Mask;
+            Y(:,:,:,v) = Y(:,:,:,v).*Mask;
         end
     end
     
 else  % smooth function
     disp('using matlab smoother ... this iterate per voxel and takes lots of time')
-       
+    
     if isempty(Mask)
         index = find(squeeze(Y(:,:,:,end)));
     else
@@ -291,12 +302,7 @@ else  % smooth function
     YY = cell(1,length(index));
     ZZ = cell(1,length(index));
     
-    try
-        parpool('local',feature('numCores')-1); % use all available core -1
-    catch
-        matlabpool('local',feature('numCores')-1); % use all available core -1
-    end
-    
+    parpool('local',feature('numCores')-1); % use all available cores -1
     parfor i=1:length(index)
         [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(i));
         data = squeeze(Y(x,y,z,:))';
@@ -311,7 +317,7 @@ else  % smooth function
             newdata = smooth(data,window,flags.method)';
         end
         ZZ{i} = newdata;
-            
+        
         % MAD of the residuals
         res = data-newdata;
         MAD = nanmedian(abs(res - repmat(nanmedian(res),1,N)));
@@ -337,12 +343,7 @@ else  % smooth function
             YY{i} = data;
         end
     end
-    
-    try
-        parpool close 
-    catch
-        matlabpool close
-    end
+    parpool close
 end
 
 %% quick QA and reformating
@@ -361,35 +362,32 @@ else
     end
 end
 
-% figure('Name','QA')
-% colormap('hot')
-% for z=1:size(Despiked_QA,3)
-%     imagesc(flipud(Despiked_QA(:,:,z)'));
-%     axis square; title(['Slice ' num2str(z)])
-%     pause
+% figure('Name','QA') colormap('hot') for z=1:size(Despiked_QA,3)
+%     imagesc(flipud(Despiked_QA(:,:,z)')); axis square; title(['Slice '
+%     num2str(z)]) pause
 % end
 
 
 %% write and return the data
 if ischar(P)
-   disp('writing data')
-   if size(P,1) ~= 1
-       [pathstr,name,ext]= fileparts(V(1).fname);
-       fname = [pathstr filesep 'despiked_' name ext];
-       for v=1:size(Y,4)
-           V(v).descrip = 'spmup despiked';
-           V(v).fname=fname;
-           spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
-       end
-   else
-       for v=1:size(Y,4)
-           V(v).descrip = 'spmup despiked';
-           [pathstr,name,ext]= fileparts(V(v).fname);
-           V(v).fname = [pathstr filesep 'despiked_' name ext];
-           despiked{v} = V(v).fname;
-           spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
-       end
-   end
+    disp('writing data')
+    if size(P,1) ~= 1
+        [pathstr,name,ext]= fileparts(V(1).fname);
+        fname = [pathstr filesep 'despiked_' name ext];
+        for v=1:size(Y,4)
+            V(v).descrip = 'spmup despiked';
+            V(v).fname=fname;
+            spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
+        end
+    else
+        for v=1:size(Y,4)
+            V(v).descrip = 'spmup despiked';
+            [pathstr,name,ext]= fileparts(V(v).fname);
+            V(v).fname = [pathstr filesep 'despiked_' name ext];
+            despiked{v} = V(v).fname;
+            spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
+        end
+    end
 end
 
 %% write the report
