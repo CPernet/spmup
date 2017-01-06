@@ -15,7 +15,7 @@ function tSNR = spmup_temporalSNR(time_series,masks,figout)
 %       plot 0/1 if you want to have a plot of tSNR per ROI size
 %
 % OUTPUT tSNR is a structure with the following fields:
-%            .GM: mean GM signal / std over time (estimaye BOLD from GM>(WM+CSF))
+%            .GM: mean GM signal / std over time (estimate BOLD from GM>(WM+CSF))
 %            .WM:  mean WM signal / std over time (estimate non-BOLD from WM>(GM+CSF))
 %            .CSF: mean CSF signal / std over time (estimate non-BOLD from CSF>(GM+WM))
 %            .Background:  mean signal outside mask (GM+WM+CSF) / std over time
@@ -87,16 +87,16 @@ stdWMCSF = mean(std(data,1)); % presumably non BOLD
 
 [x,y,z] = ind2sub(size(brain_mask),find(GM+WM+CSF+(brain_mask ~= 1)));
 data = spm_get_data(V,[x y z]'); % the whole image or so
-tSNR.average = mean(mean(data,1)) / sqrt(stdGM+stdWMCSF+stdBackground);
+tSNR.average = mean(mean(data,1)) / sqrt(stdGM^2+stdWMCSF^2+stdBackground^2);
 
 %% SNR0
 [x,y,z] = ind2sub(size(brain_mask),find(brain_mask));
 data = spm_get_data(V,[x y z]');
-tSNR.image = mean(mean(data,1)) / sqrt(stdGM+stdWMCSF);
+tSNR.image = mean(mean(data,1)) / sqrt(stdGM^2+stdWMCSF^2);
 
 %% signal
 L2 = (tSNR.image^2 /tSNR.average - 1) / tSNR.image^2;
-tSNR.signal_mean = (stdGM+stdWMCSF) / sqrt(L2);
+tSNR.signal_mean = sqrt(stdGM^2+stdWMCSF^2) / sqrt(L2);
 
 
 %% per ROI (absolute masking)
@@ -119,7 +119,7 @@ for p=0.95:-0.05:0.1
    % figure; for z=1:size(ROI,3); imagesc(squeeze(ROI(:,:,z))); pause; end
    [x,y,z] = ind2sub(size(brain_mask),find(ROI+(brain_mask~=1)));
    data = spm_get_data(V,[x y z]'); % the whole image or so
-   tSNR.roi.value(index) = mean(mean(data,1)) / sqrt(stdGM+stdWMCSF+stdBackground);
+   tSNR.roi.value(index) = mean(mean(data,1)) / sqrt(stdGM^2+stdWMCSF^2+stdBackground^2);
    tSNR.roi.size(index) = sum(ROI(:));
    index = index + 1;
 end
