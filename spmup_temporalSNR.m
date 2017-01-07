@@ -19,12 +19,16 @@ function tSNR = spmup_temporalSNR(time_series,masks,figout)
 %            .WM:  mean WM signal / std over time (estimate non-BOLD from WM>(GM+CSF))
 %            .CSF: mean CSF signal / std over time (estimate non-BOLD from CSF>(GM+WM))
 %            .Background:  mean signal outside mask (GM+WM+CSF) / std over time
-%            .average (tSNR): mean signal / sqrt(std(GM)+std(WM+CSF)+std(Background))
-%            .roi: tSNR for increased ROI (from masks 0.95 to 0.1) ~linear function of srqrt(nb voxels)
+%                          also report the data (and figure if figout ~=0)
+%                          as this should only be termal noise, i.e. gaussian distributed
+%            .average (tSNR): mean signal / sqrt(std(GM)^2+std(WM+CSF)^2+std(Background)^2)
 %            .image (SNR0):  mean signal inside mask / std outside mask over time
-%            .signal_mean: [std(GM)+std(WM+CSF)] / sqrt((SNR0^2/tSNR- 1)/SNR0^2)
+%            .physio2termal_ratio: sqrt((tSNR(whole image)/SNR0(brain only))^2-1)
+%            .physio2termal_corr: correlation between images
+%            .roi: tSNR for increased ROI (from in mask by increasing slices) ~linear function of srqrt(nb voxels)
+%            .signal_mean: sqrt(std(GM)^2+std(WM+CSF)^2) / sqrt((SNR0^2/tSNR- 1)/SNR0^2)
 %            Since tSNR = SNR0^2 / (1+L^2*SNR0^2), we have L^2 = (SNR0^2 /tSNR - 1) / SNR0^2
-%            and std(GM)+std(WM+CSF) = L*Smean 
+%            and sqrt(std(GM)^2+std(WM+CSF)^2) = L*Smean 
 %
 % Cyril Pernet - University of Edinburgh
 % -----------------------------------------
@@ -51,9 +55,9 @@ GM = spm_read_vols(VM(1));
 WM = spm_read_vols(VM(2));
 CSF = spm_read_vols(VM(3));
 
-brain_mask = (smooth3(GM)+smooth3(WM)+smooth3(CSF))>0;
+brain_mask = (smooth3(GM,'box',15)+smooth3(WM,'box',15)+smooth3(CSF,'box',15))>0;
 % figure; for z=1:size(brain_mask,3); imagesc(squeeze(brain_mask(:,:,z))); pause; end
-GM = GM.*(GM>0.2); WM = WM.*(WM>0.2); CSF = CSF.*(CSF>0.2); % baseline prob 20%
+GM = GM.*(GM>0.5); WM = WM.*(WM>0.5); CSF = CSF.*(CSF>0.5); % baseline prob 50%
 GM = GM.*(GM>(WM+CSF)); % figure; rst_hist(GM(:))
 WM = WM.*(WM>(GM+CSF)); % figure; rst_hist(WM(:))
 CSF = CSF.*(CSF>(WM+GM)); % figure; rst_hist(CSF(:))
@@ -78,7 +82,76 @@ tSNR.CSF =  mean(mean(data,1)) /stdCSF;
 [x,y,z] = ind2sub(size(brain_mask),find(brain_mask ~= 1));
 data = spm_get_data(V,[x y z]');
 stdBackground = mean(std(data,1));
+tSNR.Background_raw = data;
 tSNR.Background =  mean(mean(data,1)) /stdBackground;
+
+% Computes the density estimate of data using a Random Average Shifted 
+% Histogram algorithm is coded based on Bourel et al. Computational 
+% Statistics and Data Analysis 79 (2014) 
+
+if figout ~=0
+    % tSNR per voxel
+    data = (mean(data,1)/stdBackground)';
+    
+    % see where is it and spatial distribition
+    figure; figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
+    SNRimage = zeros(V(1).dim); index = 1; 
+    SNRimage(find(brain_mask ~= 1)) = data;
+    mymin = median(data)-3*iqr(data); if mymin<0; mymin = 0; end
+    for z=1:floor(V(1).dim(3)./16):V(1).dim(3)-1
+        subplot(4,9,figindex(index));
+        imagesc(flipud(squeeze(SNRimage(:,:,z))'));
+        index = index+1; colormap(cubehelix(32,[1.15,0.1,4,1], [0,1], [0,0.85]))
+        caxis([mymin, median(data)+3*iqr(data)]); set(gca,'XtickLabel',[],'YtickLabel',[])
+        xlabel(['slice ' num2str(z)]); 
+    end
+    clear SNRimage
+    
+    % do the histogram (kernel density)
+    n = length(data);
+    m = 100; % number of hist to compute
+    h = 2.15*sqrt(var(data))*n^(-1/5);
+    delta = h/m;
+    % 1 make a mesh with size delta
+    t0 = min(data)-min(diff(data))/2;
+    tf = max(data)+min(diff(data))/2;
+    nbin = ceil((tf-t0)/delta);
+    binedge = t0:delta:(t0+delta*nbin);
+    out = find(binedge>tf);
+    if out == 1
+        binedge(out) = tf;
+    else
+        binedge(out(1)) = tf;
+        binedge(out(2:end)) = [];
+    end
+    % 2 Get the weight vector.
+    kern = inline('(15/16)*(1-x.^2).^2');
+    ind = (1-m):(m-1);
+    den = sum(kern(ind/m));% Get the denominator.
+    wm = m*(kern(ind/m))/den;% Create the weight vector.
+    % 3 compute bin with shifted edges
+    RH=zeros(1,nbin);
+    RSH=zeros(m,nbin);
+    for e=1:m
+        v = binedge + (delta*randn(1,1)); % e is taken from N(0,h);
+        v(v<t0) = t0; % lower bound
+        v(v>tf) = tf; % upper bound
+        nu = histc(data,v);
+        nu = [zeros(1,m-1) nu' zeros(1,m-1)];
+        for k=1:nbin
+            ind=k:(2*m+k-2);
+            RH(k)=sum(wm.*nu(ind));
+        end
+        RSH(e,:) = RH/(n*h);
+    end
+    K = mean(RSH,1);
+    bc = t0+((1:nbin)-0.5)*delta;
+    
+    subplot(4,8,[5 6 7 8 13 14 15 16 21 22 23 24 29 30 31 32]);
+    bar(bc,K,1,'FaceColor',[0.5 0.5 1]);
+    title('RAS Histogram - background noise');
+    grid on; box on; ylabel('tSNR'); drawnow
+end
 
 %% average (tSNR)
 [x,y,z] = ind2sub(size(WM),find(WM+CSF));
@@ -88,12 +161,39 @@ stdWMCSF = mean(std(data,1)); % presumably non BOLD
 [x,y,z] = ind2sub(size(brain_mask),find(GM+WM+CSF+(brain_mask ~= 1)));
 data = spm_get_data(V,[x y z]'); % the whole image or so
 tSNR.average = mean(mean(data,1)) / sqrt(stdGM^2+stdWMCSF^2+stdBackground^2);
+data = (mean(data,1)/sqrt(stdGM^2+stdWMCSF^2))';
+SNRimage = zeros(V(1).dim); 
+SNRimage(find(GM+WM+CSF+(brain_mask ~= 1))) = data;
 
-%% SNR0
-[x,y,z] = ind2sub(size(brain_mask),find(brain_mask));
+%% SNR0 (brain only)
+[x,y,z] = ind2sub(size(brain_mask),find(GM+WM+CSF));
 data = spm_get_data(V,[x y z]');
-tSNR.image = mean(mean(data,1)) / sqrt(stdGM^2+stdWMCSF^2);
+tSNR.image = mean(mean(data,1)) / stdBackground;
+data = (mean(data,1)/stdBackground)';
+SNROimage = zeros(V(1).dim); 
+SNROimage(find(GM+WM+CSF)) = data;
 
+if figout ~= 0
+    figure; index = 1;
+    figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31]; 
+    for z=1:floor(V(1).dim(3)./16):V(1).dim(3)-1
+        subplot(4,9,figindex(index)); 
+        imagesc(flipud(squeeze(SNRimage(:,:,z)')));
+        caxis([min(SNRimage(:)), max(SNRimage(:))]); set(gca,'XtickLabel',[],'YtickLabel',[]); 
+        xlabel(['slice ' num2str(z)]); if index ==2; title('tSNR image'); end        
+        subplot(4,9,figindex(index)+5); R= abs(sqrt((squeeze(SNROimage(:,:,z)'./SNRimage(:,:,z)').^2)-1)); 
+        imagesc(flipud(R)); if index ==2; title('SNR0/tSNR image'); end
+        caxis([min(R(:)), max(R(:))]); set(gca,'XtickLabel',[],'YtickLabel',[]); xlabel(['slice ' num2str(z)]); 
+        index = index+1; colormap(cubehelix(32,[3,1.9,1.5,1], [0,1], [0.2,0.8]))
+    end
+end
+  
+tSNR.SNR02tSNR_corr = corr(SNRimage(:),SNROimage(:));
+clear SNRimage SNROimage
+
+%% ratio
+tSNR.SNR02tSNR_ratio = abs(sqrt(((tSNR.average/tSNR.image)^2)-1));
+    
 %% signal
 L2 = (tSNR.image^2 /tSNR.average - 1) / tSNR.image^2;
 tSNR.signal_mean = sqrt(stdGM^2+stdWMCSF^2) / sqrt(L2);
@@ -133,7 +233,8 @@ if figout ~=0
     hold on; plot(sqrt(tSNR.roi.size),tSNR.roi.value,'ro','LineWidth',2);
     axis tight; box on; grid minor; ylabel('temporal SNR','FontSize',12)
     xlabel('sqrt of the number of in brain voxels used','FontSize',12)
-    title(['linear fit temporal SNR/in brain ROI size RMSE=' num2str(sqrt(mean(model - tSNR.roi.value')))],'FontSize',12)
+    mytitle = sprintf('tSNR=%g*sqrt(nb of voxels)+%g \n RMSE=%g',B(1),B(2),sqrt(mean(model - tSNR.roi.value')));
+    title(mytitle,'FontSize',12)
 end
 
-    
+ 
