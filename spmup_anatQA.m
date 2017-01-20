@@ -45,7 +45,7 @@ end
 brain_mask = (smooth3(spm_read_vols(GrayV),'box',25)+smooth3(spm_read_vols(WhiteV),'box',25))>0;
 [x,y,z] = ind2sub(AnatV.dim,find(brain_mask==0));
 data = sort(spm_get_data(AnatV,[x y z]'));
-std_nonbrain = std(data(data<(mean(data)+iqr(data)/2))); % in case we have high values (ie brain, ghost) remove top 25%
+std_nonbrain = std(data(data<(median(data)+iqr(data)/2))); % in case we have high values (ie brain, ghost) remove top 25%
 
 [x,y,z] = ind2sub(AnatV.dim,find(spm_read_vols(GrayV) > 0.6));
 dataGM = spm_get_data(AnatV,[x y z]');
