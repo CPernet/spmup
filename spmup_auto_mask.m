@@ -1,30 +1,33 @@
-function M = spmup_auto_mask(V,threshold,fig)
+function M = spmup_auto_mask(varargin)
 
 % routine to compute a mask from V, a time-series of memory mapped images
 % this gives a similar (but more inclusive) mask than SPM. Data are
 % smoothed the the average is used as a mask above threshold * by all
 % voxels that are non zeros differences in the time series
 %
-% FORMAT M = spmup_auto_mask(V,threshold)
+% FORMAT M = spmup_auto_mask(V,threshold,fig)
 %
 % INPUT  V memory mapped images (see spm_vol)
 %        threshold the percentage of signal to keep (default = 0.2)
 %        fig 'on' or 'off' (default) to image the mask and average image
 %
 % OUTPUT M the mask image
+%        if no output is writes the mask on the drive
 %
-% Cyril Pernet v2 parallelized smoothing
-% --------------------------------------
-% Copyright (c) SPMU+ toolbox
+% Cyril Pernet - University of Edinburgh
+% -----------------------------------------
+% Copyright (c) SPM Utility Plus toolbox
 
+V= varargin{1};
 threshold = 0.2;
 fig = 'off';
 if nargin == 2
     threshold = varargin{2};
 elseif nargin == 3
     threshold = varargin{2};
-    fig = varagin{3};
+    fig = varargin{3};
 end
+clear varargin
 
 % compute the mean of normalized smoothed data
 % by filling small holes we are more inclusive
@@ -55,3 +58,9 @@ if strcmp(fig,'on')
     end
 end
 
+if nargout == 0
+       [pathstr,~,ext]= fileparts(V(1).fname);
+       V(1).fname = [pathstr filesep 'spmup_mask' ext];
+       V(1).descrip = 'spmup mask';
+       spm_write_vol(V(1),M);
+end

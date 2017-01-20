@@ -1,4 +1,4 @@
-function RM = spmup_auto_reorient(p,which_image)
+function RM = spmup_auto_reorient(P,which_image)
 
 % FORMAT: reorientation_matrix = spmup_auto_reorient(p,which_image)
 %
@@ -8,10 +8,10 @@ function RM = spmup_auto_reorient(p,which_image)
 % OUTPUT: RM is the reorientation matrix obtain from affine reg to the
 %         template - assuming the T1 and EPI are pretty much aligned, input
 %         the T1 and use M into the realign utility buit in SPM to reorient
-%         the EPI data (now all is set properly to reaign, segment, nornmalize)
+%         the EPI data (now all is set properly to realign, segment, normalize)
 %
 % the function realigns each images with the template using affine transform
-% this is the same idea as setting the AC point% manually except that
+% this is the same idea as setting the AC point manually except that
 % (0,0,0) is now the same as the template (a priori better) -
 %
 % based on auto_reorient.m from Kiyotaka Nemoto
@@ -22,36 +22,59 @@ function RM = spmup_auto_reorient(p,which_image)
 % spmup copyright
 
 if ~nargin
-    [p,sts] = spm_select(Inf,'image','Select the image(s) to re-orient');
+    [P,sts] = spm_select(Inf,'image','Select the image(s) to re-orient');
     if ~sts, return; end
 elseif nargin == 1
     which_image = 1;
 end
 
-p = cellstr(p);
-if numel(p) == 1; which_image = 1; end
+addpath([spm_file(which('spm'),'path') filesep 'toolbox' filesep 'OldNorm']);
+V = spm_vol(P);
+if numel(V) == 1; which_image = 1; end
 vg = spm_vol(fullfile(spm('Dir'),'canonical','avg152T1.nii'));
 tmp = [tempname '.nii'];
 
 fprintf('spmup: reorienting image %g \n',which_image);
-spm_smooth(p{which_image},tmp,[12 12 12]);
+if size(P,1) >1 % 3D series
+    spm_smooth(P{which_image},tmp,[12 12 12]);
+elseif size(P,1) == 1 && numel(V) == 1 % 1 image only
+    spm_smooth(P,tmp,[12 12 12]);
+elseif  size(P,1) == 1 && numel(V) > 1 % 4D series
+    spm_smooth([P ',' num2str(which_image)],tmp,[12 12 12]);
+end
 vf = spm_vol(tmp);
 M  = spm_affreg(vg,vf,struct('regtype','rigid'));
-[u,s,v] = svd(M(1:3,1:3));
+[u,~,v] = svd(M(1:3,1:3));
 M(1:3,1:3) = u*v';
 RM = M;
-N  = nifti(p{which_image});
+if size(P,1) >1 
+    N  = nifti(P{which_image});
+elseif size(P,1) == 1 && numel(V) == 1 
+    N  = nifti(P);
+elseif  size(P,1) == 1 && numel(V) > 1 
+    N  = nifti([P ',' num2str(which_image)]);
+end
 N.mat = RM*N.mat;
 create(N);
 spm_unlink(tmp);
 
-for i=1:numel(p)
-    if i ~= which_image
-        fprintf('spmup: applying to image %g \n',i);
-        N  = nifti(p{i});
-        N.mat = RM*N.mat;
-        create(N);
+if size(P,1) >1
+    for i=1:numel(V)
+        if i ~= which_image
+            fprintf('spmup: applying to image %g \n',i);
+            N  = nifti(P{i});
+            N.mat = RM*N.mat;
+            create(N);
+        end
     end
+else
+    if numel(V) > 1
+        fprintf('spmup: applying to all other images \n');
+    end
+    N  = nifti(P);
+    N.mat = RM*N.mat;
+    create(N);
 end
 spm_unlink(tmp);
+
 
