@@ -19,6 +19,9 @@ function out = spmup_ACPC(varargin)
 % OUTPUT out is simple text telling you if the script work or not
 %
 % Cyril Pernet 
+% --------------------------------------------------------------------------
+% Copyright (C) spmup team 2015
+
 
 if isempty(nargin)
     P = spm_select(Inf,'image')
