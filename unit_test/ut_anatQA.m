@@ -1,87 +1,96 @@
 % ut_spmup_anatQA
 
-% reproduce the code but uses simple 2D image ensuring the output follows
-% what is expected
+% call spmup_anatQA testing with simulated data
+% to make the analysis comparable, set the tissue_threshold to 0 in spmup_anatQA
+% that means all the data in GM and WM masks are used corresponding to the
+% values generated therein 
 
-%% Case 1 - good qality image 
-% the image is 64*64 with the brain a 32*32 box in the middle (itself a
-% 16*16GM and WM)
+%% load up the SPM tpm
 
-myimage = zeros(64,64); % image
-mybrain = abs(randn(32,32)*100);
-myimage(17:48,17:48) = mybrain; % gray matter
-myimage(25:40,25:40) = myimage(25:40,25:40)+50; %white matter
+clearvars
+spmroot = fileparts(which('spm'));
+for n=1:6
+    P(n,:) = [spmroot filesep 'tpm' filesep 'TPM.nii,' num2str(n)];
+end
+V = spm_vol(P);
 
-% brain_mask = (smooth3(spm_read_vols(GrayV),'box',25)+smooth3(spm_read_vols(WhiteV),'box',25))>0;
-% [x,y,z] = ind2sub(AnatV.dim,find(brain_mask==0));
-brain_mask = find(myimage==0);
-data = sort(myimage(brain_mask)); 
-% std_nonbrain = std(data(data<(median(data)+iqr(data)/2))); % in case we have high values (ie brain, ghost) remove top 25%
-std_nonbrain = 1;
+I_brain = spm_read_vols(V);
+I_brain = sum(I_brain(:,:,:,1:5),4); % add all tissue types but last
 
-% [x,y,z] = ind2sub(AnatV.dim,find(spm_read_vols(GrayV) > 0.6));
-% dataGM = spm_get_data(AnatV,[x y z]');
-% meanGM = mean(data);
-GM1 = myimage(17:24,17:24); GM2 = myimage(40:48,40:48);
-dataGM = [GM1(:); GM2(:)];
-meanGM = mean(dataGM);
+%% make the image with known signal
 
-% [x,y,z] = ind2sub(AnatV.dim,find(spm_read_vols(WhiteV) > 0.6));
-% dataWM = spm_get_data(AnatV,[x y z]');
-dataWM = myimage(25:40,25:40);
-dataWM = dataWM(:); meanWM = mean(dataWM);
+% background
+I_Bckgd = spm_read_vols(V(6))>0.1; % threshol prob at 0.1
+index = find(I_Bckgd);
+noise = randn(length(index),1); % generate noise for background
+I_brain(index) = noise;
+clear I_Bckgd
 
-SNR  = ((meanGM+meanWM)/2)/std_nonbrain;
-CNR  = (meanWM-meanGM)/std_nonbrain;
-FBER = var([dataGM;dataWM])/std_nonbrain^2;
-Bmax = sqrt(sum(myimage(:).^2));
-EFC = nansum((myimage(:)./Bmax).*abs(log((myimage(:)./Bmax))));
+% gray matter and white matter
+tmp_GM = spm_read_vols(V(1)); 
+tmp_WM = spm_read_vols(V(2)); 
+I_GM = tmp_GM > tmp_WM;
+I_WM = tmp_WM > tmp_GM; % make gray/white mutually exclusive
+clear tmp_GM tmp_WM 
 
-figure; subplot(1,3,1);
-imagesc(myimage); title(sprintf('Clean image \n SNR=%g CNR=%g \n FBER=%g EFC=%g',SNR,CNR,FBER,EFC));
+index1 = find(I_GM);
+GM = randn(length(index1),1)*50; % generate data for GM
+I_brain(index1) = GM;
 
-%% Case 2 - add general white noise 
-% the image is 64*64 with the brain a 32*32 box in the middle (itself a
-% 16*16GM and WM)
+index2 = find(I_WM);
+WM = randn(length(index2),1)*100; % generate data for WM
+I_brain(index2) = WM;
 
-myimage = randn(64,64)*10;
-myimage(17:48,17:48) = mybrain; % gray matter
-myimage(25:40,25:40) = myimage(25:40,25:40)+50; %white matter
-data = sort(myimage(brain_mask)); 
-std_nonbrain = std(data(data<(median(data)+iqr(data)/2))); % in case we have high values (ie brain, ghost) remove top 25%
-GM1 = myimage(17:24,17:24); GM2 = myimage(40:48,40:48);
-dataGM = [GM1(:); GM2(:)];
-meanGM = mean(dataGM);
-dataWM = myimage(25:40,25:40);
-dataWM = dataWM(:); meanWM = mean(dataWM);
-SNR  = ((meanGM+meanWM)/2)/std_nonbrain;
-CNR  = (meanWM-meanGM)/std_nonbrain;
-FBER = var([dataGM;dataWM])/std_nonbrain^2;
-Bmax = sqrt(sum(myimage(:).^2));
-EFC = nansum((myimage(:)./Bmax).*abs(log((myimage(:)./Bmax))));
+mkdir('tmp_anatQA'); W=V(1); W.fname = [pwd filesep 'tmp_anatQA' filesep 'brain.nii'];
+W.descip = 'fake brain for QA'; spm_write_vol(W,I_brain);
 
-subplot(1,3,2);
-imagesc(myimage); title(sprintf('Adding White noise (10) \n SNR=%g CNR=%g \n FBER=%g EFC=%g',SNR,CNR,FBER,EFC));
+%% Compute QA from generated data
+%        - SNR : the signal-to-Noise Ratio, ie the mean intensity within gray and white matter divided
+%                by the standard deviation of the values outside the brain. Higher values are better.
+%        - CNR : the Contrast to Noise Ratio, i.e. the mean of the white matter intensity values minus the mean 
+%                of the gray matter intensity values divided by the standard deviation of the values outside the
+%                brain. Higher values are better.
+%        - FBER: Foreground to Background Energy Ratio, i.e. the variance of voxels in grey and white matter 
+%                divided by the variance of voxels outside the brain. Higher values are better.
+%        - EFC : Entropy Focus Criterion, i.e. the entropy of voxel intensities proportional to the maximum 
+%                possibly entropy for a similarly sized image. Indicates ghosting and head motion-induced blurring. 
+%                Lower values are better. See <http://ieeexplore.ieee.org/document/650886/>
 
-%% Case 3 - add motion, i.e. blurring 
-% the image is 64*64 with the brain a 32*32 box in the middle (itself a
-% 16*16GM and WM)
+% see what values we get using spmup_anatQA
+[anatQA,int_data] = spmup_anatQA(W.fname,P(1,:),P(2,:));
 
-mybrain = myimage(17:48,17:48);
+% compute from simulated data, except noise because it's compute differently 
+SNR = ((mean(GM)+mean(WM))/2) / int_data.std_nonbrain;
+CNR = (mean(WM)-mean(GM)) / int_data.std_nonbrain;
+FBER = var([GM ;WM]) / int_data.std_nonbrain^2;
+Bmax = sqrt(sum(I_brain(:).^2));
+EFC = nansum((I_brain(:)./Bmax).*abs(log((I_brain(:)./Bmax))));
 
-myimage = myimage + noise;
-data = sort(myimage(brain_mask)); 
-std_nonbrain = std(data(data<(median(data)+iqr(data)/2))); % in case we have high values (ie brain, ghost) remove top 25%
-GM1 = myimage(17:24,17:24); GM2 = myimage(40:48,40:48);
-dataGM = [GM1(:); GM2(:)];
-meanGM = mean(dataGM);
-dataWM = myimage(25:40,25:40);
-dataWM = dataWM(:); meanWM = mean(dataWM);
-SNR  = ((meanGM+meanWM)/2)/std_nonbrain;
-CNR  = (meanWM-meanGM)/std_nonbrain;
-FBER = var([dataGM;dataWM])/std_nonbrain^2;
-Bmax = sqrt(sum(myimage(:).^2));
-EFC = nansum((myimage(:)./Bmax).*abs(log((myimage(:)./Bmax))));
+if ~any([single(anatQA.SNR)==single(SNR),...
+        single(anatQA.CNR)==single(CNR),...
+        single(anatQA.FBER)==single(FBER),...
+        single(anatQA.EFC)==single(EFC)])
+    warndlg('simulated data and measures obtained are not the same !!!')
+else
+    disp('all good SNR, CNR, FBER and EFC as simulated')
+end
 
-subplot(1,3,2);
-imagesc(myimage); title(sprintf('Adding White noise (10) \n SNR=%g CNR=%g \n FBER=%g EFC=%g',SNR,CNR,FBER,EFC));
+% still check noise levels are comparable
+up = median(noise)+iqr(noise); down = median(noise)-iqr(noise);
+index = logical((noise<up).*(noise>down)); std_noise1 = std(noise(index)); 
+std_noise2 = std(noise); 
+if int_data.std_nonbrain>std_noise1 && int_data.std_nonbrain<std_noise2
+    disp('noise_level estimate ok as well')
+else
+    warndlg('simulated data and noise estimate out of bounds')
+end
+
+figure; imagesc(squeeze(I_brain(:,:,round(V(1).dim(3)/2)))); colormap('gray')
+title(sprintf('SNR=%g CNR=%g \n FBER=%g EFC=%g',SNR,CNR,FBER,EFC));
+
+
+
+
+
+
+

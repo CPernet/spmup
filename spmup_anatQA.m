@@ -1,10 +1,10 @@
-function anatQA = spmup_anatQA(varargin)
+function [anatQA,int_data] = spmup_anatQA(varargin)
 
 % *This implements some of the the anatomical QA measures from the*
 % *Preprocessed Connectome Project Quality Assurance Protocol (QAP)*
 % <http://preprocessed-connectomes-project.org/quality-assessment-protocol/>
 %
-% FORMAT: spmup_anatQA(anat,c1,c2)
+% FORMAT: anatQA = spmup_anatQA(anat,c1,c2)
 % 
 % INPUT: anat is the anatomical image
 %        c1 is the gray matter image
@@ -21,6 +21,10 @@ function anatQA = spmup_anatQA(varargin)
 %        - EFC : Entropy Focus Criterion, i.e. the entropy of voxel intensities proportional to the maximum 
 %                possibly entropy for a similarly sized image. Indicates ghosting and head motion-induced blurring. 
 %                Lower values are better. See <http://ieeexplore.ieee.org/document/650886/>
+%        
+% Note: GM and WM are thresholded by making them mutually exclusive
+% The background is found using an initial threshold based on 
+% voxels at the edge of the image
 % 
 % Cyril Pernet 20 January 2017
 % --------------------------------------------------------------------------
@@ -42,18 +46,42 @@ end
 
 %% compute
 
-brain_mask = (smooth3(spm_read_vols(GrayV),'box',25)+smooth3(spm_read_vols(WhiteV),'box',25))>0;
+disp('spmup_anatQA: computing brain mask and background value')
+
+% % define voxels at the edge of the brain 
+% x = repmat([1 2 AnatV.dim(1)-1 AnatV.dim(1)],4,1);
+% xy = [x(:) repmat([1 2 AnatV.dim(2)-1 AnatV.dim(2)]',4,1)];
+% z = repmat([1 2 AnatV.dim(3)-1 AnatV.dim(3)],16,1);
+% xyz = [repmat(xy,4,1) z(:)];
+% bkgd_threshold = median(spm_get_data(AnatV,xyz'));
+
+% define a large brain mask making sure the background has nothing but background in it
+brain_mask = (smooth3(spm_read_vols(GrayV),'box',25)+smooth3(spm_read_vols(WhiteV),'box',25)) > 0.1;
 [x,y,z] = ind2sub(AnatV.dim,find(brain_mask==0));
 data = sort(spm_get_data(AnatV,[x y z]'));
-std_nonbrain = std(data(data<(median(data)+iqr(data)/2))); % in case we have high values (ie brain, ghost) remove top 25%
+if isempty(data)
+    figure; imagesc(squeeze(brain_mask(:,:,round(AnatV.dim(3)/2)))); title('brain mask')
+    error(sprintf('no data were obtained from the brain mask \n error in image %s\n',AnatV.fname));
+end
 
-[x,y,z] = ind2sub(AnatV.dim,find(spm_read_vols(GrayV) > 0.6));
+% compute the noise level using and  50% trimmed data (remove extreme values)
+up = median(data)+iqr(data)/2; down = median(data)-iqr(data)/2;
+index = logical((data<up).*(data>down));
+std_nonbrain = std(data(index)); 
+
+disp('spmup_anatQA: getting measures')
+% make gray/white mutually exclusive
+I_GM = spm_read_vols(GrayV) > spm_read_vols(WhiteV);
+I_WM = spm_read_vols(WhiteV) > spm_read_vols(GrayV); 
+
+% compute taking voxels in I_GM and I_WM
+[x,y,z] = ind2sub(AnatV.dim,find(I_GM));
 dataGM = spm_get_data(AnatV,[x y z]');
-meanGM = mean(data);
+meanGM = mean(dataGM);
 
-[x,y,z] = ind2sub(AnatV.dim,find(spm_read_vols(WhiteV) > 0.6));
+[x,y,z] = ind2sub(AnatV.dim,find(I_WM));
 dataWM = spm_get_data(AnatV,[x y z]');
-meanWM = mean(data);
+meanWM = mean(dataWM);
 
 anatQA.SNR  = ((meanGM+meanWM)/2)/std_nonbrain;
 anatQA.CNR  = (meanWM-meanGM)/std_nonbrain;
@@ -63,5 +91,18 @@ data = spm_read_vols(AnatV);
 Bmax = sqrt(sum(data(:).^2));
 anatQA.EFC = nansum((data(:)./Bmax).*abs(log((data(:)./Bmax))));
 
+if nargout == 2
+    int_data.meanGM = meanGM;
+    int_data.meanWM = meanWM;
+    int_data.std_nonbrain = std_nonbrain;
+    int_data.varGMWM = var([dataGM dataWM]);
+    int_data.Bmax = Bmax;
+end
 
+         
+         
+         
+         
+         
+         
 
