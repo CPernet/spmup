@@ -1,4 +1,4 @@
-function spm_single_slices(varargin)
+function spmup_single_slices(varargin)
 
 % this routine creates a series of single slices in a given orientation 
 % with the fMRI map on top of it in a given color scheme
