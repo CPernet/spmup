@@ -371,20 +371,20 @@ end
 %% write and return the data
 if ischar(P)
     disp('writing data')
-    if size(P,1) ~= 1
-        [pathstr,name,ext]= fileparts(V(1).fname);
-        fname = [pathstr filesep 'despiked_' name ext];
-        for v=1:size(Y,4)
-            V(v).descrip = 'spmup despiked';
-            V(v).fname=fname;
-            spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
-        end
-    else
+    if size(P,1) == size(YY,4)
         for v=1:size(Y,4)
             V(v).descrip = 'spmup despiked';
             [pathstr,name,ext]= fileparts(V(v).fname);
             V(v).fname = [pathstr filesep 'despiked_' name ext];
             despiked{v} = V(v).fname;
+            spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
+        end
+    else
+        [pathstr,name,ext]= fileparts(V(1).fname);
+        fname = [pathstr filesep 'despiked_' name ext];
+        for v=1:size(Y,4)
+            V(v).descrip = 'spmup despiked';
+            V(v).fname=fname;
             spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
         end
     end
