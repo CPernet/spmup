@@ -21,10 +21,14 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 %        - EFC : Entropy Focus Criterion, i.e. the entropy of voxel intensities proportional to the maximum 
 %                possibly entropy for a similarly sized image. Indicates ghosting and head motion-induced blurring. 
 %                Lower values are better. See <http://ieeexplore.ieee.org/document/650886/>
-%        
+%       - asym : a simple measure of assymmetry (Left-Right/Left+Right). Assuming the [0,0,0]
+%                coordinate is roughly in the middle of the image (+/- 20 mm), asymmetry is
+%                computed for the combined gray/white matter masks - large difference
+%                can indicate an issue with the image (for healthy brains)
+
 % Note: GM and WM are thresholded by making them mutually exclusive
-% The background is found using an initial threshold based on 
-% voxels at the edge of the image
+% The background is found using data outside a large brain mask and
+% trimming extreme values
 % 
 % Cyril Pernet 20 January 2017
 % --------------------------------------------------------------------------
@@ -61,7 +65,7 @@ brain_mask = (smooth3(spm_read_vols(GrayV),'box',25)+smooth3(spm_read_vols(White
 data = sort(spm_get_data(AnatV,[x y z]'));
 if isempty(data)
     figure; imagesc(squeeze(brain_mask(:,:,round(AnatV.dim(3)/2)))); title('brain mask')
-    error(sprintf('no data were obtained from the brain mask \n error in image %s\n',AnatV.fname));
+    error(sprintf('no background data were obtained from the brain mask \n error in image %s\n',AnatV.fname));
 end
 
 % compute the noise level using and  50% trimmed data (remove extreme values)
@@ -90,6 +94,21 @@ anatQA.FBER = var([dataGM dataWM])/std_nonbrain^2;
 data = spm_read_vols(AnatV);
 Bmax = sqrt(sum(data(:).^2));
 anatQA.EFC = nansum((data(:)./Bmax).*abs(log((data(:)./Bmax))));
+
+% asym
+middle_img = abs(AnatV.dim(1).*AnatV.mat(1) / 2);
+xoffset = AnatV.mat(1,4);
+if xoffset<(middle_img-20) || xoffset>(middle_img+20)
+    disp('skipping assymmetry index, the 0 x coordinate doesn''t seem to be in the middle of the image')
+else
+    voxoffset = abs(xoffset./AnatV.mat(1));
+    left = floor(voxoffset-1); right = ceil(voxoffset+1);
+    data = spm_read_vols(GrayV)+spm_read_vols(WhiteV);
+    N = data(1:left,:,:)-data(right:end,:,:); 
+    D = data(1:left,:,:)+data(right:end,:,:); 
+    asym = N./D; clear data N D
+    anatQA.asym = mean(asym(:));
+end
 
 if nargout == 2
     int_data.meanGM = meanGM;

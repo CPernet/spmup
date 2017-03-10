@@ -42,7 +42,7 @@ WM = randn(length(index2),1)*100; % generate data for WM
 I_brain(index2) = WM;
 
 mkdir('tmp_anatQA'); W=V(1); W.fname = [pwd filesep 'tmp_anatQA' filesep 'brain.nii'];
-W.descip = 'fake brain for QA'; spm_write_vol(W,I_brain);
+W.descrip = 'fake brain for QA'; spm_write_vol(W,I_brain);
 
 %% Compute QA from generated data
 %        - SNR : the signal-to-Noise Ratio, ie the mean intensity within gray and white matter divided
