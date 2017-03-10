@@ -40,13 +40,13 @@ if nargin == 0
 end
 
 V = spm_vol(P);
-disp('check data orientation')
-[sts, str] =  spm_check_orientations(V);
-if sts == 0
-    error(str)
+N = numel(V);
+Image = zeros([V(1).dim(1:3),N]);
+for i=1:N
+    for p=1:V(1).dim(3)
+        Image(:,:,p,i) = spm_slice_vol(V(i),spm_matrix([0 0 p]),V(i).dim(1:2),0);
+    end
 end
-    
-Image = spm_read_vols(V);
 xmax  = V(1).dim(1);
 ymax  = V(1).dim(2);
 zmax  = V(1).dim(3);
@@ -125,10 +125,10 @@ for j=1:nbimage
     end
 end
 
-figure; subplot(1,2,1); imagesc(r)
+figure; imagesc(r); ylabel('slices'); xlabel('volume nb')
 title('Correlation between slices per volume','FontSize',14)
-ylabel('slices'); xlabel('volume nb')
 drawnow
+
 
 data = nanmean(r,1); y=sort(data);
 j=floor(length(data)/4 + 5/12);
@@ -146,6 +146,31 @@ else
     disp('no volume outliers detected');
 end
 
+
+
+
+%% average neighbouring slices
+outliers = find(volume_outliers);
+if sum(diff(outliers) == 1) == 0
+    answ = input('do you want to ''repair'' bad slices using averaging? [y/n] ','s');
+    if strcmpi(answ,'y')
+        for im=1:length(outliers)
+            bad_slices = r(:,outliers(im))<(M-k*value);
+            Image(:,:,bad_slices,outliers(im)) = (Image(:,:,bad_slices,outliers(im)-1) + ...
+                Image(:,:,bad_slices,outliers(im)+1))/2;
+        end
+        
+        for im=1:size(V,1) 
+            [p,f,e]=fileparts(V(im).fname);
+            V(im).fname = [p filesep 'repaired_' f e];
+            spm_write_vol(V(im),Image(:,:,:,im));
+        end
+    end
+else
+    disp('several consecutive volumes are seen as outliers, sorry cannot repair these data')
+end
+    
+%% check outliers between volumes per slice
 for j=1:nbimage-1
     for i=1:zmax
         if mean(mean(mask(:,:,i))) ~= 0
@@ -156,7 +181,7 @@ for j=1:nbimage-1
     end
 end
 
-subplot(1,2,2); imagesc(r)
+figure; imagesc(r)
 title('Correlation between volumes per slice ','FontSize',14)
 ylabel('slices'); xlabel('volume nb')
 drawnow
