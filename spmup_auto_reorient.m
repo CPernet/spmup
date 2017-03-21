@@ -6,9 +6,9 @@ function RM = spmup_auto_reorient(P,which_image)
 %        which_image is a integer for wich image to obtain M
 %
 % OUTPUT: RM is the reorientation matrix obtain from affine reg to the
-%         template - assuming the T1 and EPI are pretty much aligned, input
-%         the T1 and use M into the realign utility buit in SPM to reorient
-%         the EPI data (now all is set properly to realign, segment, normalize)
+%         template - assuming the T1 and EPI are pretty much aligned, it
+%         takes the T1 and use M into the realign utility buit in SPM to reorient
+%         the EPI data (now all is set properly to segment and normalize)
 %
 % the function realigns each images with the template using affine transform
 % this is the same idea as setting the AC point manually except that
@@ -35,28 +35,32 @@ vg = spm_vol(fullfile(spm('Dir'),'canonical','avg152T1.nii'));
 tmp = [tempname '.nii'];
 
 fprintf('spmup: reorienting image %g \n',which_image);
-if size(P,1) >1 % 3D series
-    spm_smooth(P{which_image},tmp,[12 12 12]);
-elseif size(P,1) == 1 && numel(V) == 1 % 1 image only
+if size(P,1) == 1 && numel(V) == 1 % 1 image only
     spm_smooth(P,tmp,[12 12 12]);
-elseif  size(P,1) == 1 && numel(V) > 1 % 4D series
-    spm_smooth([P ',' num2str(which_image)],tmp,[12 12 12]);
+elseif size(P,1) >1 % series
+    if numel(V{which_image}) == 1
+        spm_smooth(P{which_image},tmp,[12 12 12]);
+    else % numel(V) > 1 % multiple 3D 
+        spm_smooth([P ',' num2str(which_image)],tmp,[12 12 12]);
+    end
 end
 vf = spm_vol(tmp);
 M  = spm_affreg(vg,vf,struct('regtype','rigid'));
 [u,~,v] = svd(M(1:3,1:3));
 M(1:3,1:3) = u*v';
 RM = M;
-if size(P,1) >1 
-    N  = nifti(P{which_image});
-elseif size(P,1) == 1 && numel(V) == 1 
+if size(P,1) == 1 && numel(V) == 1 % 1 image only
     N  = nifti(P);
-elseif  size(P,1) == 1 && numel(V) > 1 
-    N  = nifti([P ',' num2str(which_image)]);
+elseif size(P,1) >1 % series
+    if numel(V{which_image}) == 1
+        N  = nifti(P{which_image});
+    else % numel(V) > 1 % multiple 3D 
+        N  = nifti([P ',' num2str(which_image)]);
+    end
 end
+
 N.mat = RM*N.mat;
 create(N);
-spm_unlink(tmp);
 
 if size(P,1) >1
     for i=1:numel(V)
