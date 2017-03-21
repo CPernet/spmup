@@ -25,7 +25,7 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 %                coordinate is roughly in the middle of the image (+/- 20 mm), asymmetry is
 %                computed for the combined gray/white matter masks - large difference
 %                can indicate an issue with the image (for healthy brains)
-
+%
 % Note: GM and WM are thresholded by making them mutually exclusive
 % The background is found using data outside a large brain mask and
 % trimming extreme values
@@ -33,6 +33,9 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 % Cyril Pernet 20 January 2017
 % --------------------------------------------------------------------------
 % Copyright (C) spmup team 2017
+
+% 2nd input int_data is used for unit testing, this retuns intermediate
+% values computed here in a structure 
 
 if nargin ~=3
     error('3 immage names expected as input')
@@ -69,6 +72,7 @@ if isempty(data)
 end
 
 % compute the noise level using and  50% trimmed data (remove extreme values)
+data(isnan(data)) = [];
 up = median(data)+iqr(data)/2; down = median(data)-iqr(data)/2;
 index = logical((data<up).*(data>down));
 std_nonbrain = std(data(index)); 
@@ -92,6 +96,7 @@ anatQA.CNR  = (meanWM-meanGM)/std_nonbrain;
 anatQA.FBER = var([dataGM dataWM])/std_nonbrain^2;
 
 data = spm_read_vols(AnatV);
+data(isnan(data)) = [];
 Bmax = sqrt(sum(data(:).^2));
 anatQA.EFC = nansum((data(:)./Bmax).*abs(log((data(:)./Bmax))));
 
@@ -103,11 +108,11 @@ if xoffset<(middle_img-20) || xoffset>(middle_img+20)
 else
     voxoffset = abs(xoffset./AnatV.mat(1));
     left = floor(voxoffset-1); right = ceil(voxoffset+1);
-    data = spm_read_vols(GrayV)+spm_read_vols(WhiteV);
-    N = data(1:left,:,:)-data(right:end,:,:); 
-    D = data(1:left,:,:)+data(right:end,:,:); 
-    asym = N./D; clear data N D
-    anatQA.asym = mean(asym(:));
+    data = (spm_read_vols(GrayV)+spm_read_vols(WhiteV))>0;
+    N = data(1:left,:,:)-flipud(data(right:end,:,:)); 
+    D = data(1:left,:,:)+flipud(data(right:end,:,:)); 
+    asym = N./D; clear N D
+    anatQA.asym = mean(asym(data(1:left,:,:)~=0));
 end
 
 if nargout == 2
