@@ -37,11 +37,19 @@ tmp = [tempname '.nii'];
 fprintf('spmup: reorienting image %g \n',which_image);
 if size(P,1) == 1 && numel(V) == 1 % 1 image only
     spm_smooth(P,tmp,[12 12 12]);
-elseif size(P,1) >1 % series
-    if numel(V{which_image}) == 1
-        spm_smooth(P{which_image},tmp,[12 12 12]);
-    else % numel(V) > 1 % multiple 3D 
-        spm_smooth([P ',' num2str(which_image)],tmp,[12 12 12]);
+elseif numel(V) >1 % series
+    try
+        if numel(V{which_image}) == 1
+            spm_smooth(P{which_image},tmp,[12 12 12]);
+        else % numel(V) > 1 % multiple 3D
+            spm_smooth([P ',' num2str(which_image)],tmp,[12 12 12]);
+        end
+    catch
+        if numel(V) > 1 % multiple 3D
+            spm_smooth([P ',' num2str(which_image)],tmp,[12 12 12]);
+        else 
+            spm_smooth(P(which_image),tmp,[12 12 12]);
+        end
     end
 end
 vf = spm_vol(tmp);
@@ -51,11 +59,19 @@ M(1:3,1:3) = u*v';
 RM = M;
 if size(P,1) == 1 && numel(V) == 1 % 1 image only
     N  = nifti(P);
-elseif size(P,1) >1 % series
-    if numel(V{which_image}) == 1
+elseif numel(V) >1 % series
+    try
+        if numel(V{which_image}) == 1
         N  = nifti(P{which_image});
     else % numel(V) > 1 % multiple 3D 
         N  = nifti([P ',' num2str(which_image)]);
+        end
+    catch
+        if numel(V) > 1 % multiple 3D
+            N  = nifti([P ',' num2str(which_image)]);
+        else 
+            N  = nifti(P(which_image));
+        end
     end
 end
 
