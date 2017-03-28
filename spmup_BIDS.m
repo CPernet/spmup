@@ -43,6 +43,8 @@ if nargin == 0
     BIDS_dir= uigetdir(pwd,'select BIDS directory');
     if BIDS_dir == 0
         return
+    else
+        choices = get_all_options(BIDS_dir);
     end
 end
 
@@ -51,10 +53,6 @@ I=intersect(fieldnames(options),fieldnames(choices));
 for f=1:length(I)
     options = setfield(options,I{f},getfield(choices,I{f}));
 end
-
-% if ~isfield(options,'removeNvol') || isempty(options.removeNvol)
-%     options.removeNvol = input('How many initial EPI volumes to discard?: '); disp(' ')
-% end
 
 spm('defaults', 'FMRI');
 
@@ -384,7 +382,7 @@ for s=1:size(BIDS.subjects,2)
     % ----------------------------------------------
     [filepath,filename,ext] = fileparts(subjects{s}.anat);
     normalization_file = [BIDS.dir filesep filepath filesep 'y_' filename ext];
-    normalizated_file  = [BIDS.dir filesep filepath filesep 'wm' filename ext];
+    NormalizedAnat_file  = [BIDS.dir filesep filepath filesep 'wm' filename ext];
     class{1} = [BIDS.dir filesep filepath filesep 'c1' filename ext];
     class{2} = [BIDS.dir filesep filepath filesep 'c2' filename ext];
     class{3} = [BIDS.dir filesep filepath filesep 'c3' filename ext];
@@ -526,41 +524,34 @@ for s=1:size(BIDS.subjects,2)
     % QC and additional regressors
     % ----------------------------
     if strcmp(options.QC,'on') %
-        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist([fileparts(normalizated_file) filesep 'anatQA.mat'],'file'))
+        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist([fileparts(NormalizedAnat_file) filesep 'anatQA.mat'],'file'))
             fprintf('subject %g: Anatomical Quality control \n',s)
             % Basic QA for anatomical data is to get SNR, CNR, FBER and Entropy
             % This is useful to check coregistration and normalization worked fine
-            % Doing the analysis pre- post- processing also allows to see how much
-            % deformation / changes were introduced and if we have groups this is
-            % definitively something the check
-            anatQA{s}.subject_space  = spmup_anatQA([BIDS.dir filesep subjects{s}.anat],class{1},class{2});
-            anatQA{s}.template_space = spmup_anatQA(normalizated_file,Normalized_class{1},Normalized_class{2});
-            tmp = anatQA{s}; save([fileparts(normalizated_file) filesep 'anatQA.mat'],'tmp'); clear tmp
+            tmp = spmup_anatQA(NormalizedAnat_file,Normalized_class{1},Normalized_class{2});
+            save([fileparts(NormalizedAnat_file) filesep 'anatQA.mat'],'tmp'); anatQA{s} = tmp; clear tmp
         end
         
-        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist([fileparts(normalizated_file) filesep 'anatQA.mat'],'file'))
+        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist([fileparts(Normalized_files{1}) filesep 'fMRIQA.mat'],'file'))
             fprintf('subject %g: fMRI Quality control \n',s)
             % For functional data, QA is consists in getting temporal SNR and then
             % check for motion - here we also compute additional regressors to
             % account for motion
-            if s==1 && exist([pwd filesep 'tSNR.ps'],'file')
-                delete([pwd filesep 'tSNR.ps'])
+            
+            if strcmpi(options.scrubbing,'on')
+                flags = struct('motion_parameters','on','globals','on','volume_distance','off','movie','off', ...
+                'AC', [], 'average','on', 'T1', 'on');
+            else
+                flags = struct('motion_parameters','off','globals','off','volume_distance','on','movie','off', ...
+                'AC', [], 'average','on', 'T1', 'on');
             end
             
             for frun = 1:size(BIDS.subjects(s).func,2)
-                figure('Name','title')
-                set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-                title(['subject ' num2str(s) ' run ' num2str(frun)],'FontSize',20);  box off;
-                set(gca,'xcolor',get(gcf,'color')); set(gca,'xtick',[]);
-                set(gca,'ycolor',get(gcf,'color')); set(gca,'ytick',[]);drawnow;
-                if exist([pwd filesep 'tSNR.ps'],'file')
-                    print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps'], '-append');
-                else
-                    print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps']);
-                end
-                close('title')
-                tSNR{s,frun} = spmup_temporalSNR(stats_ready{frun},EPI_class,1);
-                tmp = tSNR{s}; save([fileparts(normalizated_file) filesep 'tSNR.mat'],'tmp'); clear tmp
+                fMRIQA.tSNR{s, frun} = spmup_temporalSNR(stats_ready{frun},EPI_class,0);
+                tmp = spmup_first_level_qa(NormalizedAnat_file,cell2mat(Normalized_files(frun)),flags);
+                fMRIQA.meanFD{s,frun} = mean(spmup_FD(cell2mat(tmp))); clear tmp
+                QA.tSNR = fMRIQA.tSNR{s,frun}; QA.meanFD = fMRIQA.meanFD{s,frun}; 
+                save([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA'); clear QA
             end
         end
     end
@@ -588,6 +579,7 @@ for s=1:size(BIDS.subjects,2)
                 cond{n} = BIDS.subjects(s).func(frun).events.trial_type(n,:);
             end
             cond = unique(cond);
+            all_cond{frun} = cond;
             N_cond = length(cond);
             
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {stats_ready{frun}};
@@ -633,6 +625,68 @@ for s=1:size(BIDS.subjects,2)
         save([filepath filesep 'stats_batch_sub' num2str(s) '.mat'],'matlabbatch');
         spm_jobman('run',matlabbatch); clear matlabbatch;
     end
+    
+    % contrasts
+    % we can assume that at 1 contrast per condition is computed, if there
+    % is only one run, no need this is the same as betas, if there are
+    % seveal runs, simply match condition labels - and do it for each
+    % derivatives if any
+    if size(BIDS.subjects(s).func,2) > 1
+        if ~exist('CI','var') %% if we did not recompute the model this is missing
+            for frun = 1:size(BIDS.subjects(s).func,2)
+                N_events = length(BIDS.subjects(s).func(frun).events.trial_type);
+                for n=1:N_events
+                    cond{n} = BIDS.subjects(s).func(frun).events.trial_type(n,:);
+                end
+                all_cond{frun} = unique(cond);
+            end
+            CI = intersect(all_cond{1},all_cond{2});
+        end
+        
+        if size(BIDS.subjects(s).func,2) > 2
+            for frun = 3:size(BIDS.subjects(s).func,2)
+                CI = intersect(CI,all_cond{frun});
+            end
+        end
+    else
+        CI = all_cond{1};
+    end
+    
+    if ~isempty(CI)
+        filepath = fileparts(SPMmat_file); con_file1 = [filepath filesep 'con_0001.nii'];
+        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist(con_file1,'file'))
+            
+            % check contrast weight for run 1 and replicate if needed
+            for n=1:length(BIDS.subjects(s).func(1).events.trial_type)
+                cond{n} = BIDS.subjects(s).func(1).events.trial_type(n,:);
+            end
+            cond = unique(cond);
+            v = zeros(length(cond));
+            for c=1:length(cond) % that's the columns to span
+                for a=1:length(all_cond{1}) % that's the contrast to do
+                    if strcmp(all_cond{1}{a},cond{c})
+                        v(a,c) = 1;
+                    end
+                end
+            end
+                
+            matlabbatch{1}.spm.stats.con.spmmat = {SPMmat_file};
+            for frun = 1:size(BIDS.subjects(s).func,2)
+                for c=1:length(CI)
+                    matlabbatch{1}.spm.stats.con.consess{c}.tcon.name = CI{c};
+                    matlabbatch{1}.spm.stats.con.consess{c}.tcon.weights = v(c,:);
+                    if size(BIDS.subjects(s).func,2) == 1
+                        matlabbatch{1}.spm.stats.con.consess{c}.tcon.sessrep = 'none';
+                    else
+                        matlabbatch{1}.spm.stats.con.consess{c}.tcon.sessrep = 'replsc';
+                    end
+                end
+            end
+            matlabbatch{1}.spm.stats.con.delete = 1;
+            spm_jobman('run',matlabbatch); clear matlabbatch;
+        end
+    end
+    
 end
 
 disp('spmup BIDS done - all subjects processed')
