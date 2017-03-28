@@ -2,8 +2,8 @@ function new_files = spmup_first_level_qa(varargin)
 
 % routine calling spmup_realign_qa and spmup_normalize_qa
 %
-% INPUT spmup_first_level_qa (prompt user)
-%       spmup_first_level_qa(T1_name,Images,flags)
+% INPUT new_files = spmup_first_level_qa (prompt user)
+%       new_files = spmup_first_level_qa(T1_name,Images,flags)
 %
 %       T1_name is the full name of the T1 image to use as reference
 %       Images is a cell array of the time series per session / subjects
@@ -62,24 +62,28 @@ if nargin <2
         end
     end
 else
-    for f=1:size(varargin{2},2)
-        Normalized{f} = cell2mat(varargin{2}{f});
-        [folder{f},name,ext] = fileparts(Normalized{f}(1,:));
+    if iscell(varargin{2})
+        for f=1:size(varargin{2},2)
+            Normalized{f} = cell2mat(varargin{2}{f});
+            [folder{f},name,ext] = fileparts(Normalized{f}(1,:));
+        end
+    else
+        for f=1:size(varargin{2},1)
+            Normalized{f} = varargin{2}(f,:);
+            [folder{f},name,ext] = fileparts(Normalized{f}(1,:));
+        end
     end
 end
 
 %% flag definition
-if nargin <3
-    flags = struct('motion_parameters','on','globals','on','volume_distance','off','movie','off', ...
-        'AC', [], 'average','on', 'T1', 'on');
-else
-    if ~isfield(varargin{3},'motion_parameters'); flags.motion_paramters = varargin{3}.motion_paramters; end
-    if ~isfield(varargin{3},'globals'); flags.globals = varargin{3}.globals; end
-    if ~isfield(varargin{3},'volume_distance'); flags.volume_distance = varargin{3}.volume_distance; end
-    if ~isfield(varargin{3},'movie'); flags.movie = varargin{3}.movie; end
-    if ~isfield(varargin{3},'T1'); flags.T1 = varargin{3}.T1; end
-    if ~isfield(varargin{3},'average'); flags.average = varargin{3}.average; end
-end
+flags = struct('motion_parameters','on','globals','on','volume_distance','off','movie','off', ...
+    'AC', [], 'average','on', 'T1', 'on');
+if isfield(varargin{3},'motion_parameters'); flags.motion_paramters = varargin{3}.motion_parameters; end
+if isfield(varargin{3},'globals'); flags.globals = varargin{3}.globals; end
+if isfield(varargin{3},'volume_distance'); flags.volume_distance = varargin{3}.volume_distance; end
+if isfield(varargin{3},'movie'); flags.movie = varargin{3}.movie; end
+if isfield(varargin{3},'T1'); flags.T1 = varargin{3}.T1; end
+if isfield(varargin{3},'average'); flags.average = varargin{3}.average; end
 
 %% iterate
 for f=1:size(folder,2)
