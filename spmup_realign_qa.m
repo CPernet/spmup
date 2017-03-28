@@ -102,6 +102,10 @@ end
  
 
 %% look at motion parameters
+moutlier_matrix = [];
+goutlier_matrix = [];
+dist_outliers_matrix  = []; 
+
 if strcmp(flags.motion_parameters,'on')
     
     motion_file = dir('rp*.txt'); % SPM
@@ -147,8 +151,6 @@ if strcmp(flags.motion_parameters,'on')
         for i=1:sum(m_outliers)
             moutlier_matrix(indices(i),i) = 1;
         end
-    else
-        moutlier_matrix = [];
     end
     
     % figure
@@ -183,8 +185,12 @@ if strcmp(flags.globals,'on')
     % find outliers in global mean intensity
     disp('computing globals for outliers ... ')
     glo = zeros(size(P,1),1);
-    for s=1:size(P,1)
+    if size(P,1) == 1 %4D
+        glo = spm_global(spm_vol(P));
+    else
+        for s=1:size(P,1)
         glo(s) = spm_global(spm_vol(P(s,:)));
+        end
     end
     glo = detrend(glo); % since in spm the data are detrended
     
@@ -208,8 +214,6 @@ if strcmp(flags.globals,'on')
         for i=1:sum(g_outliers)
             goutlier_matrix(indices(i),i) = 1;
         end
-    else
-        goutlier_matrix = [];
     end
     
     % figure
@@ -233,7 +237,8 @@ if strcmp(flags.volume_distance, 'on')
     distance_between = zeros(n-1,1);
     % mean_data = spm_read_vols(spm_vol(average));
     mask = average > 0;
-    
+    dist_outliers_matrix = [];
+
     for i=1:n
         fprintf('computing mean square distances, volume %g/%g \n',i,n)
         vol = spm_read_vols(V(i));
@@ -281,10 +286,7 @@ if strcmp(flags.volume_distance, 'on')
         for i=1:sum(dist_outliers)
             dist_outliers_matrix(indices(i),i) = 1;
         end
-    else
-        dist_outliers_matrix = [];
     end
-    
 end
 
 %% update the motion parameter file
