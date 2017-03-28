@@ -74,10 +74,10 @@ elseif nargin < 3
 elseif nargin == 3
     V = spm_vol(Normalized);
     if spm_check_orientations(V) ~= 1; error('Volumes are not all oriented the same way'); end
-    if sum(findstr(V(1).descrip,'normalized'))==0 && sum(findstr(V(1).descrip,'normed'))==0
+    if sum(findstr(V(1).descrip,'normalized'))==0 && sum(findstr(V(1).descrip,'normed'))==0 && sum(findstr(V(1).descrip,'Warped'))==0
         warning('Volumes appear not to be SPM normalized ones'); end
     T = spm_vol(T1);
-    if sum(findstr(T.descrip,'normalized'))==0 && sum(findstr(T.descrip,'normed'))==0 
+    if sum(findstr(T.descrip,'normalized'))==0 && sum(findstr(T.descrip,'normed'))==0 && sum(findstr(T.descrip,'Warped'))==0 
         warning('The T1 volume appears not to be SPM normalized'); end
 end
 
