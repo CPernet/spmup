@@ -4,7 +4,9 @@ function [despiked,filtered] = spmup_despike(varargin)
 % does Note is requires the statistics toolbox (nansum, icdf are called)
 %
 % FORMAT spmup_despike
-%        spmup_despike(P) spmup_despike(P,M) spmup_despike(P,M,flags)
+%        spmup_despike(P) 
+%        spmup_despike(P,M) 
+%        spmup_despike(P,M,flags)
 %        spmup_despike(P,[],flags)
 %
 % INPUT if none the user is prompted
@@ -33,6 +35,8 @@ function [despiked,filtered] = spmup_despike(varargin)
 %
 % OUTPUT despiked is either the list of despiked images save onto disk or
 %                 the despiked data, matching the input P
+%        filtered is a data median smoothed from which one despikes
+%
 %        spmup_despike_log is saved onto disk where the data are
 %        spmup_despike_log can be reviewed using spmup_review_despike_log
 %        spmup_despike_log is structure with the fields: - P the list of
@@ -385,7 +389,7 @@ if ischar(P)
         for v=1:size(Y,4)
             V(v).descrip = 'spmup despiked';
             V(v).fname=fname;
-            spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
+            despiked = spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
         end
     end
 end
