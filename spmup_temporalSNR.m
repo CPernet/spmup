@@ -43,12 +43,20 @@ V = spm_vol(time_series);
 if size(V,1) < 10
     error('there is less than 10 images in your time series ??')
 end
-
-VM = spm_vol(masks);
-if size(VM,1) ~= 3
-    error(['3 masks files expected, ' num2str(size(VM,1)) ' detected - check input file'])
+% use 3D format
+V = spm_vol(time_series);
+if size(time_series,1) ==1 
+    n = size(V,1);
+    time_series = strcat(repmat(time_series, n, 1), ',', num2str([1:n]'));
 end
 
+VM = spm_vol(masks);
+if length(VM) ~= 3
+    error(['3 masks files expected, ' num2str(size(VM,1)) ' detected - check input file'])
+end
+if iscell(VM)
+    VM = cell2mat(VM);
+end
     
 %% Compute relative masks
 GM = spm_read_vols(VM(1));
@@ -90,17 +98,19 @@ tSNR.Background =  mean(mean(data,1)) /stdBackground;
 % Statistics and Data Analysis 79 (2014) 
 
 if figout ~=0
-    % tSNR per voxel
+    % tSNR per voxel from background
     data = (mean(data,1)/stdBackground)';
     
     % see where is it and spatial distribition
-    figure; figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
+    figure('Name','Background SNR')
+    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
     SNRimage = zeros(V(1).dim); index = 1; 
-    SNRimage(find(brain_mask ~= 1)) = data;
+    SNRimage(find(brain_mask~=1)) = data;
     mymin = median(data)-3*iqr(data); if mymin<0; mymin = 0; end
-    for z=1:floor(V(1).dim(3)./16):V(1).dim(3)-1
+    for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
         subplot(4,9,figindex(index));
-        imagesc(flipud(squeeze(SNRimage(:,:,z))'));
+        imagesc((squeeze(SNRimage(:,:,z))'));
         index = index+1; colormap(cubehelix(32,[1.15,0.1,4,1], [0,1], [0,0.85]))
         caxis([mymin, median(data)+3*iqr(data)]); set(gca,'XtickLabel',[],'YtickLabel',[])
         xlabel(['slice ' num2str(z)]); 
@@ -151,6 +161,12 @@ if figout ~=0
     bar(bc,K,1,'FaceColor',[0.5 0.5 1]);
     title('RAS Histogram - background noise');
     grid on; box on; ylabel('tSNR'); drawnow
+    if exist([pwd filesep 'tSNR.ps'],'file')
+        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps'], '-append');
+    else
+        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps']);
+    end
+    close('Background SNR')
 end
 
 %% average (tSNR)
@@ -174,18 +190,27 @@ SNROimage = zeros(V(1).dim);
 SNROimage(find(GM+WM+CSF)) = data;
 
 if figout ~= 0
-    figure; index = 1;
+    figure('Name','SNR0'); index = 1;
+    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
     figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31]; 
-    for z=1:floor(V(1).dim(3)./16):V(1).dim(3)-1
+    for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
         subplot(4,9,figindex(index)); 
         imagesc(flipud(squeeze(SNRimage(:,:,z)')));
         caxis([min(SNRimage(:)), max(SNRimage(:))]); set(gca,'XtickLabel',[],'YtickLabel',[]); 
         xlabel(['slice ' num2str(z)]); if index ==2; title('tSNR image'); end        
         subplot(4,9,figindex(index)+5); R= abs(sqrt((squeeze(SNROimage(:,:,z)'./SNRimage(:,:,z)').^2)-1)); 
         imagesc(flipud(R)); if index ==2; title('SNR0/tSNR image'); end
-        caxis([min(R(:)), max(R(:))]); set(gca,'XtickLabel',[],'YtickLabel',[]); xlabel(['slice ' num2str(z)]); 
+        try caxis([min(R(:)), max(R(:))]); end 
+        set(gca,'XtickLabel',[],'YtickLabel',[]); xlabel(['slice ' num2str(z)]); 
         index = index+1; colormap(cubehelix(32,[3,1.9,1.5,1], [0,1], [0.2,0.8]))
     end
+    drawnow
+    if exist([pwd filesep 'tSNR.ps'],'file')
+        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps'], '-append');
+    else
+        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps']);
+    end
+    close('SNR0')
 end
   
 tSNR.SNR02tSNR_corr = corr(SNRimage(:),SNROimage(:));
@@ -228,13 +253,20 @@ model = [sqrt(tSNR.roi.size)' ones(18,1)]*B;
 tSNR.roi.slope = B(1);
 
 if figout ~=0
-    figure('Name','spmup tSNR');
+    figure('Name','SNR per size'); index = 1;
+    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
     plot(sqrt(tSNR.roi.size),[sqrt(tSNR.roi.size)' ones(18,1)]*B,'LineWidth',3);
     hold on; plot(sqrt(tSNR.roi.size),tSNR.roi.value,'ro','LineWidth',2);
     axis tight; box on; grid minor; ylabel('temporal SNR','FontSize',12)
     xlabel('sqrt of the number of in brain voxels used','FontSize',12)
     mytitle = sprintf('tSNR=%g*sqrt(nb of voxels)+%g \n RMSE=%g',B(1),B(2),sqrt(mean(model - tSNR.roi.value')));
-    title(mytitle,'FontSize',12)
+    title(mytitle,'FontSize',12); drawnow
+    if exist([pwd filesep 'tSNR.ps'],'file')
+        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps'], '-append');
+    else
+        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps']);
+    end
+    close('SNR per size')
 end
 
  
