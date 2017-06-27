@@ -76,15 +76,26 @@ if nargin <= 1
     end
 end
 
-if iscell(P); P = cell2mat(P); end
-[folder,name,ext] = fileparts(P(1,:));
+if iscell(P)
+    try
+        P = cell2mat(P);
+        V = spm_vol(P)
+    catch
+        for v=1:size(P,1)
+            V(v) =spm_vol(P{v});
+        end
+    end
+else
+    V = spm_vol(P);
+end
+[folder,name,ext] = fileparts(V(1).fname);
 cd(folder); average = dir('mean*.nii');
 
 % if distance we need the mean image
 if strcmp(flags.volume_distance,'on')
     if isempty(average)
         disp('mean image not found - computing one .. ')
-        average = mean(spm_read_vols(spm_vol(P)),4);
+        average = mean(spm_read_vols(V),4);
     else
         average =  spm_read_vols(spm_vol([folder filesep average.name]));
     end
@@ -94,7 +105,7 @@ end
 if strcmp(flags.movie,'on')
     if ~isfield(flags,'AC') && isempty(average)
         disp('mean image not found - computing one .. ')
-        average = mean(spm_read_vols(spm_vol(P)),4);
+        average = mean(spm_read_vols(V),4);
     end
     flags.AC = [size(average,1)/2, size(average,2)/2, size(average,3)/2];
 end
@@ -102,10 +113,6 @@ end
  
 
 %% look at motion parameters
-moutlier_matrix = [];
-goutlier_matrix = [];
-dist_outliers_matrix  = []; 
-
 if strcmp(flags.motion_parameters,'on')
     
     motion_file = dir('rp*.txt'); % SPM
@@ -151,6 +158,8 @@ if strcmp(flags.motion_parameters,'on')
         for i=1:sum(m_outliers)
             moutlier_matrix(indices(i),i) = 1;
         end
+    else
+        moutlier_matrix = [];
     end
     
     % figure
@@ -185,12 +194,8 @@ if strcmp(flags.globals,'on')
     % find outliers in global mean intensity
     disp('computing globals for outliers ... ')
     glo = zeros(size(P,1),1);
-    if size(P,1) == 1 %4D
-        glo = spm_global(spm_vol(P));
-    else
-        for s=1:size(P,1)
-        glo(s) = spm_global(spm_vol(P(s,:)));
-        end
+    for s=1:size(V,2)
+        glo(s) = spm_global(V(s));
     end
     glo = detrend(glo); % since in spm the data are detrended
     
@@ -214,6 +219,8 @@ if strcmp(flags.globals,'on')
         for i=1:sum(g_outliers)
             goutlier_matrix(indices(i),i) = 1;
         end
+    else
+        goutlier_matrix = [];
     end
     
     % figure
@@ -231,14 +238,12 @@ end
 %% check distances to the mean and volume to volume
 if strcmp(flags.volume_distance, 'on')
     
-    V = spm_vol(P);
     n = size(P,1);
     distance_to_mean = zeros(n,1);
     distance_between = zeros(n-1,1);
     % mean_data = spm_read_vols(spm_vol(average));
     mask = average > 0;
-    dist_outliers_matrix = [];
-
+    
     for i=1:n
         fprintf('computing mean square distances, volume %g/%g \n',i,n)
         vol = spm_read_vols(V(i));
@@ -286,7 +291,10 @@ if strcmp(flags.volume_distance, 'on')
         for i=1:sum(dist_outliers)
             dist_outliers_matrix(indices(i),i) = 1;
         end
+    else
+        dist_outliers_matrix = [];
     end
+    
 end
 
 %% update the motion parameter file
@@ -312,9 +320,6 @@ end
 %% make movies
 if strcmp (flags.movie, 'on')
 
-    if strcmp(def_flags.volume_distance, 'off')
-        V = spm_vol(P);
-    end
     Images = spm_read_vols(V);
     if isnan(AC)
        AC(1) = round(size(Images,1) / 2);
