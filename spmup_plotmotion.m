@@ -6,7 +6,7 @@ function spmup_plotmotion(folder)
 % FORMAT: spmup_plotmotion(folder)
 %
 % INPUT: the folder in which the motion paramters are
-%        in not providing, search the current folder
+%        if not providing, search the current folder
 %
 % OUTPUT: a figure (both .fig and .jpg)
 %
@@ -16,7 +16,14 @@ function spmup_plotmotion(folder)
 
 %% get the data
 current = pwd;
-if nargin == 1
+if nargin == 0
+    filepath = uigetdir(pwd,'select fmri run directory');
+    if filepath == 0
+        return
+    else
+        cd(filepath);
+    end
+elseif nargin == 1
     cd(varargin{1});
 end
 
@@ -40,9 +47,9 @@ for i = 2:n
     delta(i) = sqrt((temp_motion(i-1,1) - temp_motion(i,1))^2 + ...
         (temp_motion(i-1,2) - temp_motion(i,2))^2 +...
         (temp_motion(i-1,3) - temp_motion(i,3))^2 +...
-        1.28*(temp_motion(i-1,4) - temp_motion(i,4))^2 +...
-        1.28*(temp_motion(i-1,5) - temp_motion(i,5))^2 +...
-        1.28*(temp_motion(i-1,6) - temp_motion(i,6))^2);
+        (temp_motion(i-1,4) - temp_motion(i,4))^2 +...
+        (temp_motion(i-1,5) - temp_motion(i,5))^2 +...
+        (temp_motion(i-1,6) - temp_motion(i,6))^2);
 end
 
 %% plot
@@ -58,6 +65,7 @@ subplot(2,2,3:4); plot(delta,'LineWidth',3); hold on;
 axis tight; grid on; title(['Mean square displacement ' num2str(mean(delta)) ' std ' num2str(std(delta))],'FontSize',14);
 xlabel('scans'); ylabel('displacement');
 saveas(gcf, 'motion plots.fig','fig');
-saveas(gcf, 'motion plots.jpg','jpg'); close(gcf)
+print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'motion plots.ps']);
+close(gcf)
 
 cd(current)

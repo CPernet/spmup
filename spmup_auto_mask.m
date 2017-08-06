@@ -1,9 +1,9 @@
 function M = spmup_auto_mask(varargin)
 
-% routine to compute a mask from V, a time-series of memory mapped images
-% this gives a similar (but more inclusive) mask than SPM. Data are
-% smoothed the the average is used as a mask above threshold * by all
-% voxels that are non zeros differences in the time series
+% Routine to compute a mask from V, a time-series of memory mapped images.
+% This gives a similar (but more inclusive) mask than SPM. Data are
+% smoothed and the average is used as the mean above threshold * by all
+% voxels that have non zeros differences in the time series
 %
 % FORMAT M = spmup_auto_mask(V,threshold,fig)
 %

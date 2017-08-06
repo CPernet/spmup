@@ -3,11 +3,11 @@ function M = spmup_timeseriesplot(P,c1,c2,c3,varargin)
 % routine to produce plots a la Jonathan Power
 %
 % FORMAT spmup_timeseriesplot(P,c1, c2, c3, options)
-%        M = spmup_timeseriesplot(P,c1, c2, c3, options)
+%        M = spmup_timeseriesplot(P,c1, c2, c3, 'motion','on','displacement','on','nuisance','on','design','on')
 %
 % INPUT P is a cell array for the time series (see spm_select)
-%       several options are available
 %       c1, c2, c3 are the tissue classes derived from the segmentation
+%       several options are available
 %       'motion' is either 'on' or is a vector associated to the data
 %       'displacement' is either on or is a vector associated to the data
 %       --> these represent the motion and displacement computed from the
@@ -18,7 +18,7 @@ function M = spmup_timeseriesplot(P,c1,c2,c3,varargin)
 %       cardiac cycles that are not well captured by motion correction
 %       'design' is the tsv file describing the experiment
 %       --> for task fMRI this is useful to check against motion
-%
+%       'correlations'  
 % OUTPUT a figure (voxplot) showing all gray and white matter voxels
 %         in time, associated to the traces in options
 %        M is the matrix of voxel by time
@@ -26,7 +26,7 @@ function M = spmup_timeseriesplot(P,c1,c2,c3,varargin)
 % Reference: Power, J.D. (2016). A simple but useful way to assess fMRI
 % scan qualities. NeuroImage
 % <http://dx.doi.org/10.1016/j.neuroimage.2016.08.009>
-%
+%       
 % Cyril Pernet - University of Edinburgh
 % -----------------------------------------
 % Copyright (c) SPM Utility Plus toolbox
@@ -37,10 +37,10 @@ if nargin < 4
 end
 
 V = spm_vol(P);
-c1 = spm_read_vol(spm_vol(c1));
-c2 = spm_read_vol(spm_vol(c2));
-c3 = spm_read_vol(spm_vol(c3));
-if any(size(c1)==V(1).dim) || any(size(c2)==V(1).dim) || any(size(c3)==V(1).dim)
+c1 = spm_read_vols(spm_vol(c1));
+c2 = spm_read_vols(spm_vol(c2));
+c3 = spm_read_vols(spm_vol(c3));
+if any(size(c1)~=V(1).dim) || any(size(c2)~=V(1).dim) || any(size(c3)~=V(1).dim)
     error('segmentation images and data are not of the same dimension')
 end
 

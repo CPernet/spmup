@@ -113,6 +113,8 @@ end
  
 
 %% look at motion parameters
+moutlier_matrix = [];
+
 if strcmp(flags.motion_parameters,'on')
     
     motion_file = dir('rp*.txt'); % SPM
@@ -158,8 +160,6 @@ if strcmp(flags.motion_parameters,'on')
         for i=1:sum(m_outliers)
             moutlier_matrix(indices(i),i) = 1;
         end
-    else
-        moutlier_matrix = [];
     end
     
     % figure
@@ -189,6 +189,8 @@ end
 
 
 %% look at globals
+goutlier_matrix = [];
+
 if strcmp(flags.globals,'on')
     
     % find outliers in global mean intensity
@@ -219,8 +221,6 @@ if strcmp(flags.globals,'on')
         for i=1:sum(g_outliers)
             goutlier_matrix(indices(i),i) = 1;
         end
-    else
-        goutlier_matrix = [];
     end
     
     % figure
@@ -236,6 +236,8 @@ end
 
 
 %% check distances to the mean and volume to volume
+ dist_outliers_matrix = [];
+
 if strcmp(flags.volume_distance, 'on')
     
     n = size(P,1);
@@ -291,10 +293,7 @@ if strcmp(flags.volume_distance, 'on')
         for i=1:sum(dist_outliers)
             dist_outliers_matrix(indices(i),i) = 1;
         end
-    else
-        dist_outliers_matrix = [];
     end
-    
 end
 
 %% update the motion parameter file

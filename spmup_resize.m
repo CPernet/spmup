@@ -3,10 +3,10 @@ function fname = spmup_resize(P,bb,vs)
 % routine that resize an image to match the desired bounding box and voxel
 % size
 %
-% FORMAT: spmup_resize(P,bb,vs)
+% FORMAT: fname = spmup_resize(P,bb,vs)
 % IMPUT:  P is a cell string with images to resize (see spm_select)
 %         bb is the bounding box (default is [-78 -112 -70; 78 76 86])
-%         cs is the voxelo size (default is [2 2 2])
+%         vs is the voxel size (default is [2 2 2])
 %
 % OUTPUT fname is the name of the file
 %

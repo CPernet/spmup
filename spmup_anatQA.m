@@ -3,7 +3,7 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 % *This implements some of the the anatomical QA measures from the*
 % *Preprocessed Connectome Project Quality Assurance Protocol (QAP)*
 % <http://preprocessed-connectomes-project.org/quality-assessment-protocol/>
-%
+% 
 % FORMAT: anatQA = spmup_anatQA(anat,c1,c2)
 % 
 % INPUT: anat is the anatomical image
@@ -73,20 +73,53 @@ end
 
 % compute the noise level using and  50% trimmed data (remove extreme values)
 data(isnan(data)) = [];
-up = median(data)+iqr(data)/2; down = median(data)-iqr(data)/2;
+up = median(data)+iqr(data)/2; 
+down = median(data)-iqr(data)/2;
 index = logical((data<up).*(data>down));
 std_nonbrain = std(data(index)); 
 
+%% make a figure showing the mask and the data range
+figure('Name','Brain Mask')
+set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+
+subplot(2,2,1); 
+tmp = spm_read_vols(AnatV); % read anat
+tmp = tmp ./max(tmp(:))*100; % nornalize to 100
+tmp(brain_mask==0) = 200; % set non brain to 200
+imagesc(squeeze(tmp(:,:,round(AnatV.dim(3)/2))));
+title('brain mask - axial');
+subplot(2,2,2); 
+imagesc(flipud(squeeze(tmp(:,round(AnatV.dim(2)/2),:))'));
+title('brain mask - coronal');
+subplot(2,2,4); 
+imagesc(flipud(squeeze(tmp(round(AnatV.dim(1)/2),:,:))'));
+title('brain mask - sagital');
+clear tmp
+
+subplot(2,2,3);
+k = round(1+log2(length(data)));
+histogram(data,k,'FaceColor',[1 1 0],'EdgeColor',[1 1 0],'FaceAlpha',0.8); hold on
+plot(repmat(down,max(hist(data,k)),1),[1:max(hist(data,k))],'k','LineWidth',3);
+plot(repmat(up,  max(hist(data,k)),1),[1:max(hist(data,k))],'k','LineWidth',3);
+clear x y z; [x,y,z] = ind2sub(AnatV.dim,find(brain_mask));
+histogram(spm_get_data(AnatV,[x y z]'),k,'FaceColor',[0 0 1],'EdgeColor',[0 0 1],'FaceAlpha',0.4); hold on
+title('background voxels & limits vs brain mask'); axis tight; box on; grid on; 
+print (gcf,'-dpsc2', '-bestfit', [fileparts(AnatV.fname) filesep 'AnatQC.ps'])
+close(gcf)
+
+%% now do all computations
 disp('spmup_anatQA: getting measures')
 % make gray/white mutually exclusive
 I_GM = spm_read_vols(GrayV) > spm_read_vols(WhiteV);
 I_WM = spm_read_vols(WhiteV) > spm_read_vols(GrayV); 
 
 % compute taking voxels in I_GM and I_WM
+clear x y z 
 [x,y,z] = ind2sub(AnatV.dim,find(I_GM));
 dataGM = spm_get_data(AnatV,[x y z]');
 meanGM = mean(dataGM);
 
+clear x y z 
 [x,y,z] = ind2sub(AnatV.dim,find(I_WM));
 dataWM = spm_get_data(AnatV,[x y z]');
 meanWM = mean(dataWM);
@@ -115,6 +148,8 @@ else
     anatQA.asym = mean(asym(data(1:left,:,:)~=0));
 end
 
+
+%% outpouts for unit test
 if nargout == 2
     int_data.meanGM = meanGM;
     int_data.meanWM = meanWM;

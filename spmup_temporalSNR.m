@@ -47,7 +47,7 @@ end
 V = spm_vol(time_series);
 if size(time_series,1) ==1 
     n = size(V,1);
-    time_series = strcat(repmat(time_series, n, 1), ',', num2str([1:n]'));
+    time_series = strcat(repmat(time_series, n, 1), ',', num2str([1:n]')); % write as seroes of 3D
 end
 
 VM = spm_vol(masks);
@@ -57,7 +57,15 @@ end
 if iscell(VM)
     VM = cell2mat(VM);
 end
-    
+
+if any(VM(1).dim~= VM(2).dim) || any(VM(3).dim~= VM(2).dim)
+    error('masks do not have the same dimentions')
+end
+
+if any(V(1).dim~= VM(1).dim)
+    error('dimention mismatch between the time series and masks')
+end
+
 %% Compute relative masks
 GM = spm_read_vols(VM(1));
 WM = spm_read_vols(VM(2));
@@ -71,27 +79,32 @@ WM = WM.*(WM>(GM+CSF)); % figure; rst_hist(WM(:))
 CSF = CSF.*(CSF>(WM+GM)); % figure; rst_hist(CSF(:))
 
 %% in masks tSNR
+clear x y z
 [x,y,z] = ind2sub(size(GM),find(GM));
 data = spm_get_data(V,[x y z]');
 stdGM = mean(std(data,1));
 tSNR.GM =  mean(mean(data,1)) /stdGM;
 
+clear x y z
 [x,y,z] = ind2sub(size(WM),find(WM));
 data = spm_get_data(V,[x y z]');
 stdWM = mean(std(data,1));
 tSNR.WM =  mean(mean(data,1)) /stdWM;
 
+clear x y z
 [x,y,z] = ind2sub(size(CSF),find(CSF));
 data = spm_get_data(V,[x y z]');
 stdCSF = mean(std(data,1));
 tSNR.CSF =  mean(mean(data,1)) /stdCSF;
 
 %% Background
+clear x y z
 [x,y,z] = ind2sub(size(brain_mask),find(brain_mask ~= 1));
 data = spm_get_data(V,[x y z]');
 stdBackground = mean(std(data,1));
 tSNR.Background_raw = data;
 tSNR.Background =  mean(mean(data,1)) /stdBackground;
+% figure; rst_hist(data(:))
 
 % Computes the density estimate of data using a Random Average Shifted 
 % Histogram algorithm is coded based on Bourel et al. Computational 
