@@ -5,7 +5,7 @@ function [anatQA,fMRIQA]=spmup_BIDS(BIDS_dir,choices)
 %
 % FORMAT spmup_BIDS
 %        spmup_BIDS(BIDS_dir)
-%        spmup_BIDS(BIDS_dir,options)
+%        spmup_BIDS(BIDS_dir,choices)
 %
 % INPUTS BIDS_dir is the BIDS directory
 %        choices a structure with the following fields:
@@ -13,7 +13,7 @@ function [anatQA,fMRIQA]=spmup_BIDS(BIDS_dir,choices)
 %               .removeNvol = number of initial volumes to remove
 %               .keep_data = 'off' (default) or 'on' to keep all steps - off means
 %                            only the last processed data are available
-%               .overwrite_data = 'on' turning it 'off; is useful to restart
+%               .overwrite_data = 'on' turning it 'off' is useful to restart
 %                                  some processing while kepping previous steps
 %               .QC = 'on' (default) or 'off' performs quality controls for
 %                     anatomical (T1) scans and EPI time series
@@ -22,16 +22,18 @@ function [anatQA,fMRIQA]=spmup_BIDS(BIDS_dir,choices)
 %               .motionexp = 'off' (default) or 'on' compute 24 motion parameters
 %               .scrubbing = 'off' (default) or 'on' find outliers in motion derivatives and in globals
 %               .compcor = 'on' (default) or 'off' does the equivalent of compcor
+%               .norm = 'EPInorm' (default) or 'T1norm' choice of the type of template for normalization
+%               .ignore_fieldmaps = 'on' or 'off' (default) to include distorsion correction
 %               .skernel = [6 6 6] by default is the smoothing kernel
 %               .derivatives = 'off', 1 or 2 to use for GLM
 %                              if dervatives are used, beta hrf get boosted
 %                              and smoothing is performed after the GLM
 %
 % usage:
-% options = struct('removeNvol', 0, 'keep_data', 'on',  'overwrite_data', 'on', ...
+% choice = struct('removeNvol', 0, 'keep_data', 'on',  'overwrite_data', 'on', ...
 %     'despike', 'off', 'drifter', 'off', 'motionexp', 'off', 'scrubbing', 'off', ...
-%     'compcor', 'off', 'skernel', [6 6 6], 'derivatives', 1, 'ignore_fieldmaps', 'on', ...
-%     'outdir', 'spmup_BIDS_processed_basic', 'QC', 'off'); % standard SPM pipeline
+%     'compcor', 'off', 'norm', 'EPInorm', 'skernel', [6 6 6], 'derivatives', 1, ...
+%     'ignore_fieldmaps', 'on',  'outdir', 'spmup_BIDS_processed_basic', 'QC', 'off'); % standard SPM pipeline
 % [anatQA,fMRIQA]=spmup_BIDS(pwd,options)
 %
 % Cyril Pernet - University of Edinburgh
@@ -53,7 +55,7 @@ I=intersect(fieldnames(options),fieldnames(choices));
 for f=1:length(I)
     options = setfield(options,I{f},getfield(choices,I{f}));
 end
-
+clear choices
 spm('defaults', 'FMRI');
 
 %% get the data info
@@ -78,13 +80,16 @@ if ~isfield(options,'outdir')
     options.outdir = [BIDS_dir filesep 'spmup_BIDS_processed'];
 end
 
-mkdir(options.outdir);
+if ~exist(options.outdir,'dir')
+    mkdir(options.outdir);
+end
+
 % this needs update for longitinal dataset ie multiple 'sessions'
 for s=1:size(BIDS.subjects,2)
-    fprintf('subject %g: unpacking anatomical data \n',s)
     in = [BIDS.dir filesep BIDS.subjects(s).name filesep 'anat' filesep BIDS.subjects(s).anat.filename];
     subjects{s}.anat = [options.outdir filesep BIDS.subjects(s).name filesep 'anat' filesep BIDS.subjects(s).anat.filename(1:end-3)];
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist(subjects{s}.anat,'file'))
+        fprintf('subject %g: unpacking anatomical data \n',s)
         gunzip(in, [options.outdir filesep BIDS.subjects(s).name filesep 'anat' ]);
         spmup_auto_reorient(subjects{s}.anat); disp('anat reoriented');
     end
@@ -99,21 +104,18 @@ if size(BIDS.subjects(s).func,2) >= 2
 end
 
 parfor s=1:size(BIDS.subjects,2)
-    if ~isempty(BIDS.subjects(s).fmap)
-        fprintf('subject %g: unpacking functional data and field maps \n',s)
-    else
-        fprintf('subject %g: unpacking functional data \n',s)
-    end
     
     for frun = 1:size(BIDS.subjects(s).func,2)
         % functional
         in = [BIDS.dir filesep BIDS.subjects(s).name filesep 'func' filesep BIDS.subjects(s).func(frun).filename];
         subjects{s}.func(frun,:) = [options.outdir filesep BIDS.subjects(s).name filesep 'run' num2str(frun) filesep BIDS.subjects(s).func(frun).filename(1:end-3)];
         if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist(subjects{s}.func(frun,:),'file'))
+            fprintf('subject %g: unpacking functional data \n',s)
             gunzip(in, [options.outdir filesep BIDS.subjects(s).name filesep 'run' num2str(frun)]);
         end
         
         if ~isempty(BIDS.subjects(s).fmap)
+            fprintf('subject %g: checking field maps \n',s)
             % field maps
             in = [BIDS.dir filesep BIDS.subjects(s).name filesep 'fmap' filesep BIDS.subjects(s).fmap{frun}.magnitude1];
             subjects{s}.fieldmap(frun,:).mag1 = [options.outdir filesep BIDS.subjects(s).name filesep 'run' num2str(frun) filesep 'fieldmaps' filesep BIDS.subjects(s).fmap{frun}.magnitude1(1:end-3)];
@@ -156,13 +158,23 @@ disp('spmup has finished unpacking data')
 % -------------------------------------------------------------------------
 spm_jobman('initcfg');
 spm_root = fileparts(which('spm'));
+if isfield(BIDS,'skip') %% need to check BIDS spec 
+    start_at = BIDS.'skip';
+else
+    start_at = 1;
+end
 
 % do the computation if needed
 for s=1:size(BIDS.subjects,2)
     % each subject build a job structure around matlabbatch
     
     for frun = 1:size(BIDS.subjects(s).func,2) % each run
-        filesin = [BIDS_dir filesep subjects{s}.func(frun,:)];
+        if start_at == 1
+            filesin = [BIDS_dir filesep subjects{s}.func(frun,:)];
+        else
+            % remove from the 4D the files we don't want and proceed
+            disp('skipped not implemented yet'); % start_at
+        end
         [filepath,filename,ext] = fileparts(filesin);
         
         % -----------------------------------------
@@ -295,11 +307,11 @@ for s=1:size(BIDS.subjects,2)
                 spm_jobman('run',matlabbatch); clear matlabbatch;
             end
         end
-    end
+    end % end processing per run
     
-    % ------------
-    % Realignment
-    % ------------
+    % -----------------------
+    % Realignment across runs
+    % ------------------------
     if isempty(BIDS.subjects(s).fmap)
         % file out of realign will be
         [filepath,filename,ext] = fileparts(st_files{1});
@@ -568,7 +580,7 @@ for s=1:size(BIDS.subjects,2)
         matlabbatch{1}.spm.stats.fmri_spec.dir = {[filepath filesep 'Stats']};
         matlabbatch{1}.spm.stats.fmri_spec.timing.units = 'secs';
         matlabbatch{1}.spm.stats.fmri_spec.timing.RT = BIDS.subjects(1).func(1).meta.RepetitionTime;
-        N = length(BIDS.subjects(1).func(1).meta.SliceTiming);
+        N = length(BIDS.subjects(s).func(1).meta.SliceTiming);
         matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t = N;
         matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0 = round(N/ 2);
         
@@ -715,6 +727,8 @@ options.drifter= 'off';
 options.motionexp = 'off'; % 24 motion param
 options.scrubbing = 'off'; % scrubbing
 options.compcor= 'off'; % compcor
+% Normalization
+options.norm = 'EPInorm';
 % Smoothing
 options.skernel = [6 6 6];
 % 1st level analysis
