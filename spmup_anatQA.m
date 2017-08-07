@@ -104,10 +104,12 @@ plot(repmat(up,  max(hist(data,k)),1),[1:max(hist(data,k))],'k','LineWidth',3);
 clear x y z; [x,y,z] = ind2sub(AnatV.dim,find(brain_mask));
 histogram(spm_get_data(AnatV,[x y z]'),k,'FaceColor',[0 0 1],'EdgeColor',[0 0 1],'FaceAlpha',0.4); hold on
 title('background voxels & limits vs brain mask'); axis tight; box on; grid on; 
+filepath = fileparts(AnatV.fname);
+if isempty(filepath); filepath = pwd; end
 try
-    print (gcf,'-dpsc2', '-bestfit', [fileparts(AnatV.fname) filesep 'AnatQC.ps'])
+    print (gcf,'-dpsc2', '-bestfit', [filepath filesep 'AnatQC.ps'])
 catch
-    print (gcf,'-dpsc2', [fileparts(AnatV.fname) filesep 'AnatQC.ps'])
+    print (gcf,'-dpsc2', [filepath filesep 'AnatQC.ps'])
 end
 close(gcf)
 
@@ -140,14 +142,19 @@ anatQA.EFC = nansum((data(:)./Bmax).*abs(log((data(:)./Bmax))));
 % asym
 middle_img = abs(AnatV.dim(1).*AnatV.mat(1) / 2);
 xoffset = AnatV.mat(1,4);
-if xoffset<(middle_img-20) || xoffset>(middle_img+20)
+if abs(xoffset)<(middle_img-20) || abs(xoffset)>(middle_img+20)
     disp('skipping assymmetry index, the 0 x coordinate doesn''t seem to be in the middle of the image')
 else
     voxoffset = abs(xoffset./AnatV.mat(1));
     left = floor(voxoffset-1); right = ceil(voxoffset+1);
     data = (spm_read_vols(GrayV)+spm_read_vols(WhiteV))>0;
-    N = data(1:left,:,:)-flipud(data(right:end,:,:)); 
-    D = data(1:left,:,:)+flipud(data(right:end,:,:)); 
+    if left < right
+        L = 1:left;
+    else
+        L = 1:right;
+    end
+    N = data(L,:,:)-flipud(data(right+L,:,:));
+    D = data(L,:,:)+flipud(data(right+L,:,:));
     asym = N./D; clear N D
     anatQA.asym = mean(asym(data(1:left,:,:)~=0));
 end
@@ -160,12 +167,9 @@ if nargout == 2
     int_data.std_nonbrain = std_nonbrain;
     int_data.varGMWM = var([dataGM dataWM]);
     int_data.Bmax = Bmax;
+else
+    writetable(struct2table(anatQA), [filepath filesep 'spmup_anatQA.txt']);
 end
 
-         
-         
-         
-         
-         
-         
+        
 
