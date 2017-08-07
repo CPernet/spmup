@@ -104,7 +104,11 @@ plot(repmat(up,  max(hist(data,k)),1),[1:max(hist(data,k))],'k','LineWidth',3);
 clear x y z; [x,y,z] = ind2sub(AnatV.dim,find(brain_mask));
 histogram(spm_get_data(AnatV,[x y z]'),k,'FaceColor',[0 0 1],'EdgeColor',[0 0 1],'FaceAlpha',0.4); hold on
 title('background voxels & limits vs brain mask'); axis tight; box on; grid on; 
-print (gcf,'-dpsc2', '-bestfit', [fileparts(AnatV.fname) filesep 'AnatQC.ps'])
+try
+    print (gcf,'-dpsc2', '-bestfit', [fileparts(AnatV.fname) filesep 'AnatQC.ps'])
+catch
+    print (gcf,'-dpsc2', '-bestfit', [fileparts(AnatV.fname) filesep 'AnatQC.ps'])
+end
 close(gcf)
 
 %% now do all computations
