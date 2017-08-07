@@ -107,7 +107,7 @@ title('background voxels & limits vs brain mask'); axis tight; box on; grid on;
 try
     print (gcf,'-dpsc2', '-bestfit', [fileparts(AnatV.fname) filesep 'AnatQC.ps'])
 catch
-    print (gcf,'-dpsc2', '-bestfit', [fileparts(AnatV.fname) filesep 'AnatQC.ps'])
+    print (gcf,'-dpsc2', [fileparts(AnatV.fname) filesep 'AnatQC.ps'])
 end
 close(gcf)
 
