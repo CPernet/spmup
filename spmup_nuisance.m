@@ -19,6 +19,9 @@ function nuisances = spmup_nuisance(fmridata,whitematter,csf)
 if nargin == 0
     [fmridata,sts]= spm_select(Inf,'image','Select fMRI data');
     if sts == 0; disp('selection aborded'); return; end
+    if size(fmridata,1) == 1 && strcmp(fmridata(length(fmridata)-1:end),',1')
+        fmridata = fmridata(1:length(fmridata)-2); % in case picked 4D put left ,1
+    end
     [whitematter,sts]= spm_select(1,'image','Select white matter tissue image');
     if sts == 0; disp('selection aborded'); return; end
     [csf,sts]= spm_select(1,'image','Select csf tissue image');
@@ -38,15 +41,17 @@ if sum(size(Vfmri)) == 2
     error('fMRI data must be time series')
 end
     
-Vwhitematter = spm_vol(whitematter); whitematter = spm_read_vols(Vwhitematter);
+Vwhitematter = spm_vol(whitematter);
 if any(Vwhitematter.dim ~= Vfmri(1).dim)
     error('Dimension issue between data and white matter')
 end
+whitematter = spm_read_vols(Vwhitematter);
 
-Vcsf = spm_vol(csf); csf = spm_read_vols(Vcsf);
+Vcsf = spm_vol(csf); 
 if any(Vcsf.dim ~= Vfmri(1).dim)
     error('Dimension issue between data and CSF')
 end
+csf = spm_read_vols(Vcsf);
 
 % check if the masks are binary with a threshold at 0.7
 whitematter = whitematter > 0.7;

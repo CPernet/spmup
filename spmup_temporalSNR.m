@@ -40,22 +40,24 @@ if nargin == 2
 end
 
 V = spm_vol(time_series);
-if size(V,1) < 10
-    error('there is less than 10 images in your time series ??')
-end
-% use 3D format
-V = spm_vol(time_series);
-if size(time_series,1) ==1 
-    n = size(V,1);
-    time_series = strcat(repmat(time_series, n, 1), ',', num2str([1:n]')); % write as seroes of 3D
+if size(time_series,1) ==1
+    for i=1:size(V,1)
+        newname = {[time_series ',' num2str(i)]};
+    end
+    V = spm_vol(newname);
 end
 
-VM = spm_vol(masks);
+if iscell(V); V = cell2mat(V); end
+if size(V,1) < 10; error('there is less than 10 images in your time series ??'); end
+
+
+for m=1:3
+    VM(m) = spm_vol(masks{m});
+end
+VM = cell2mat(VM);
+
 if length(VM) ~= 3
     error(['3 masks files expected, ' num2str(size(VM,1)) ' detected - check input file'])
-end
-if iscell(VM)
-    VM = cell2mat(VM);
 end
 
 if any(VM(1).dim~= VM(2).dim) || any(VM(3).dim~= VM(2).dim)
@@ -109,6 +111,9 @@ tSNR.Background =  mean(mean(data,1)) /stdBackground;
 % Computes the density estimate of data using a Random Average Shifted 
 % Histogram algorithm is coded based on Bourel et al. Computational 
 % Statistics and Data Analysis 79 (2014) 
+if exist('cubehelix','file') == 0
+    addpath([fileparts(which('spmup_temporalSNR.m')) filesep 'external']);
+end
 
 if figout ~=0
     % tSNR per voxel from background
@@ -175,9 +180,17 @@ if figout ~=0
     title('RAS Histogram - background noise');
     grid on; box on; ylabel('tSNR'); drawnow
     if exist([pwd filesep 'tSNR.ps'],'file')
-        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps'], '-append');
+        try
+            print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps'], '-append');
+        catch
+            print (gcf,'-dpsc2', [pwd filesep 'tSNR.ps'], '-append');
+        end
     else
-        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps']);
+        try
+            print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps']);
+        catch
+            print (gcf,'-dpsc2', [pwd filesep 'tSNR.ps']);
+        end
     end
     close('Background SNR')
 end
@@ -219,9 +232,17 @@ if figout ~= 0
     end
     drawnow
     if exist([pwd filesep 'tSNR.ps'],'file')
-        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps'], '-append');
+        try
+            print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps'], '-append');
+        catch
+            print (gcf,'-dpsc2', [pwd filesep 'tSNR.ps'], '-append');
+        end
     else
-        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps']);
+        try
+            print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps']);
+        catch
+            print (gcf,'-dpsc2', [pwd filesep 'tSNR.ps']);
+        end
     end
     close('SNR0')
 end
@@ -275,9 +296,17 @@ if figout ~=0
     mytitle = sprintf('tSNR=%g*sqrt(nb of voxels)+%g \n RMSE=%g',B(1),B(2),sqrt(mean(model - tSNR.roi.value')));
     title(mytitle,'FontSize',12); drawnow
     if exist([pwd filesep 'tSNR.ps'],'file')
-        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps'], '-append');
+        try
+            print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps'], '-append');
+        catch
+            print (gcf,'-dpsc2', [pwd filesep 'tSNR.ps'], '-append');
+        end
     else
-        print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps']);
+        try
+            print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'tSNR.ps']);
+        catch
+            print (gcf,'-dpsc2', [pwd filesep 'tSNR.ps']);
+        end
     end
     close('SNR per size')
 end

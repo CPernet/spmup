@@ -2,11 +2,11 @@ function outlying_volumes = spmup_outliers(varargin)
 %
 % this function is similar to 3dToutcount
 % http://afni.nimh.nih.gov/pub/dist/doc/program_help/3dToutcount.html
-% Note is requires the statistics toolbox (nansum, icdf are called)
+% Note that it requires the statistics toolbox (nansum, icdf are called)
 %
-% FORMAT spmup_despike
-%        spmup_despike(P)
-%        spmup_despike(P,M)
+% FORMAT outlying_volumes = spmup_outliers
+%        outlying_volumes = spmup_outliers(P)
+%        outlying_volumes = spmup_outliers(P,M)
 %
 % INPUT if none the user is prompted
 %       P the names of the fMRI images (time-series) or the 4D matrix of data
@@ -16,9 +16,10 @@ function outlying_volumes = spmup_outliers(varargin)
 %
 % one looks for outlier voxels based on the Median Absolute Deviation
 % Here the MAD is median absolute value of time series minus trend.
-% The trend is optained using spn_detrend (2nd order polynomial)
-% Outliers are then those voxels with values outside
-% k = alphav * sqrt(pi/2) * MAD 
+% The trend is optained using spm_detrend (2nd order polynomial)
+% Outliers are then those voxels with values outside: k = alphav * sqrt(pi/2) * MAD 
+% Once obtain we count the number of outlying voxels per volume to find
+% volumes with high number of outlying voxels (same procedure)
 %
 % Cyril Pernet 
 % --------------------------------------------------------------------------
@@ -63,6 +64,17 @@ else
                 Y(:,:,p,i) = spm_slice_vol(V(i),spm_matrix([0 0 p]),V(i).dim(1:2),0);
             end
         end
+    elseif iscell(P)
+        for v=1:size(P,1)
+            V(v) =spm_vol(P{v});
+        end
+        N = numel(V);
+        Y = zeros([V(1).dim(1:3),N]);
+        for i=1:N
+            for p=1:V(1).dim(3)
+                Y(:,:,p,i) = spm_slice_vol(V(i),spm_matrix([0 0 p]),V(i).dim(1:2),0);
+            end
+        end
     else
         if numel(size(P)) == 4 % this is already data in
             Y = P; N = size(Y,4);
@@ -70,31 +82,34 @@ else
             error('input data are not char nor 4D data matrix, please check inputs')
         end
     end
+end
     
-    if nargin == 2
-        M = varargin{2};
-        if ischar(M)
-            V = spm_vol(M);
-            N = numel(V);
-            Mask = zeros([V(1).dim(1:3),N]);
-            for i=1:N
-                for p=1:V(1).dim(3)
-                    Mask(:,:,p,i) = spm_slice_vol(V(i),spm_matrix([0 0 p]),V(i).dim(1:2),0);
-                end
-            end
-        else
-            if numel(size(M)) == 4 % this is already data in
-                Mask = m; N = size(Mask,4);
-            else
-                error('input data are not char nor 4D data matrix, please check inputs')
+if nargin == 2
+    M = varargin{2};
+    if ischar(M)
+        V = spm_vol(M);
+        N = numel(V);
+        Mask = zeros([V(1).dim(1:3),N]);
+        for i=1:N
+            for p=1:V(1).dim(3)
+                Mask(:,:,p,i) = spm_slice_vol(V(i),spm_matrix([0 0 p]),V(i).dim(1:2),0);
             end
         end
+    else
+        if numel(size(M)) == 4 % this is already data in
+            Mask = m; N = size(Mask,4);
+        else
+            error('input data are not char nor 4D data matrix, please check inputs')
+        end
     end
+else
+    disp('generating a mask')
+    Mask = spmup_auto_mask(V);
 end
 
-disp('looking for outlier volumes')
 
 % detrend, get the MAD and classify
+disp('looking for outlier volumes')
 class = NaN(size(Y));
 alphav = icdf('Normal',1-(0.001/N),0,1);
 
