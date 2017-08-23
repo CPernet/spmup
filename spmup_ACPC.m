@@ -24,9 +24,7 @@ function out = spmup_ACPC(varargin)
 
 
 if isempty(nargin)
-    P = spm_select(Inf,'image')
-else
-    
+    P = spm_select(Inf,'image');   
 end
 
 spmDir=which('spm');

@@ -27,7 +27,8 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 %                can indicate an issue with the image (for healthy brains)
 %
 % * when the background has 0 variance (e.g. a sequence with noise suppression like FLAIR) then the standard 
-%   deviation of the white matter is used as reference instead of the background
+%   deviation of the white matter is used as reference instead of the
+%   background
 %
 % Note: GM and WM are thresholded by making them mutually exclusive
 % The background is found using data outside a large brain mask and

@@ -11,7 +11,7 @@ function [FD,RMS,motion] = spmup_FD(realignment_file,radius)
 %
 % OUTPUT: FD framewise displacement
 %         RMS the root mean square displacement 
-%         motion, the mition parameters
+%         motion, the motion parameters
 %
 % Cyril Pernet - University of Edinburgh
 % -----------------------------------------
@@ -26,7 +26,7 @@ if nargin == 0
     end
 end
 motion = load(realignment_file); % load data
-motion = motion(:,[1:6]); % make sure to pick only the initial 6 if another file is used
+motion = motion(:,1:6); % make sure to pick only the initial 6 if another file is used
 motion = spm_detrend(motion,1); % de-mean and detrend
 
 if ~exist('radius','var')
@@ -45,6 +45,10 @@ subplot(2,2,1); plot(motion(:,[1 2 3]),'LineWidth',3); axis tight; box on; grid 
 subplot(2,2,2); plot(motion(:,[4 5 6]),'LineWidth',3); axis tight; box on; grid on; title('rotation')
 subplot(2,2,3); plot(FD,'LineWidth',3); axis tight; box on; grid on; title('framewise displacement')
 subplot(2,2,4); plot(RMS,'LineWidth',3); axis tight; box on; grid on; title('root mean square')
-print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'displacement.ps']);
+try
+    print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'displacement.ps']);
+catch
+    print (gcf,'-dpsc2', [pwd filesep 'displacement.ps']);
+end
 close(gcf)
 
