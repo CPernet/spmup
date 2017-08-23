@@ -12,12 +12,12 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 %
 % OUTPUT anatQA is a structure with the following fields:
 %        - SNR : the signal-to-Noise Ratio, ie the mean intensity within gray and white matter divided
-%                by the standard deviation of the values outside the brain*. Higher values are better.
+%                by the standard deviation of the values outside the brain. Higher values are better.
 %        - CNR : the Contrast to Noise Ratio, i.e. the mean of the white matter intensity values minus the mean 
 %                of the gray matter intensity values divided by the standard deviation of the values outside the
-%                brain*. Higher values are better.
+%                brain. Higher values are better.
 %        - FBER: Foreground to Background Energy Ratio, i.e. the variance of voxels in grey and white matter 
-%                divided by the variance of voxels outside the brain*. Higher values are better.
+%                divided by the variance of voxels outside the brain. Higher values are better.
 %        - EFC : Entropy Focus Criterion, i.e. the entropy of voxel intensities proportional to the maximum 
 %                possibly entropy for a similarly sized image. Indicates ghosting and head motion-induced blurring. 
 %                Lower values are better. See <http://ieeexplore.ieee.org/document/650886/>
@@ -25,9 +25,6 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 %                coordinate is roughly in the middle of the image (+/- 20 mm), asymmetry is
 %                computed for the combined gray/white matter masks - large difference
 %                can indicate an issue with the image (for healthy brains)
-%
-% * when the background has 0 variance (e.g. a sequence with noise suppression like FLAIR) then the standard 
-%   deviation of the white matter is used as reference instead of the background
 %
 % Note: GM and WM are thresholded by making them mutually exclusive
 % The background is found using data outside a large brain mask and
@@ -109,18 +106,10 @@ histogram(spm_get_data(AnatV,[x y z]'),k,'FaceColor',[0 0 1],'EdgeColor',[0 0 1]
 title('background voxels & limits vs brain mask'); axis tight; box on; grid on; 
 filepath = fileparts(AnatV.fname);
 if isempty(filepath); filepath = pwd; end
-if exist([pwd filesep 'tSNR.ps'],'file')
-    try
-        print (gcf,'-dpsc2', '-bestfit', [filepath filesep 'AnatQC.ps'], '-append');
-    catch
-        print (gcf,'-dpsc2', [filepath filesep 'AnatQC.ps'], '-append');
-    end
-else
-    try
-        print (gcf,'-dpsc2', '-bestfit', [filepath filesep 'AnatQC.ps']);
-    catch
-        print (gcf,'-dpsc2', [filepath filesep 'AnatQC.ps']);
-    end
+try
+    print (gcf,'-dpsc2', '-bestfit', [filepath filesep 'AnatQC.ps'])
+catch
+    print (gcf,'-dpsc2', [filepath filesep 'AnatQC.ps'])
 end
 close(gcf)
 
@@ -141,15 +130,9 @@ clear x y z
 dataWM = spm_get_data(AnatV,[x y z]');
 meanWM = mean(dataWM);
 
-if std_nonbrain == 0
-    anatQA.SNR  = ((meanGM+meanWM)/2)/std(dataWM);
-    anatQA.CNR  = (meanWM-meanGM)/std(dataWM);
-    anatQA.FBER = var([dataGM dataWM])/std(dataWM)^2;
-else
-    anatQA.SNR  = ((meanGM+meanWM)/2)/std_nonbrain;
-    anatQA.CNR  = (meanWM-meanGM)/std_nonbrain;
-    anatQA.FBER = var([dataGM dataWM])/std_nonbrain^2;
-end
+anatQA.SNR  = ((meanGM+meanWM)/2)/std_nonbrain;
+anatQA.CNR  = (meanWM-meanGM)/std_nonbrain;
+anatQA.FBER = var([dataGM dataWM])/std_nonbrain^2;
 
 data = spm_read_vols(AnatV);
 data(isnan(data)) = [];
@@ -184,8 +167,8 @@ if nargout == 2
     int_data.std_nonbrain = std_nonbrain;
     int_data.varGMWM = var([dataGM dataWM]);
     int_data.Bmax = Bmax;
-% else
-%     writetable(struct2table(anatQA), [filepath filesep 'spmup_anatQA.txt']);
+else
+    writetable(struct2table(anatQA), [filepath filesep 'spmup_anatQA.txt']);
 end
 
         
