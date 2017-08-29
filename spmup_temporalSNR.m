@@ -29,6 +29,11 @@ function tSNR = spmup_temporalSNR(time_series,masks,figout)
 %            .signal_mean: sqrt(std(GM)^2+std(WM+CSF)^2) / sqrt((SNR0^2/tSNR- 1)/SNR0^2)
 %            Since tSNR = SNR0^2 / (1+L^2*SNR0^2), we have L^2 = (SNR0^2 /tSNR - 1) / SNR0^2
 %            and sqrt(std(GM)^2+std(WM+CSF)^2) = L*Smean 
+%        tSMR_time_series.nii image is also saved on the drive, showing tSNR in each voxel for GM, WM and CSF as computed above 
+%
+% References: (1) Thomas Liu  (2016) Noise contributions to the fMRI signal: An overview NeuroImage, 143, 141-151.
+%             (2) César Caballero-Gaudes and Richard C. Reynolds (2016). Methods For Cleaning The BOLD fMRI Signal. NeuroImage, 154,128-149
+%             (3) Lawrence Wald and Jonathan R Polimeni (2016). Impacting the effect of fMRI noise through hardware and acquisition choices – Implications for controlling false positive rates. NeuroImage, 154,15-22
 %
 % Cyril Pernet - University of Edinburgh
 % -----------------------------------------
@@ -40,21 +45,31 @@ if nargin == 2
 end
 
 V = spm_vol(time_series);
-if size(time_series,1) ==1
-    for i=1:size(V,1)
-        newname = {[time_series ',' num2str(i)]};
+if size(time_series,1) == 1 && strcmp(time_series(length(time_series)-1:end),',1')
+    time_series = time_series(1:length(time_series)-2); % in case picked 4D put left ,1
+end
+
+if iscell(time_series)
+    for v=1:size(time_series,1)
+        Vfmri(v) =spm_vol(time_series{v});
     end
-    V = spm_vol(newname);
+else
+    Vfmri = spm_vol(time_series);
 end
 
 if iscell(V); V = cell2mat(V); end
 if size(V,1) < 10; error('there is less than 10 images in your time series ??'); end
 
-
 for m=1:3
-    VM(m) = spm_vol(masks{m});
+    if iscell(masks) ==0
+        VM(m) = spm_vol(masks(m,:));
+    else
+        VM(m) = spm_vol(masks{m});
+    end
 end
-VM = cell2mat(VM);
+
+if iscell(VM); VM = cell2mat(VM); end
+
 
 if length(VM) ~= 3
     error(['3 masks files expected, ' num2str(size(VM,1)) ' detected - check input file'])
@@ -81,23 +96,24 @@ WM = WM.*(WM>(GM+CSF)); % figure; rst_hist(WM(:))
 CSF = CSF.*(CSF>(WM+GM)); % figure; rst_hist(CSF(:))
 
 %% in masks tSNR
-clear x y z
+clear x y z 
 [x,y,z] = ind2sub(size(GM),find(GM));
 data = spm_get_data(V,[x y z]');
 stdGM = mean(std(data,1));
 tSNR.GM =  mean(mean(data,1)) /stdGM;
 
-clear x y z
+clear x y z 
 [x,y,z] = ind2sub(size(WM),find(WM));
 data = spm_get_data(V,[x y z]');
 stdWM = mean(std(data,1));
 tSNR.WM =  mean(mean(data,1)) /stdWM;
 
-clear x y z
+clear x y z 
 [x,y,z] = ind2sub(size(CSF),find(CSF));
 data = spm_get_data(V,[x y z]');
 stdCSF = mean(std(data,1));
 tSNR.CSF =  mean(mean(data,1)) /stdCSF;
+
 
 %% Background
 clear x y z
@@ -206,6 +222,10 @@ tSNR.average = mean(mean(data,1)) / sqrt(stdGM^2+stdWMCSF^2+stdBackground^2);
 data = (mean(data,1)/sqrt(stdGM^2+stdWMCSF^2))';
 SNRimage = zeros(V(1).dim); 
 SNRimage(find(GM+WM+CSF+(brain_mask ~= 1))) = data;
+W = V(1); [rootfolder,name,ext]=fileparts(V(1).fname);
+W.fname = [rootfolder filesep 'tSNR_' name ext];
+W.descrip = 'tSNR image - see spmup_temporalSNR';
+spm_write_vol(W,SNRimage);
 
 %% SNR0 (brain only)
 [x,y,z] = ind2sub(size(brain_mask),find(GM+WM+CSF));
