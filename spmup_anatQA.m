@@ -157,11 +157,12 @@ Bmax = sqrt(sum(data(:).^2));
 anatQA.EFC = nansum((data(:)./Bmax).*abs(log((data(:)./Bmax))));
 
 % asym
-middle_img = abs(AnatV.dim(1).*AnatV.mat(1) / 2);
+middle_img = abs(AnatV.dim(1)/2);
 xoffset = AnatV.mat(1,4);
 if abs(xoffset)<(middle_img-20) || abs(xoffset)>(middle_img+20)
     disp('skipping assymmetry index, the 0 x coordinate doesn''t seem to be in the middle of the image')
 else
+    try
     voxoffset = abs(xoffset./AnatV.mat(1));
     left = floor(voxoffset-1); right = ceil(voxoffset+1);
     data = (spm_read_vols(GrayV)+spm_read_vols(WhiteV))>0;
@@ -174,6 +175,7 @@ else
     D = data(L,:,:)+flipud(data(right+L,:,:));
     asym = N./D; clear N D
     anatQA.asym = mean(asym(data(1:left,:,:)~=0));
+    end
 end
 
 
