@@ -23,16 +23,11 @@ function out = spmup_ACPC(varargin)
 % Copyright (C) spmup team 2015
 
 
-if isempty(nargin)
-    P = spm_select(Inf,'image');   
-end
-
 spmDir=which('spm');
 spmDir=spmDir(1:end-5);
 tmpl=[spmDir 'canonical/avg152T1.nii'];
 vg=spm_vol(tmpl);
 flags.regtype='rigid';
-p=spm_select(inf,'image');
 for i=1:size(p,1)
     f=strtrim(p(i,:));
     spm_smooth(f,'temp.nii',[12 12 12]);

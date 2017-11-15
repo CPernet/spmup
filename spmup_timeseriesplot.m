@@ -113,7 +113,7 @@ end
 
 figplot = 0;
 % Motion
-if strcmpi('motion','on') || ~exist('motion','var')
+if strcmpi(motion,'on') || ~exist('motion','var')
     rfile = dir([fileparts(Vfmri(1).fname) filesep '*.txt']);
     if isempty(rfile)
         [rfile,sts]= spm_select(1,'txt','Select realignmnet parameters');
@@ -145,7 +145,7 @@ elseif isnumeric(motion)
 end
 
 % Nuisance
-if strcmpi('nuisances','on') || ~exist('nuisances','var')
+if strcmpi(nuisances,'on') || ~exist('nuisances','var')
     nuisances = spmup_nuisance(fmridata,whitematter,csf); 
     nuisances = struct2array(nuisances)';
     figplot = figplot+1;
@@ -158,13 +158,13 @@ elseif isnumeric(nuisances)
 end
 
 % Correlation
-if strcmpi('correlation','on') || ~exist('correlation','var')
+if strcmpi(correlation,'on') || ~exist('correlation','var')
     [r_course(1,:), r_course(2,:)] = spmup_volumecorr(fmridata);
     figplot = figplot+1;
     
 elseif isnumeric(correlation) 
     if size(correlation,1) == size(Vfmri,1)
-        correlation = correlation';
+        r_course = correlation';
     end
     figplot = figplot+1;
 end
@@ -196,7 +196,7 @@ if exist('nuisances','var')
 end
 
 % displacement and the white mattrer and csf time courses (detrended)
-if exist('motion','var')
+if exist('r_course','var')
     subplot(figplot+4,1,plotindex); plotindex = plotindex+1;
     plot(r_course(1,:),'LineWidth',3); hold on;
     if size(r_course,1) == 2
@@ -235,7 +235,7 @@ end
 line_index = size(M,1);
 [x,y,z]=ind2sub(size(c3),[find(c2);find(c3)]);
 M = [M ; spm_get_data(Vfmri,[x y z]')'];
-subplot(figplot+4,1,[plotindex:7]);
+subplot(figplot+4,1,[plotindex:figplot+4]);
 X = [linspace(0,1,length(Vfmri))' ones(length(Vfmri),1)]; % remove mean and linear trend
 cleanM = M - (X*(X\M'))'; imagesc(cleanM); colormap('gray'); hold on
 plot([1:size(M,2)],line_index.*ones(1,size(M,2)),'g','LineWidth',2)
