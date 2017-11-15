@@ -414,7 +414,7 @@ for s=1:size(BIDS.subjects,2)
         if exist('matlabbatch','var')
             clear matlabbatch
         end
-        % coregister anotomical to mean EPI
+        % coregister anatomical to mean EPI
         matlabbatch{1}.spm.spatial.coreg.estwrite.ref = {mean_realigned_file};
         matlabbatch{1}.spm.spatial.coreg.estwrite.source = {subjects{s}.anat};
         matlabbatch{1}.spm.spatial.coreg.estwrite.other = {''};
