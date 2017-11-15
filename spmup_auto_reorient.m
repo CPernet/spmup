@@ -29,7 +29,7 @@ elseif nargin == 1
 end
 
 addpath([spm_file(which('spm'),'path') filesep 'toolbox' filesep 'OldNorm']);
-V = spm_vol(P);
+V = spm_vol(P);    
 if numel(V) == 1; which_image = 1; end
 vg = spm_vol(fullfile(spm('Dir'),'canonical','avg152T1.nii'));
 tmp = [tempname '.nii'];
