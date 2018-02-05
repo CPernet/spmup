@@ -29,15 +29,14 @@ elseif nargin == 1
 end
 
 addpath([spm_file(which('spm'),'path') filesep 'toolbox' filesep 'OldNorm']);
-V = spm_vol(P);
-if numel(V) == 1; which_image = 1; end
+V = spm_vol(P); if numel(V) == 1; which_image = 1; end
 vg = spm_vol(fullfile(spm('Dir'),'canonical','avg152T1.nii'));
 tmp = [tempname '.nii'];
 
 fprintf('spmup: reorienting image %g \n',which_image);
 if size(P,1) == 1 && numel(V) == 1 % 1 image only
     spm_smooth(P,tmp,[12 12 12]);
-elseif numel(V) >1 % series
+elseif numel(V) >1 % series and possibly cell array
     try
         if numel(V{which_image}) == 1
             spm_smooth(P{which_image},tmp,[12 12 12]);
@@ -57,14 +56,16 @@ M  = spm_affreg(vg,vf,struct('regtype','rigid'));
 [u,~,v] = svd(M(1:3,1:3));
 M(1:3,1:3) = u*v';
 RM = M;
+
+% apply RM
 if size(P,1) == 1 && numel(V) == 1 % 1 image only
     N  = nifti(P);
 elseif numel(V) >1 % series
     try
         if numel(V{which_image}) == 1
-        N  = nifti(P{which_image});
-    else % numel(V) > 1 % multiple 3D 
-        N  = nifti([P ',' num2str(which_image)]);
+            N  = nifti(P{which_image});
+        else % numel(V) > 1 % multiple 3D
+            N  = nifti([P ',' num2str(which_image)]);
         end
     catch
         if numel(V) > 1 % multiple 3D
@@ -75,10 +76,10 @@ elseif numel(V) >1 % series
     end
 end
 
-N.mat = RM*N.mat;
-create(N);
+N.mat = RM*N.mat; % new orientation
+create(N); % write over which_image
 
-if size(P,1) >1
+if size(P,1) >1 % now apply to all other images
     for i=1:numel(V)
         if i ~= which_image
             fprintf('spmup: applying to image %g \n',i);
