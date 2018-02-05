@@ -1,6 +1,6 @@
 function [FD,RMS,motion] = spmup_FD(realignment_file,radius)
 
-% simple routine that computes framewise displacement as a sum (FD) and RMS
+% simple routine that computes framewise displacement as a sum (FD) and RMS (a.k.a. DVARS)
 % Power et al. (2012) doi:10.1016/j.neuroimage.2011.10.018  
 % Power et al. (2014) doi:10.1016/j.neuroimage.2013.08.048
 %
@@ -17,6 +17,7 @@ function [FD,RMS,motion] = spmup_FD(realignment_file,radius)
 % -----------------------------------------
 % Copyright (c) SPM Utility Plus toolbox
 
+current = pwd;
 if nargin == 0
     [filename,filepath,sts] = uigetfile('*.txt','select realignement parameters');
     if sts == 0
@@ -39,6 +40,7 @@ D=[zeros(1,6); D];  % set first row to 0
 FD = sum(abs(D),2); % framewise displacement a la Powers
 RMS =sqrt(mean(D.^2,2)); % root mean square for each column a la Van Dijk
 
+cd(fileparts(realignment_file))
 figure('Name','Motion and displacement')
 set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
 subplot(2,2,1); plot(motion(:,[1 2 3]),'LineWidth',3); axis tight; box on; grid on; title('translation')
@@ -51,4 +53,5 @@ catch
     print (gcf,'-dpsc2', [pwd filesep 'displacement.ps']);
 end
 close(gcf)
+cd(current)
 

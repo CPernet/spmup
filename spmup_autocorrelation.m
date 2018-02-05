@@ -14,7 +14,7 @@ function R = spmup_autocorrelation(varargin)
 %
 % OUTPUT R is a 2D or 3D matrix of autocorrelation coefficients
 %
-% The Wiener–Khinchin theorem relates the autocorrelation function to the 
+% The Wienerï¿½Khinchin theorem relates the autocorrelation function to the 
 % power spectral density via the Fourier transform. It states that the 
 % autocorrelation function of a wide-sense-stationary random process 
 % (the 1st moment does not vary in time) has a spectral decomposition given 
@@ -84,6 +84,11 @@ parfor v=1:n
             autocorrelation_window(v) = 0;
         end
     end
+end
+try
+    parpool close
+catch
+    delete(gcp('nocreate'))
 end
 
 %% reformat as input

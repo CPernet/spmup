@@ -24,15 +24,31 @@ function [despiked,filtered] = spmup_despike(varargin)
 %             and flags.window = 3 means that each data point is 1st
 %             substituted by a moving 3 points median and the resulting
 %             fit is used to determine outliers (see below)
+%
+%       P the names of the fMRI images (time-series) or the 4D matrix of
+%       data M the name of the mask or the 3D binary matrix flags defines
+%       options to be used
+%             - flags.auto_mask,'off' or 'on' if M is not provided, auto_mask is
+%                               'on' but if set to 'off' the user is prompted to 
+%                               select a mask
+%             - flags.method is 'median' or any of the option of the 'smooth'
+%                            matlab function - in all cases the span is function 
+%                            of the autocorrelation unless window is specified
+%             - flags.window defines the number of consecutive images to use
+%                            to despike the data ; for instance flags.method = 'median'
+%                            and flags.window = 3 means that each data point is 1st
+%                            substituted by a moving 3 points median and the resulting
+%                            fit is used to determine outliers (see below)
 %             - flags.skip defines the number of initial images to skip
-%               often despiking is the 1st step in preprocessing and
-%               therefore some initial scans needs to be discarded because
-%               the series hasn't reach staty-state (unless prescan
-%               normalizalise)
+%                          often despiking is the 1st step in preprocessing and
+%                          therefore some initial scans needs to be discarded because
+%                          the series hasn't reach staty-state (unless prescan
+%                          normalizalise)
 %
 % OUTPUT despiked is either the list of despiked images save onto disk or
 %                 the despiked data, matching the input P
-%        filtered is a data median smoothed from which one despikes
+%        filtered corresponds to the data after median smoother (despiked
+%                 images comes from the difference to these filtered images)
 %
 %        spmup_despike_log is saved onto disk where the data are
 %        spmup_despike_log can be reviewed using spmup_review_despike_log
@@ -144,7 +160,7 @@ if get_data == 1
     % bypass orientation check
     N = numel(V);
     Y = zeros([V(1).dim(1:3),N]);
-    for i=1:N
+    for i=flags.skip+1:N
         for p=1:V(1).dim(3)
             Y(:,:,p,i) = spm_slice_vol(V(i),spm_matrix([0 0 p]),V(i).dim(1:2),0);
         end
@@ -155,6 +171,7 @@ else
         V = spm_vol(P);
         V(1:flags.skip) = []; % remove initial volumes
         N = numel(V);
+        for n=1:N; V(n).n = [n 1]; end % change volume n
         Y = zeros([V(1).dim(1:3),N]);
         for i=1:N
             for p=1:V(1).dim(3)
@@ -240,10 +257,12 @@ if strcmp(flags.method,'median')
             newdata(:,p) = nanmedian([repmat(data(:,1),1,ceil(index(i)/2)-p) data(:,1:p) ...
                 data(:,p+1:p+floor(index(i)/2))],2); % repeate half previous points, current point, next set of points
         end
+        
         % middle
         for p=(floor(index(i)/2)+1):(N-floor(index(i)/2))
             newdata(:,p) = nanmedian(data(:,(p-floor(index(i)/2)):(p+floor(index(i)/2))),2);
         end
+        
         % end
         last = 1;
         for p=(N-floor(index(i)/2)+1):(N-1) % don't do last data point
@@ -347,9 +366,12 @@ else  % smooth function
             YY{i} = data;
         end
     end
-    parpool close
+    try 
+        parpool close
+    catch
+        delete(gcp('nocreate'))
+    end
 end
-
 
 % quick cleanup
 if ~isempty(Mask)
@@ -358,6 +380,39 @@ if ~isempty(Mask)
         YY(:,:,:,v) = YY(:,:,:,v).*Mask;
     end
 end
+
+% CHECK DATA
+% D = (YY-Y).^2; D = sum(reshape(D,64*64*35,326),2); % sum of squared differences
+% [~,position] = max(D); % find witch voxel has maximum difference
+% [x,y,z]=ind2sub(size(Y),position); % get coordinate
+% figure('Name','Despiking effect')
+% set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+% plot(squeeze(Y(x,y,z,:))); hold on; grid on; box on
+% plot(squeeze(YY(x,y,z,:)),'r--','LineWidth',2); title('Most different time series');
+
+%% quick QA and reformating
+if strcmp(flags.method,'median')
+    Despiked_QA = sum((YY == Y),4);
+    despiked = YY;
+else
+    Despiked_QA = NaN(size(Y,1),size(Y,2),size(Y,3));
+    for i=1:length(index)
+        [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(i));
+        Despiked_QA(x,y,z) = sum(YY{i} ~= squeeze(Y(x,y,z,:))')/size(Y,4).*100;
+        if ~isnan(Despiked_QA(x,y,z))
+            Y(x,y,z,:) = YY{i};
+        end
+        despiked(x,y,z,:) = YY{i};
+        filtered(x,y,z,:) = ZZ{i};
+    end
+end
+
+% figure('Name','QA'); colormap('hot') 
+% for z=1:size(Despiked_QA,3)
+%     imagesc(flipud(Despiked_QA(:,:,z)')); axis square; 
+%     title(['Slice ' num2str(z)]); pause
+% end
+
 
 %% write and return the data
 if ischar(P)

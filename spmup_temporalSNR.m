@@ -222,9 +222,13 @@ tSNR.average = mean(mean(data,1)) / sqrt(stdGM^2+stdWMCSF^2+stdBackground^2);
 data = (mean(data,1)/sqrt(stdGM^2+stdWMCSF^2))';
 SNRimage = zeros(V(1).dim); 
 SNRimage(find(GM+WM+CSF+(brain_mask ~= 1))) = data;
+
 W = V(1); [rootfolder,name,ext]=fileparts(V(1).fname);
 W.fname = [rootfolder filesep 'tSNR_' name ext];
+W.private.dat.fname  = [rootfolder filesep 'tSNR_' name ext];
 W.descrip = 'tSNR image - see spmup_temporalSNR';
+W.private.dat.dim = V(1).private.dat.dim(1:3);
+W.n = [1 1];
 spm_write_vol(W,SNRimage);
 
 %% SNR0 (brain only)

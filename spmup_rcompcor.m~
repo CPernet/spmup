@@ -294,9 +294,9 @@ if exist('tnoise','var')
     
     % if QC then output an tSNR image and an image of selected voxels
     if exist('QC','var')
-        [fpath,~,fext]=fileparts(Vbrainmask.fname);
+        [fpath,fname,fext]=fileparts(Vbrainmask.fname);
         Vbrainmask.fname = [fpath filesep 'tSRN' fext];
-        Vbrainmask.descrip = 'robust temporal SNR image';
+        Vbrainmask.descrip = ['robust temporal SNR image'];
         QC.SNR.V = Vbrainmask;
         QC.SNR.img = SNRimg;
         QC.spectral = norm_power(tnoise);
@@ -331,7 +331,7 @@ function compout = decompose(timeseries,fig)
 
 %%
 % clean up by removing constant and linear trend column-wise
-[m,~] = size(timeseries);
+[m,n] = size(timeseries);
 timeseries = spm_detrend(timeseries-(ones(m,1)*mean(timeseries)),1);
 % figure; plot(mean(timeseries,2))
 
