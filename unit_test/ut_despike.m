@@ -24,9 +24,7 @@ for x=1:5
     for y=1:5
         for z=1:5
             DataM(index,:) = sin(2*pi*t*randi(10,1,1))+.25*sin(2*pi*t*randi(50,1,1)); 
-            Data(x,y,z,:) =  DataM(index,:); 
-            FilteredM(index,:) = medfilt1(squeeze(Data(x,y,z,:)),1); 
-            FilteredData(x,y,z,:) = FilteredM(index,:) ; index = index+1;
+            FilteredM(index,:) = medfilt1(squeeze(Data(x,y,z,:)),[],'truncate',3); 
         end
     end
 end
@@ -47,48 +45,62 @@ end
 %% do some plots
 figure
 subplot(2,2,1);
-plot(squeeze(Data(1,1,1,:)),'*b','LineWidth',2);
+plot(squeeze(DataM(1,:)),'*b','LineWidth',2);
 hold on; grid on; axis tight
-plot(squeeze(despiked(1,1,1,:)),'or','LineWidth',2);
-title('Exemple of time course with spmup despike vs data');
+plot(squeeze(filteredM(1,:)),'r','LineWidth',2);
+title('Exemple of filter with spmup despike vs data');
+
+[~,position] = max(sqrt(mean([DataM-filteredM].^2,2)));
 subplot(2,2,2);
-plot(squeeze(Data(1,1,1,:)),'*','LineWidth',2);
+plot(DataM(position,:),'*','LineWidth',2);
 hold on; grid on; axis tight
-plot(squeeze(FilteredData(1,1,1,:)),'k','LineWidth',3);
-plot(squeeze(despiked(1,1,1,:)),'--r','LineWidth',2);
-title('Data with filtered versions (medfilt1 / spmup)');
+plot(FilteredM(position,:),'k','LineWidth',2);
+plot(filteredM(position,:),'--r','LineWidth',2);
+title('Most diff data to filtered version (medfilt1 / spmup)');
 
 subplot(2,2,3);
-plot(mean(DataM,1),'*','LineWidth',2);
+plot(median(DataM,1),'*','LineWidth',2);
 hold on; grid on; axis tight
-plot(mean(despikedM,1),'r','LineWidth',2);
-title('mean time course with spmup desipked version');
+plot(median(despikedM,1),'r','LineWidth',2);
+title('mean time course of desipked data');
 subplot(2,2,4);
-plot(mean(DataM,1),'*','LineWidth',2);
+plot(median(DataM,1),'*','LineWidth',2);
 hold on; grid on; axis tight
-plot(nanmean(FilteredM,1),'k','LineWidth',3);
-plot(nanmean(despikedM,1),'--r','LineWidth',2);
+plot(nanmedian(FilteredM,1),'k','LineWidth',3);
+plot(nanmedian(filteredM,1),'--r','LineWidth',2);
 title('Data with filtered versions (medfilt1 / spmup)');
 
 %% quantify
-D = (despikedM == FilteredM);
-fprintf('%g%% time courses identical median filter (except end)\n',mean(mean(D(:,1:100)<eps))*100);
-figure; indices = find(sum(D(:,1:100),2)<99);
-for i=1:length(indices)
-    plot([1:101],DataM(indices(i),:),'*','LineWidth',2);
-    hold on; grid on; axis tight
-    plot(FilteredM(indices(i),:),'k','LineWidth',3);
-    plot(despikedM(indices(i),:),'--r','LineWidth',2);
-    title(['filtered data ' num2str(indices(i))]);
-    pause; hold off
-end
+D = (FilteredM == filteredM);
+fprintf('%g%% time courses identical to median filter (except end)\n',mean(mean(D(:,1:100)<eps))*100);
+M(:,1) = sqrt(mean([DataM(indices,:) - FilteredM(indices,:)].^2,2));
+M(:,2) = sqrt(mean([DataM(indices,:) - filteredM(indices,:)].^2,2));
+
+overfit = sum(M(:,1) == 0) / size(M,1);
+fprintf('matlab median filter matches exactly the data in %g%% of cases \n',overfit*100)
+goodfit = sum(M(:,2) < 1) / size(M,1);
+fprintf('spmup filter matches the data correctly in %g%% of cases (rms<1)\n',goodfit*100)
+bad_fit = find(M(:,2)>=1);
+fprintf('spmup filter gives a bad fit in %g%% of all data \n',(numel(Data)-length(bad_fit))/numel(Data));
 
 figure; 
-D = (despikedM - FilteredM);
-D = mean(D(indices,:),1) / mean(range(DataM(indices,:),2)) .* 100;
-plot(D,'LineWidth',3);
-title('average difference spmup - medfilt1 among different time courses')
-hold on; grid on; axis tight; ylabel('difference in filter (unit % data range)')
+for i=1:length(bad_fit)
+    subplot(1,2,1);
+    plot([1:101],DataM(bad_fit(i),:),'*b','LineWidth',2);
+    hold on; grid on; axis tight
+    plot([1:101],DataM(bad_fit(i),:),'b','LineWidth',2);
+    plot(despikedM(bad_fit(i),:),'r','LineWidth',2);
+    title(['filtered data ' num2str(indices(i)) ' RMS ' num2str(M(bad_fit(i),2))]);
+    hold off
+
+    subplot(1,2,2);
+    plot([1:101],DataM(bad_fit(i),:),'*b','LineWidth',2);
+    hold on; grid on; axis tight
+    plot([1:101],DataM(bad_fit(i),:),'b','LineWidth',2);
+    plot(despikedM(bad_fit(i),:),'r','LineWidth',2);
+    title(['despiked data ' num2str(indices(i)) ' RMS ' num2str(sqrt(mean([DataM(bad_fit(i),:) - despikedM(bad_fit(i),:)].^2,2)))]);
+    pause; hold off
+end
 
 %% do additional testing for other smoother - just to check the function works
  flags.method = 'moving';
