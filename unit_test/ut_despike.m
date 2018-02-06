@@ -25,7 +25,7 @@ for x=1:5
         for z=1:5
             DataM(index,:) = sin(2*pi*t*randi(10,1,1))+.25*sin(2*pi*t*randi(50,1,1)); 
             Data(x,y,z,:) =  DataM(index,:); 
-            FilteredM(index,:) = medfilt1(squeeze(Data(x,y,z,:)),3); % Median filtering - Output
+            FilteredM(index,:) = medfilt1(squeeze(Data(x,y,z,:)),1); 
             FilteredData(x,y,z,:) = FilteredM(index,:) ; index = index+1;
         end
     end
@@ -33,31 +33,30 @@ end
 
 flags = struct('auto_mask','off','method','median','window',3);
 [despiked,filtered]  = spmup_despike(Data,[],flags);
-
-%% do some plots
-figure
-subplot(2,2,1);
-plot(squeeze(Data(1,1,1,:)),'*','LineWidth',2);
-hold on; grid on; axis tight
-plot(squeeze(despiked(1,1,1,:)),'r','LineWidth',2);
-title('1 time course with spmup desipked version');
-subplot(2,2,2);
-plot(squeeze(Data(1,1,1,:)),'*','LineWidth',2);
-hold on; grid on; axis tight
-plot(squeeze(FilteredData(1,1,1,:)),'k','LineWidth',3);
-plot(squeeze(filtered(1,1,1,:)),'--r','LineWidth',2);
-title('Data with filtered versions (medfilt1 / spmup)');
-
 index = 1;
 for x=1:5
     for y=1:5
         for z=1:5
             despikedM(index,:) = squeeze(despiked(x,y,y,:)); 
-            filteredM(index,:) =  squeeze(filtered(x,y,y,:)); 
+            filteredM(index,:) = squeeze(filtered(x,y,y,:)); 
             index = index+1;
         end
     end
 end
+
+%% do some plots
+figure
+subplot(2,2,1);
+plot(squeeze(Data(1,1,1,:)),'*b','LineWidth',2);
+hold on; grid on; axis tight
+plot(squeeze(despiked(1,1,1,:)),'or','LineWidth',2);
+title('Exemple of time course with spmup despike vs data');
+subplot(2,2,2);
+plot(squeeze(Data(1,1,1,:)),'*','LineWidth',2);
+hold on; grid on; axis tight
+plot(squeeze(FilteredData(1,1,1,:)),'k','LineWidth',3);
+plot(squeeze(despiked(1,1,1,:)),'--r','LineWidth',2);
+title('Data with filtered versions (medfilt1 / spmup)');
 
 subplot(2,2,3);
 plot(mean(DataM,1),'*','LineWidth',2);
@@ -68,24 +67,24 @@ subplot(2,2,4);
 plot(mean(DataM,1),'*','LineWidth',2);
 hold on; grid on; axis tight
 plot(nanmean(FilteredM,1),'k','LineWidth',3);
-plot(nanmean(filteredM,1),'--r','LineWidth',2);
+plot(nanmean(despikedM,1),'--r','LineWidth',2);
 title('Data with filtered versions (medfilt1 / spmup)');
 
 %% quantify
-D = (filteredM == FilteredM);
-fprintf('%g time courses with the same time course (except start)\n',sum(sum(D,2)<=2)/125*100);
-figure; indices = find(sum(D,2)>2);
+D = (despikedM == FilteredM);
+fprintf('%g%% time courses identical median filter (except end)\n',mean(mean(D(:,1:100)<eps))*100);
+figure; indices = find(sum(D(:,1:100),2)<99);
 for i=1:length(indices)
     plot([1:101],DataM(indices(i),:),'*','LineWidth',2);
     hold on; grid on; axis tight
     plot(FilteredM(indices(i),:),'k','LineWidth',3);
-    plot(filteredM(indices(i),:),'--r','LineWidth',2);
+    plot(despikedM(indices(i),:),'--r','LineWidth',2);
     title(['filtered data ' num2str(indices(i))]);
     pause; hold off
 end
 
 figure; 
-D = (filteredM - FilteredM);
+D = (despikedM - FilteredM);
 D = mean(D(indices,:),1) / mean(range(DataM(indices,:),2)) .* 100;
 plot(D,'LineWidth',3);
 title('average difference spmup - medfilt1 among different time courses')
@@ -93,40 +92,5 @@ hold on; grid on; axis tight; ylabel('difference in filter (unit % data range)')
 
 %% do additional testing for other smoother - just to check the function works
  flags.method = 'moving';
- [despiked2,filtered2]  = spmup_despike(Data,[],flags);
+[despiked2,filtered2]  = spmup_despike(Data,[],flags);
 
-%  figure
-% subplot(2,2,1);
-% plot(squeeze(Data(1,1,1,:)),'*','LineWidth',2);
-% hold on; grid on; axis tight
-% plot(squeeze(despiked2(1,1,1,:)),'r','LineWidth',2);
-% title('1 time course with spmup desipked version');
-% subplot(2,2,2);
-% plot(squeeze(Data(1,1,1,:)),'*','LineWidth',2);
-% hold on; grid on; axis tight
-% plot(squeeze(FilteredData(1,1,1,:)),'k','LineWidth',3);
-% plot(squeeze(filtered2(1,1,1,:)),'--r','LineWidth',2);
-% title('Data with filtered versions (medfilt1 / spmup)');
-% 
-% index = 1;
-% for x=1:5
-%     for y=1:5
-%         for z=1:5
-%             despikedM(index,:) = squeeze(despiked2(x,y,y,:)); 
-%             filteredM(index,:) =  squeeze(filtered2(x,y,y,:)); 
-%             index = index+1;
-%         end
-%     end
-% end
-% 
-% subplot(2,2,3);
-% plot(mean(DataM,1),'*','LineWidth',2);
-% hold on; grid on; axis tight
-% plot(mean(despikedM,1),'r','LineWidth',2);
-% title('mean time course with spmup desipked version');
-% subplot(2,2,4);
-% plot(mean(DataM,1),'*','LineWidth',2);
-% hold on; grid on; axis tight
-% plot(nanmean(FilteredM,1),'k','LineWidth',3);
-% plot(nanmean(filteredM,1),'--r','LineWidth',2);
-% title('Data with filtered versions (medfilt1 / spmup)');
