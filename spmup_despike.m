@@ -233,7 +233,7 @@ if strcmp(flags.method,'median')
     index(isnan(index))=[]; index = unique(index);  % the different window sizes to use
     if nargout == 2; filtered = NaN(size(Y)); end   % if we want to save filtered data
     YY = NaN(size(Y));                              % that's the despiked data
-   
+
     for i=1:length(index)
         if index(i) == 3
             [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],find(R<=index(i))); % which voxels to do
@@ -284,7 +284,6 @@ if strcmp(flags.method,'median')
         %     s=[c1..infinity) is mapped to s'=[c1..c2)   [default c2=4].
         
         c1 = 2.5; c2=4; s2 = s;
-
         out = find(s > c1); % positive outliers
         for p=1:length(out)
             s2(out(p)) = c1+(c2-c1)*tanh((s(out(p))-c1)/(c2-c1));
@@ -300,7 +299,7 @@ if strcmp(flags.method,'median')
         % sum(single(test(:)) == data(:)) is numel(data) to the rounding precision
         s2 = (s2.*repmat(SIGMA,1,N)) + newdata;
         
-        % we can use indices here and remove that coord loop ?
+        % can we use indices here and remove that coord loop ?
         for coord = 1:size(x,1)
             if nargout == 2
                 filtered(x(coord),y(coord),z(coord),:) = newdata(coord,:);
@@ -314,6 +313,9 @@ if strcmp(flags.method,'median')
         end
     end
     
+%     out = medfilt1(data,index(i),[],'truncate',2);
+%     figure; plot(data(77,:)); hold on; plot(out(77,:)); plot(newdata(77,:));  
+
 else  % smooth function
     disp('using matlab smoother ... this iterate per voxel and takes lots of time')
     
@@ -393,7 +395,7 @@ end
 %% quick QA and reformating
 if strcmp(flags.method,'median')
     Despiked_QA = sum((YY == Y),4);
-    despiked = YY;
+    despiked = YY; clear YY
 else
     Despiked_QA = NaN(size(Y,1),size(Y,2),size(Y,3));
     for i=1:length(index)
@@ -402,9 +404,10 @@ else
         if ~isnan(Despiked_QA(x,y,z))
             Y(x,y,z,:) = YY{i};
         end
-        despiked(x,y,z,:) = YY{i};
+        despiked(x,y,z,:) = YY{i}; 
         filtered(x,y,z,:) = ZZ{i};
     end
+    clear YY ZZ
 end
 
 % figure('Name','QA'); colormap('hot') 
@@ -443,11 +446,15 @@ spmup_despike_log.flags = flags;
 if isempty(flags.window)
     spmup_despike_log.window = R;
 else
-    spmup_despike_log.window = window;
+    spmup_despike_log.window = flags.window;
 end
-Despiked_QA = sqrt(mean((YY-Y).^2,4)); % how much different
+Despiked_QA = sqrt(mean((despiked-Y).^2,4)); % how much different
 spmup_despike_log.RMS = Despiked_QA;
-[pathstr,name,ext]= fileparts(V(1).fname);
+if ischar(P)
+    [pathstr,name,ext]= fileparts(V(1).fname);
+else
+    pathstr = pwd;
+end
 save([pathstr filesep 'spmup_despike_log'],'spmup_despike_log')
 
 % figure('Name','QA'); colormap('hot');
