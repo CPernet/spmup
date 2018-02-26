@@ -32,7 +32,7 @@ clear varargin
 
 % compute the mean of normalized smoothed data
 % by filling small holes we are more inclusive
-if istruct(V)
+if isstruct(V)
     if size(V,1) == 1; V=V'; end
     Ys = NaN(size(V,1),V(1).dim(1),V(1).dim(2),V(1).dim(3));
     parfor im=1:size(V,1)
