@@ -12,7 +12,8 @@ function M = spmup_auto_mask(varargin)
 %        fig 'on' or 'off' (default) to image the mask and average image
 %
 % OUTPUT M the mask image
-%        if no output is writes the mask on the drive
+%        if no output, the mask image is writen on the drive next to 
+%        the 1st image in V
 %
 % Cyril Pernet - University of Edinburgh
 % -----------------------------------------
