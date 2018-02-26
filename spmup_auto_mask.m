@@ -32,11 +32,19 @@ clear varargin
 
 % compute the mean of normalized smoothed data
 % by filling small holes we are more inclusive
-if size(V,1) == 1; V=V'; end
-Ys = NaN(size(V,1),V(1).dim(1),V(1).dim(2),V(1).dim(3));
-parfor im=1:size(V,1)
-    Ys(im,:,:,:) = smooth3(squeeze(spm_read_vols(V(im)))); 
+if istruct(V)
+    if size(V,1) == 1; V=V'; end
+    Ys = NaN(size(V,1),V(1).dim(1),V(1).dim(2),V(1).dim(3));
+    parfor im=1:size(V,1)
+        Ys(im,:,:,:) = smooth3(squeeze(spm_read_vols(V(im))));
+    end
+elseif iscell(V)
+    Ys = NaN(size(V,1),V{1}.dim(1),V{1}.dim(2),V{1}.dim(3));
+    parfor im=1:size(V,1)
+        Ys(im,:,:,:) = smooth3(squeeze(spm_read_vols(V{im})));
+    end
 end
+
 Ys = (Ys-nanmin(Ys(:)));
 Ys = Ys ./ nanmax(Ys(:)); 
 Avg = squeeze(mean(Ys,1));
@@ -46,7 +54,7 @@ Avg = squeeze(mean(Ys,1));
 M = squeeze(any(diff(Ys))) .* squeeze(Avg>threshold);
 
 if strcmp(fig,'on')
-    figure('Name','Mask')
+    figure('Name','Mask - press a key to change slice')
     set(gcf,'Color','w')
     colormap('gray')
     for im=1:size(M,3)
@@ -61,6 +69,7 @@ if strcmp(fig,'on')
 end
 
 if nargout == 0
+       if iscell(V); V = V{1}; end
        [pathstr,~,ext]= fileparts(V(1).fname);
        V(1).fname = [pathstr filesep 'spmup_mask' ext];
        V(1).descrip = 'spmup mask';
