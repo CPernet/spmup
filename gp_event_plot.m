@@ -165,7 +165,7 @@ for i=1:size(V,1) % for each image/subject
             end
             hrf = spm_hrf(SPM.xBF.dt,p,SPM.xBF.T);
             adjusted_response{i,c} = hrf*adjusted_coef{i,c};
-            estimated_time_to_peak{i,c} = t2p; % p(1);
+            estimated_time_to_peak{i,c} = p(1);
         else % standard parameter estimates
             adjusted_response{i,c} = SPM.xBF.bf(:,1)*adjusted_coef{i,c};
         end
@@ -187,12 +187,12 @@ for i=1:size(V,1) % for each image/subject
             if strcmp(SPM.xBF.name,'hrf (with time derivative)')
                 if sum(findstr(name,'beta')) ~=0
                     try
-                        tmp(1) = spm_get_data([SPMPath filesep name(6:end) ext],Coordinate(:,c)); % get the coresponding hrf value
-                        add_one = num2str(eval(name(end-3:end)) + 1); newname = [name(6:end-length(add_one)) add_one]; % get the time derivative beta
+                        tmp(1) = spm_get_data([SPMPath filesep name(7:end) ext],Coordinate(:,c)); % get the coresponding hrf value
+                        add_one = num2str(eval(name(end-3:end)) + 1); newname = [name(7:end-length(add_one)) add_one]; % get the time derivative beta
                         tmp(2) = spm_get_data([SPMPath filesep newname ext],Coordinate(:,c));
                     catch
-                        tmp(1) = spm_get_data([SPMPath filesep name(7:end) ext],Coordinate(:,c)); 
-                        add_one = num2str(eval(name(end-3:end)) + 1); newname = [name(7:end-length(add_one)) add_one]; 
+                        tmp(1) = spm_get_data([SPMPath filesep name(8:end) ext],Coordinate(:,c)); 
+                        add_one = num2str(eval(name(end-3:end)) + 1); newname = [name(8:end-length(add_one)) add_one]; 
                         tmp(2) = spm_get_data([SPMPath filesep newname ext],Coordinate(:,c));
                     end
                     response{i,c} = SPM.xBF.bf(:,[1 2])*tmp';
@@ -220,16 +220,16 @@ for i=1:size(V,1) % for each image/subject
             else % necesarilly time and dispersion
                 if sum(findstr(name,'beta')) ~=0
                     try
-                        tmp(1) = spm_get_data([SPMPath filesep name(6:end) ext],Coordinate(:,c));
-                        add_one = num2str(eval(name(end-3:end)) + 1); newname = [name(6:end-length(add_one)) add_one];
-                        tmp(2) = spm_get_data([SPMPath filesep newname ext],Coordinate(:,c));
-                        add_two = num2str(eval(name(end-3:end)) + 2); newname = [name(6:end-length(add_two)) add_two]; % get the dispersion derivative beta
-                        tmp(3) = spm_get_data([SPMPath filesep newname ext],Coordinate(:,c));
-                    catch
                         tmp(1) = spm_get_data([SPMPath filesep name(7:end) ext],Coordinate(:,c));
                         add_one = num2str(eval(name(end-3:end)) + 1); newname = [name(7:end-length(add_one)) add_one];
                         tmp(2) = spm_get_data([SPMPath filesep newname ext],Coordinate(:,c));
-                        add_two = num2str(eval(name(end-3:end)) + 2); newname = [name(7:end-length(add_two)) add_two];
+                        add_two = num2str(eval(name(end-3:end)) + 2); newname = [name(7:end-length(add_two)) add_two]; % get the dispersion derivative beta
+                        tmp(3) = spm_get_data([SPMPath filesep newname ext],Coordinate(:,c));
+                    catch
+                        tmp(1) = spm_get_data([SPMPath filesep name(8:end) ext],Coordinate(:,c));
+                        add_one = num2str(eval(name(end-3:end)) + 1); newname = [name(8:end-length(add_one)) add_one];
+                        tmp(2) = spm_get_data([SPMPath filesep newname ext],Coordinate(:,c));
+                        add_two = num2str(eval(name(end-3:end)) + 2); newname = [name(8:end-length(add_two)) add_two];
                         tmp(3) = spm_get_data([SPMPath filesep newname ext],Coordinate(:,c));
                     end
                     response{i,c} = SPM.xBF.bf(:,[1 2 3])*tmp';
@@ -271,23 +271,22 @@ cd(current);
 
 disp('computing mean response and bootstrap 95% CI')
 Y.coordinate = Coordinate;
-Y.individual_parameters = coef;
 Y.individual_responses = response;
-Y.individual_adjusted_parameters = adjusted_coef;
 Y.individual_adjusted_responses = adjusted_response;
-
+Y.individual_parameters = coef;
+Y.individual_adjusted_parameters = adjusted_coef;
 if exist('estimated_time_to_peak','var')
     Y.individual_estimated_time_to_peak = estimated_time_to_peak;
 end
-
 if exist('beta_coef','var')
     Y.individual_beta_coef = beta_coef;
 end
 
+
 % compute the mean response per condition
 index = 1; repeated_measure = 'no';
-for n=1:size(GpSPM.xX.name)
-    if ~strncmp(GpSPM.xX.name{n},'subject',7)
+for n=1:size(GpSPM.xX.name,1)
+    if ~strncmpi(GpSPM.xX.name{n},'subject',7)
         cname{index} = GpSPM.xX.name{n};
         index = index+1;
     else
@@ -297,9 +296,11 @@ end
 Ncond = index-1;
 N = size(Y.individual_responses,1)/Ncond;
 
+
 % now average across coordinates 
 clear tmp t2p
 index = 1;
+warning off
 for n=1:Ncond
     if exist('estimated_time_to_peak','var')
         t2p = cell2mat(estimated_time_to_peak(index:index+N-1)');
@@ -309,7 +310,44 @@ for n=1:Ncond
         Y.average.condition{n}.time_to_peak = mean(t2p,2);
     end
     
-    tmp = cell2mat(Y.individual_parameters(index:index+N-1)');
+    
+     % ---- 
+    
+    tmp = cell2mat(Y.individual_adjusted_parameters(index:index+N-1)');
+    data = cell2mat(Y.individual_adjusted_responses(index:index+N-1)');
+    if numel(size(data)) == 3
+        tmp = squeeze(mean(tmp,3)); % average coordinates
+        t2p  = squeeze(t2p(tmp,3));
+        data = squeeze(mean(data,3)); 
+    end
+    Y.adjusted_average.condition{n}.name = cname{n};
+    Y.adjusted_average.condition{n}.parameters = mean(tmp,2);% average subjects
+    Y.adjusted_average.condition{n}.response = mean(data,2); 
+    
+    fprintf('computing average adjusted response boostrap CI condition %g \n',n)
+    boot_data = NaN(size(data,1), 599); % bootstrap
+    for b=1:599
+        go = 0; 
+        while go == 0
+            tmp = randi(size(data,2),size(data,2),1);
+            if length(unique(tmp)) > 3
+                rand_table(:,b) = tmp; go = 1;
+            end
+        end
+        boot_data(:,b) = squeeze(mean(data(:,rand_table(:,b)),2)); % resample subjects and average
+    end
+   
+    boot_data=sort(boot_data,2);
+    for t=1:size(boot_data,1)
+        if Y.adjusted_average.condition{n}.response(t)<=boot_data(t,15)
+            Y.adjusted_average.condition{n}.CI = [boot_data(:,15) boot_data(:,584)];
+        else
+            Y.adjusted_average.condition{n}.CI = [boot_data(:,584) boot_data(:,15)];
+        end
+    end
+        
+     % ---- 
+     tmp = cell2mat(Y.individual_parameters(index:index+N-1)');
     data = cell2mat(Y.individual_responses(index:index+N-1)');
     if numel(size(data)) == 3
         tmp = squeeze(mean(tmp,3)); % average coordinates
@@ -319,72 +357,30 @@ for n=1:Ncond
     Y.average.condition{n}.name = cname{n};
     Y.average.condition{n}.parameters = mean(tmp,2);% average subjects
     Y.average.condition{n}.response = mean(data,2); 
-    
-    go = 0;
-    while go == 0
-        boot_data = NaN(size(data,1), size(data,2), 599); % bootstrap
-        for b=1:599
-            boot_data(:,:,b) = data(:,randi(size(data,2),size(data,2),1)); % resample subjects
-        end
-        boot_data = mean(boot_data,2); % average subjects
-        boot_data = sort(boot_data,2); % sort boostraps
-        if (max(abs(boot_data(:,15)))<max(abs(Y.average.condition{n}.response))) && (max(abs(boot_data(:,584)))>max(abs(Y.average.condition{n}.response)))
-                go = 1;            
-        end
-        Y.average.condition{n}.CI = [boot_data(:,15) boot_data(:,584)];
-    end
-
-    % Bayesian Bootstrap
-% sample with replcament from Dirichlet
-% sampling = number of observations, e.g. participants
-% n=size(Y,2);
-% bb = zeros(size(Y,1),Nb);
-% parfor boot=1:Nb % bootstrap loop
-%     theta = exprnd(1,[n,1]);
-%     weigths = theta ./ repmat(sum(theta,1),n,1);
-%     resample = (datasample(Y',n,'Replace',true,'Weights',weigths))';
-%     bb(:,boot) = mean(resample,2);
-% end
-% 
-% sorted_data = sort(bb,2); % sort bootstrap estimates
-% upper_centile = floor(prob_coverage*size(sorted_data,2)); % upper bound
-% nCIs = size(sorted_data,2) - upper_centile;
-% HDI = zeros(2,size(Y,1));
-    
-% ci = 1:nCIs;
-% ciWidth = sorted_data(:,ci+upper_centile) - sorted_data(:,ci); % all centile distances
-% [~,J] = min(ciWidth,[],2);
-% r = size(sorted_data,1);
-% I = (1:r)';
-% index = I+r.*(J-1); % linear index
-% HDI(1,:) = sorted_data(index);
-% index = I+r.*(J+upper_centile-1); % linear index
-% HDI(2,:) = sorted_data(index);
    
-    tmp = cell2mat(Y.individual_adjusted_parameters(index:index+N-1)');
-    data = cell2mat(Y.individual_adjusted_responses(index:index+N-1)');
-    if numel(size(data)) == 3
-        tmp = squeeze(mean(tmp,3)); % average coordinates
-        data = squeeze(mean(data,3)); 
-    end
-    Y.adjusted_average.condition{n}.name = cname{n};
-    Y.adjusted_average.condition{n}.parameters = mean(tmp,2);
-    Y.adjusted_average.condition{n}.response = mean(data,2);
-        
-    boot_data = NaN(size(data,1), size(data,2), 599); % bootstrap
+    fprintf('computing average response boostrap CI condition %g \n',n)
+    boot_data = NaN(size(data,1), 599); % bootstrap
     for b=1:599
-        boot_data(:,:,b) = data(:,randi(size(data,2),size(data,2),1)); % resample subjects
+        boot_data(:,b) = squeeze(mean(data(:,rand_table(:,b)),2)); % resample subjects and average
     end
-    boot_data = mean(boot_data,2); % average subjects
-    boot_data = sort(boot_data,2); % sort boostraps
-    Y.adjusted_average.condition{n}.CI = [boot_data(:,15) boot_data(:,584)];
+   
+    boot_data=sort(boot_data,2);
+    for t=1:size(boot_data,1)
+        if Y.average.condition{n}.response(t)<=boot_data(t,15)
+            Y.average.condition{n}.CI = [boot_data(:,15) boot_data(:,584)];
+        else
+            Y.average.condition{n}.CI = [boot_data(:,584) boot_data(:,15)];
+        end
+    end
     
+    % ---   
     index = index+N;
 end
+warning on
 
-if nargout == 0
-    assignin('base','gp_event',Y);
-end
+Y.individual_parameters = reshape(cell2mat(coef),N,Ncond);
+Y.individual_adjusted_parameters = reshape(cell2mat(adjusted_coef),N,Ncond);
+
 
 %% plot
 if nargout == 0
@@ -395,10 +391,10 @@ if nargout == 0
     if isempty(times)
         times = [1:size(Y.average.condition{1}.response)];
     end
-    mycolors = jet; mycolors = mycolors(1:64/Ncond:end,:);
+    mycolors = cubehelixmap('semi_continuous',Ncond+2);
     
     for n=1:Ncond
-        plot(times,Y.adjusted_average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:));
+        plot(times,Y.adjusted_average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:)); hold on
         plot(times,Y.adjusted_average.condition{n}.CI(:,1)','LineWidth',0.5,'Color',mycolors(n,:));
         plot(times,Y.adjusted_average.condition{n}.CI(:,2)','LineWidth',0.5,'Color',mycolors(n,:));
         fillhandle(n) = patch([times fliplr(times)], [Y.adjusted_average.condition{n}.CI(:,1)' fliplr(Y.adjusted_average.condition{n}.CI(:,2)')], mycolors(n,:));
@@ -413,15 +409,21 @@ if nargout == 0
     end
     legend(fillhandle,cname,'Location','SouthEast'); axis tight
     
+    % get the individual parameters
+    [mean_param,CI_param]=rst_data_plot(Y.individual_adjusted_parameters,'estimator','mean','newfig','yes');
+    title('Adjusted parameter estimates for each condition')
+    for n=1:Ncond
+        Y.adjusted_average.condition{n}.param_CI = CI_param(:,n);
+        
+    end
+    
     % update the SPM figure too
     spm_results_ui('Clear',Fgraph);
     figure(Fgraph);
     subplot(2,2,4);
-    v =  mean(cell2mat(Y.individual_adjusted_parameters),2); 
-    sv = sort(mean(v(randi(size(V,1),size(V,1),599)),1));
-    L = mean(v)-sv(15); H = sv(584)-mean(v);
-    bar(1,mean(v)); hold on; errorbar(1,mean(v),L,H,'LineWidth',3);
-    title(sprintf('Average adjusted coef and 95%% CI \n %g [%g %g]',mean(v), sv(15),sv(584)));
+    L = mean(mean_param-mean(CI_param(1,:))); H = mean(mean_param-mean(CI_param(2,:)));
+    bar(1,mean(mean_param)); hold on; errorbar(1,mean(mean_param),L,H,'LineWidth',3);
+    title(sprintf('Average adjusted coef and 95%% CI \n %g [%g %g]',mean(mean_param), L, H));
     grid on; box on
     
     subplot(2,2,3); hold on
@@ -434,4 +436,6 @@ if nargout == 0
     else
         title(['Average adjusted responses'],'FontSize',10);
     end
+    
+    assignin('base','gp_event',Y);
 end
