@@ -4,11 +4,12 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 % *Preprocessed Connectome Project Quality Assurance Protocol (QAP)*
 % <http://preprocessed-connectomes-project.org/quality-assessment-protocol/>
 % 
-% FORMAT: anatQA = spmup_anatQA(anat,c1,c2)
+% FORMAT: anatQA = spmup_anatQA(anat,c1,c2,option)
 % 
 % INPUT: anat is the anatomical image
 %        c1 is the gray matter image
 %        c2 is the white matter image
+%        option is 'no background' set to 'true' or 'false'
 %
 % OUTPUT anatQA is a structure with the following fields:
 %        - SNR : the signal-to-Noise Ratio, ie the mean intensity within gray and white matter divided
@@ -18,6 +19,9 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 %                brain*. Higher values are better.
 %        - FBER: Foreground to Background Energy Ratio, i.e. the variance of voxels in grey and white matter 
 %                divided by the variance of voxels outside the brain*. Higher values are better.
+%
+%        --> is 'no background' is true, std_WM is used instead of std(background)
+%
 %        - EFC : Entropy Focus Criterion, i.e. the entropy of voxel intensities proportional to the maximum 
 %                possibly entropy for a similarly sized image. Indicates ghosting and head motion-induced blurring. 
 %                Lower values are better. See <http://ieeexplore.ieee.org/document/650886/>
@@ -40,8 +44,8 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 % 2nd input int_data is used for unit testing, this retuns intermediate
 % values computed here in a structure 
 
-if nargin ~=3
-    error('3 immage names expected as input')
+if nargin < 3
+    error('at least 3 inputs expected')
 end
 
 AnatV  = spm_vol(varargin{1});
@@ -54,6 +58,16 @@ if any(AnatV.dim ~= WhiteV.dim)
     error('Ther anatomical and white matter images do not have the same size')
 end
 
+option.background = 1;
+if nargin > 3
+    for n = 4:2:nargin
+        if strcmpi(varargin{n},'no background') && strcmpi(varargin{n+1},'true')
+        option.background = 0;
+        end
+    end
+end
+    
+    
 %% compute
 
 disp('spmup_anatQA: computing brain mask and background value')
@@ -74,12 +88,15 @@ if isempty(data)
     error(sprintf('no background data were obtained from the brain mask \n error in image %s\n',AnatV.fname));
 end
 
-% compute the noise level using and  50% trimmed data (remove extreme values)
+% compute the noise level using and 50% trimmed data (remove extreme values)
 data(isnan(data)) = [];
 up = median(data)+iqr(data)/2; 
 down = median(data)-iqr(data)/2;
 index = logical((data<up).*(data>down));
 std_nonbrain = std(data(index)); 
+if std_nonbrain == 0
+    option.background = 0;
+end
 
 %% make a figure showing the mask and the data range
 figure('Name','Brain Mask')
@@ -141,7 +158,7 @@ clear x y z
 dataWM = spm_get_data(AnatV,[x y z]');
 meanWM = mean(dataWM);
 
-if std_nonbrain == 0
+if option.background == 0
     anatQA.SNR  = ((meanGM+meanWM)/2)/std(dataWM);
     anatQA.CNR  = (meanWM-meanGM)/std(dataWM);
     anatQA.FBER = var([dataGM dataWM])/std(dataWM)^2;
