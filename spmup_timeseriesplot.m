@@ -100,6 +100,10 @@ c2  = c2 .* (c2>0.7);
 c3  = c3 .* (c3>0.7);
 
 
+motion = 'on';
+nuisances = 'on';
+correlation = 'on';
+
 % options
 for i=1:length(varargin)
    if strcmpi(varargin{i},'motion') 
