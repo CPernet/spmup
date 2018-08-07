@@ -383,7 +383,6 @@ Y.individual_adjusted_parameters = reshape(cell2mat(adjusted_coef),N,Ncond);
 
 
 %% plot
-if nargout == 0
       
     % average adjusted responses and plot 95% CI
     figure('Name','Gp level evoked response','units','normalized','outerposition',[0 0 1 1]);
@@ -417,6 +416,8 @@ if nargout == 0
         
     end
     
+if nargout == 0 % called via GUI
+
     % update the SPM figure too
     spm_results_ui('Clear',Fgraph);
     figure(Fgraph);
