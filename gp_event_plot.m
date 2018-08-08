@@ -101,6 +101,13 @@ disp('collecting data for all subjects ... '); clear tmp
 
 % the coef of the input images are:
 y = spm_get_data(V,Coordinate);
+if sum(y) == 0
+    error('all estimates are 0 ???, typically an error of input mm vs voxel')
+end
+
+if any(isnan(y))
+    error('at least some estimates are NaN ?? check input coordinate')
+end
 
 % the adjusted coef of the input images at the gp level are:
 yy = GpSPM.xX.W*y;
@@ -268,9 +275,6 @@ clear Y tmp
 cd(current);
 
 %% outputs
-if sum(y) == 0
-    error('all estimates are 0 ???, typically an error of input mm vs voxel')
-end
 
 disp('computing mean response and bootstrap 95% CI')
 Y.coordinate = Coordinate;
