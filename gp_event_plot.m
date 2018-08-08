@@ -268,6 +268,9 @@ clear Y tmp
 cd(current);
 
 %% outputs
+if sum(y) == 0
+    error('all estimates are 0 ???, typically an error of input mm vs voxel')
+end
 
 disp('computing mean response and bootstrap 95% CI')
 Y.coordinate = Coordinate;
