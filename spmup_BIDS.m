@@ -39,6 +39,10 @@ function [anatQA,fMRIQA]=spmup_BIDS(BIDS_dir,choices)
 % -----------------------------------------
 % Copyright (c) SPM Utility Plus toolbox
 
+% TO DO
+% implement keep_data ?
+% implement BIDS.skip
+
 % inputs
 % -------------------------------------------------------------------------
 if nargin == 0
@@ -83,7 +87,7 @@ fMRIQA = [];
 % -------------------------------------------------------------------------
 if ~isfield(options,'outdir')
     options.outdir = [BIDS_dir filesep '..' filesep 'derivatives' filesep  ...
-        'spmup_BIDS_processed'];
+        'spmup_BIDS_processed']; % ?? isn't that set by the get_all_options subfunction ??
 end
 
 if ~exist(options.outdir,'dir')
@@ -95,27 +99,26 @@ subjs_ls = spm_BIDS(BIDS,'subjects');
 % unpack anat and center [0 0 0]
 % -------------------------------
 for s=1:size(subjs_ls,2) % for each subject
-    
+
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
-    
+
     for session = 1:size(sess_ls,2) % for each session
-        
+
         if size(sess_ls,2)==1
             sess_fodler = '';
         else
             sess_fodler = ['ses-' sess_ls{session}];
         end
-        
+
         in = char(spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
             'ses', sess_ls{session}, 'type', 'T1w'));
-        
+
         [~,name,ext,~] = spm_fileparts(in);
-        
+
         if strcmp(ext,'.gz') % if compressed
-            
             subjects{s}.anat = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
                 sess_fodler, 'anat', name); %#ok<*AGROW>
-            
+
             if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
                     && ~exist(subjects{s}.anat,'file'))
                 fprintf('subject %g: unpacking anatomical data \n',s)
@@ -123,12 +126,11 @@ for s=1:size(subjs_ls,2) % for each subject
                 sess_fodler, 'anat'));
                 spmup_auto_reorient(subjects{s}.anat); disp('anat reoriented');
             end
-            
+
         elseif strcmp(ext,'.nii') % if not compressed
-            
             subjects{s}.anat = fullfile(options.outdir, ['sub-' subjs_ls(s)], ...
                 sess_fodler, 'anat', [name ext]);
-            
+
             if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
                     && ~exist(subjects{s}.anat,'file'))
                 fprintf('subject %g: copying anatomical data \n',s)
@@ -136,18 +138,18 @@ for s=1:size(subjs_ls,2) % for each subject
                 sess_fodler, 'anat'));
                 spmup_auto_reorient(subjects{s}.anat); disp('anat reoriented');
             end
-            
+
         elseif isempty(name) % if no valid T1w was found
             warning('No valid T1w file found for subject %s - session %s', subjs_ls{s}, sess_ls{session})
         end
-        
+
     end
-    
+
 end
 
 % if more than 2 functional run, try to unpack data using multiple cores
 % ----------------------------------------------------------------------
-if size(spm_BIDS(BIDS, 'runs', 'sub', subjs_ls(s)),2) >= 2 %#ok<*UNRCH>
+if size(spm_BIDS(BIDS, 'runs', 'sub', subjs_ls{s}),2) >= 2 %#ok<*UNRCH>
     try
         parpool(feature('numCores')-1); % use all available cores -1
     catch no_parpool
@@ -157,23 +159,54 @@ end
 
 % unpack functional and field maps (still need to work out sessions here)
 % -----------------------------------------------------------------------
+% for s=1:size(subjs_ls,2)
 parfor s=1:size(subjs_ls,2)
     
-    for frun = 1:size(BIDS.subjects(s).func,2) 
+    sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
+    
+    % initialize bold file list so that new runs can be appended with end+1
+    % even if they are from different sessions
+    subjects{s}.func = [];
+    
+    for session = 1:size(sess_ls,2) % for each session
         
-        % functional
-        in = [BIDS.dir filesep BIDS.subjects(s).name filesep 'func' filesep BIDS.subjects(s).func(frun).filename];
-        if strcmp(in(end-2:end),'.gz')
-            subjects{s}.func(frun,:) = [options.outdir filesep BIDS.subjects(s).name filesep 'run' num2str(frun) filesep BIDS.subjects(s).func(frun).filename(1:end-3)];
-            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist(subjects{s}.func(frun,:),'file'))
-                fprintf('subject %g: unpacking functional data run %g \n',s,frun)
-                gunzip(in, [options.outdir filesep BIDS.subjects(s).name filesep 'run' num2str(frun)]);
-            end
-        elseif strcmp(in(end-2:end),'nii')
-            subjects{s}.func(frun,:) = [options.outdir filesep BIDS.subjects(s).name filesep 'run' num2str(frun) filesep BIDS.subjects(s).func(frun).filename];
-            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist(subjects{s}.func(frun,:),'file'))
-                fprintf('subject %g: copying functional data \n',s)
-                copyfile(in, [options.outdir filesep BIDS.subjects(s).name filesep 'run' num2str(frun)]);
+        if size(sess_ls,2)==1
+            sess_fodler = '';
+        else
+            sess_fodler = ['ses-' sess_ls{session}];
+        end
+        
+        run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
+            'ses', sess_ls{session}, 'type', 'bold');
+        
+        for frun = 1:size(run_ls,1)
+            
+            % functional
+            in = run_ls {frun,1};
+            
+            [~,name,ext,~] = spm_fileparts(in);
+            
+            if strcmp(ext,'.gz')
+                subjects{s}.func(end+1,:) = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                    sess_fodler, 'func', ['run' num2str(frun)], name); %#ok<*AGROW>
+                
+                if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                        && ~exist(subjects{s}.func(frun,:),'file'))
+                    fprintf('subject %g: unpacking functional data run %g \n',s,frun)
+                    gunzip(in, fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                        sess_fodler, 'func', ['run' num2str(frun)]));
+                end
+                
+            elseif strcmp(ext,'nii')
+                subjects{s}.func(end+1,:) = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                    sess_fodler, 'func', ['run' num2str(frun)], [name ext]); %#ok<*AGROW>
+                
+                if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                        && ~exist(subjects{s}.func(frun,:),'file'))
+                    fprintf('subject %g: copying functional data \n',s)
+                    copyfile(in, fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                        sess_fodler, 'func', ['run' num2str(frun)]));
+                end
             end
         end
         
@@ -205,8 +238,8 @@ parfor s=1:size(subjs_ls,2)
                     copyfile(in, [options.outdir filesep BIDS.subjects(s).name filesep 'run' num2str(frun) filesep 'fieldmaps']);
                 end
             end
-             
-             
+            
+            
             if isfield(BIDS.subjects(s).fmap{frun},'phasediff')
                 in = [BIDS.dir filesep BIDS.subjects(s).name filesep 'fmap' filesep BIDS.subjects(s).fmap{frun}.phasediff];
                 if strcmp(in(end-2:end),'.gz')
@@ -249,6 +282,7 @@ parfor s=1:size(subjs_ls,2)
                 end
             end
         end
+        
     end
 end
 
@@ -256,7 +290,7 @@ disp('spmup has finished unpacking data')
 
 %% run preprocessing using options
 % -------------------------------------------------------------------------
-if isfield(BIDS,'skip') %% need to check BIDS spec 
+if isfield(BIDS,'skip') %% need to check BIDS spec (???)
     start_at = BIDS.skip;
 else
     start_at = 1;
@@ -282,7 +316,7 @@ options.keep_data ='off';
 options.overwrite_data ='on';
 options.removeNvol = 0;
 options.outdir = [BIDS_dir filesep '..' filesep 'derivatives' filesep  ...
-        'spmup_BIDS_processed'];
+    'spmup_BIDS_processed'];
 
 % depiking
 options.despike= 'off';
