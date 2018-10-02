@@ -33,9 +33,8 @@ function [anatQA,fMRIQA]=spmup_BIDS(BIDS_dir,choices)
 % choice = struct('removeNvol', 0, 'keep_data', 'off',  'overwrite_data', 'on', ...
 %     'despike', 'off', 'drifter', 'off', 'motionexp', 'off', 'scrubbing', 'off', ...
 %     'compcor', 'off', 'norm', 'EPInorm', 'skernel', [8 8 8], 'derivatives', 'off', ...
-%     'ignore_fieldmaps', 'on',  'outdir', 'spmup_BIDS_processed_basic', 'QC', 'off'); % standard SPM pipeline
+%     'ignore_fieldmaps', 'on',  'outdir', ['..' filesep 'derivatives' filesep 'spmup_BIDS_processed'], 'QC', 'off'); % standard SPM pipeline
 % [anatQA,fMRIQA]=spmup_BIDS(pwd,choice)
-%
 % Cyril Pernet - University of Edinburgh
 % -----------------------------------------
 % Copyright (c) SPM Utility Plus toolbox
@@ -83,43 +82,72 @@ fMRIQA = [];
 %% unpack data
 % -------------------------------------------------------------------------
 if ~isfield(options,'outdir')
-    options.outdir = [BIDS_dir filesep 'spmup_BIDS_processed'];
+    options.outdir = [BIDS_dir filesep '..' filesep 'derivatives' filesep  ...
+        'spmup_BIDS_processed'];
 end
 
 if ~exist(options.outdir,'dir')
     mkdir(options.outdir);
 end
 
-if isempty(BIDS.sessions)
-    BIDS.sessions = 1;
-end
+subjs_ls = spm_BIDS(BIDS,'subjects');
 
 % unpack anat and center [0 0 0]
 % -------------------------------
-for s=1:size(BIDS.subjects,2) % for each subject
-    for session = 1:BIDS.sessions % for each session
-        in = [BIDS.dir filesep BIDS.subjects(s).name filesep 'anat' filesep BIDS.subjects(s).anat(session).filename];
-        if strcmp(in(end-2:end),'.gz') % if compressed
-            subjects{s}.anat = [options.outdir filesep BIDS.subjects(s).name filesep 'anat' filesep BIDS.subjects(s).anat(session).filename(1:end-3)];
-            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist(subjects{s}.anat,'file'))
-                fprintf('subject %g: unpacking anatomical data \n',s)
-                gunzip(in, [options.outdir filesep BIDS.subjects(s).name filesep 'anat' ]);
-                spmup_auto_reorient(subjects{s}.anat); disp('anat reoriented');
-            end
-        else % if nor compressed
-            subjects{s}.anat = [options.outdir filesep BIDS.subjects(s).name filesep 'anat' filesep BIDS.subjects(s).anat(session).filename];
-            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist(subjects{s}.anat,'file'))
-                fprintf('subject %g: copying anatomical data \n',s)
-                copyfile(in, [options.outdir filesep BIDS.subjects(s).name filesep 'anat' ]);
-                spmup_auto_reorient(subjects{s}.anat); disp('anat reoriented');
-            end
+for s=1:size(subjs_ls,2) % for each subject
+    
+    sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
+    
+    for session = 1:size(sess_ls,2) % for each session
+        
+        if size(sess_ls,2)==1
+            sess_fodler = '';
+        else
+            sess_fodler = ['ses-' sess_ls{session}];
         end
+        
+        in = char(spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
+            'ses', sess_ls{session}, 'type', 'T1w'));
+        
+        [~,name,ext,~] = spm_fileparts(in);
+        
+        if strcmp(ext,'.gz') % if compressed
+            
+            subjects{s}.anat = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                sess_fodler, 'anat', name); %#ok<*AGROW>
+            
+            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                    && ~exist(subjects{s}.anat,'file'))
+                fprintf('subject %g: unpacking anatomical data \n',s)
+                gunzip(in, fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                sess_fodler, 'anat'));
+                spmup_auto_reorient(subjects{s}.anat); disp('anat reoriented');
+            end
+            
+        elseif strcmp(ext,'.nii') % if not compressed
+            
+            subjects{s}.anat = fullfile(options.outdir, ['sub-' subjs_ls(s)], ...
+                sess_fodler, 'anat', [name ext]);
+            
+            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                    && ~exist(subjects{s}.anat,'file'))
+                fprintf('subject %g: copying anatomical data \n',s)
+                copyfile(in, fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                sess_fodler, 'anat'));
+                spmup_auto_reorient(subjects{s}.anat); disp('anat reoriented');
+            end
+            
+        elseif isempty(name) % if no valid T1w was found
+            warning('No valid T1w file found for subject %s - session %s', subjs_ls{s}, sess_ls{session})
+        end
+        
     end
+    
 end
 
-% if mote than 2 functional run, try to unpack data using multiple cores
+% if more than 2 functional run, try to unpack data using multiple cores
 % ----------------------------------------------------------------------
-if size(BIDS.subjects(s).func,2) >= 2
+if size(spm_BIDS(BIDS, 'runs', 'sub', subjs_ls(s)),2) >= 2 %#ok<*UNRCH>
     try
         parpool(feature('numCores')-1); % use all available cores -1
     catch no_parpool
@@ -129,7 +157,7 @@ end
 
 % unpack functional and field maps (still need to work out sessions here)
 % -----------------------------------------------------------------------
-parfor s=1:size(BIDS.subjects,2)
+parfor s=1:size(subjs_ls,2)
     
     for frun = 1:size(BIDS.subjects(s).func,2) 
         
@@ -253,7 +281,8 @@ function options = get_all_options(BIDS_dir)
 options.keep_data ='off';
 options.overwrite_data ='on';
 options.removeNvol = 0;
-options.outdir = [BIDS_dir filesep 'spmup_BIDS_processed'];
+options.outdir = [BIDS_dir filesep '..' filesep 'derivatives' filesep  ...
+        'spmup_BIDS_processed'];
 
 % depiking
 options.despike= 'off';
