@@ -101,6 +101,13 @@ disp('collecting data for all subjects ... '); clear tmp
 
 % the coef of the input images are:
 y = spm_get_data(V,Coordinate);
+if sum(y) == 0
+    error('all estimates are 0 ???, typically an error of input mm vs voxel')
+end
+
+if any(isnan(y))
+    error('at least some estimates are NaN ?? check input coordinate')
+end
 
 % the adjusted coef of the input images at the gp level are:
 yy = GpSPM.xX.W*y;
@@ -299,11 +306,10 @@ N = size(Y.individual_responses,1)/Ncond;
 
 % now average across coordinates 
 clear tmp t2p
-index = 1;
 warning off
 for n=1:Ncond
     if exist('estimated_time_to_peak','var')
-        t2p = cell2mat(estimated_time_to_peak(index:index+N-1)');
+        t2p = cell2mat(estimated_time_to_peak(find(GpSPM.xX.X(:,n)))');
         if numel(size(t2p)) == 3
             t2p  = squeeze(t2p(tmp,3));
         end
@@ -313,8 +319,8 @@ for n=1:Ncond
     
      % ---- 
     
-    tmp = cell2mat(Y.individual_adjusted_parameters(index:index+N-1)');
-    data = cell2mat(Y.individual_adjusted_responses(index:index+N-1)');
+    tmp = cell2mat(Y.individual_adjusted_parameters(find(GpSPM.xX.X(:,n)))');
+    data = cell2mat(Y.individual_adjusted_responses(find(GpSPM.xX.X(:,n)))');
     if numel(size(data)) == 3
         tmp = squeeze(mean(tmp,3)); % average coordinates
         t2p  = squeeze(t2p(tmp,3));
@@ -346,9 +352,9 @@ for n=1:Ncond
         end
     end
         
-     % ---- 
-     tmp = cell2mat(Y.individual_parameters(index:index+N-1)');
-    data = cell2mat(Y.individual_responses(index:index+N-1)');
+    % ---- 
+    tmp = cell2mat(Y.individual_parameters(find(GpSPM.xX.X(:,n)))');
+    data = cell2mat(Y.individual_responses(find(GpSPM.xX.X(:,n)))');
     if numel(size(data)) == 3
         tmp = squeeze(mean(tmp,3)); % average coordinates
         t2p  = squeeze(t2p(tmp,3));
@@ -372,18 +378,14 @@ for n=1:Ncond
             Y.average.condition{n}.CI = [boot_data(:,584) boot_data(:,15)];
         end
     end
-    
-    % ---   
-    index = index+N;
 end
 warning on
 
-Y.individual_parameters = reshape(cell2mat(coef),N,Ncond);
-Y.individual_adjusted_parameters = reshape(cell2mat(adjusted_coef),N,Ncond);
+Y.individual_parameters = reshape(cell2mat(coef),Ncond,N)';
+Y.individual_adjusted_parameters = reshape(cell2mat(adjusted_coef),Ncond,N');
 
 
 %% plot
-if nargout == 0
       
     % average adjusted responses and plot 95% CI
     figure('Name','Gp level evoked response','units','normalized','outerposition',[0 0 1 1]);
@@ -394,29 +396,30 @@ if nargout == 0
     mycolors = cubehelixmap('semi_continuous',Ncond+2);
     
     for n=1:Ncond
-        plot(times,Y.adjusted_average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:)); hold on
-        plot(times,Y.adjusted_average.condition{n}.CI(:,1)','LineWidth',0.5,'Color',mycolors(n,:));
-        plot(times,Y.adjusted_average.condition{n}.CI(:,2)','LineWidth',0.5,'Color',mycolors(n,:));
-        fillhandle(n) = patch([times fliplr(times)], [Y.adjusted_average.condition{n}.CI(:,1)' fliplr(Y.adjusted_average.condition{n}.CI(:,2)')], mycolors(n,:));
+        plot(times,Y.average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:)); hold on
+        plot(times,Y.average.condition{n}.CI(:,1)','LineWidth',0.5,'Color',mycolors(n,:));
+        plot(times,Y.average.condition{n}.CI(:,2)','LineWidth',0.5,'Color',mycolors(n,:));
+        fillhandle(n) = patch([times fliplr(times)], [Y.average.condition{n}.CI(:,1)' fliplr(Y.average.condition{n}.CI(:,2)')], mycolors(n,:));
         set(fillhandle(n),'EdgeColor',mycolors(n,:),'FaceAlpha',0.2,'EdgeAlpha',0.2);
     end
     grid on; xlabel('PST (sec)','FontSize',14);
     ylabel('Evoked Response (A.U.)','FontSize',14);
     if Ncond == 1
-        title(sprintf('Average adjusted response\n at coord [%g %g %g]=%g [%g %g]',xyz(1),xyz(2),xyz(3)),'FontSize',16);
+        title(sprintf('Average response\n at coord [%g %g %g]=%g [%g %g]',xyz(1),xyz(2),xyz(3)),'FontSize',16);
     else
-        title(sprintf('Average adjusted responses per conditions \n at coord [%g %g %g]',xyz(1),xyz(2),xyz(3)),'FontSize',16);
+        title(sprintf('Average responses per conditions \n at coord [%g %g %g]',xyz(1),xyz(2),xyz(3)),'FontSize',16);
     end
     legend(fillhandle,cname,'Location','SouthEast'); axis tight
     
     % get the individual parameters
-    [mean_param,CI_param]=rst_data_plot(Y.individual_adjusted_parameters,'estimator','mean','newfig','yes');
-    title('Adjusted parameter estimates for each condition')
+    [mean_param,CI_param]=rst_data_plot(Y.individual_parameters,'estimator','mean','newfig','yes');
+    title('Parameter estimates for each condition')
     for n=1:Ncond
-        Y.adjusted_average.condition{n}.param_CI = CI_param(:,n);
-        
+        Y.average.condition{n}.param_CI = CI_param(:,n);
     end
     
+if nargout == 0 % called via GUI
+
     % update the SPM figure too
     spm_results_ui('Clear',Fgraph);
     figure(Fgraph);
@@ -428,13 +431,13 @@ if nargout == 0
     
     subplot(2,2,3); hold on
     for n=1:Ncond
-        plot(times,Y.adjusted_average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:));
+        plot(times,Y.average.condition{n}.response,'LineWidth',3,'Color',mycolors(n,:));
     end
     grid on; xlabel('PST'); ylabel('Event related resp.'); axis tight
     if Ncond == 1
-        title(['Average adjusted response'],'FontSize',10);
+        title(['Average response'],'FontSize',10);
     else
-        title(['Average adjusted responses'],'FontSize',10);
+        title(['Average responses'],'FontSize',10);
     end
     
     assignin('base','gp_event',Y);
