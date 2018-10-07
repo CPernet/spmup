@@ -395,7 +395,7 @@ end
 %% quick QA and reformating
 if strcmp(flags.method,'median')
     Despiked_QA = sum((YY == Y),4);
-    despiked = YY; clear YY
+    despiked = YY; %clear YY
 else
     Despiked_QA = NaN(size(Y,1),size(Y,2),size(Y,3));
     for i=1:length(index)
@@ -407,8 +407,11 @@ else
         despiked(x,y,z,:) = YY{i}; 
         filtered(x,y,z,:) = ZZ{i};
     end
-    clear YY ZZ
+    clear ZZ
+%     clear YY
 end
+
+Despiked_QA = despiked; %set aside for QA report (see below)
 
 % figure('Name','QA'); colormap('hot') 
 % for z=1:size(Despiked_QA,3)
@@ -448,7 +451,7 @@ if isempty(flags.window)
 else
     spmup_despike_log.window = flags.window;
 end
-Despiked_QA = sqrt(mean((despiked-Y).^2,4)); % how much different
+Despiked_QA = sqrt(mean((Despiked_QA-Y).^2,4)); % how much different
 spmup_despike_log.RMS = Despiked_QA;
 if ischar(P)
     [pathstr,name,ext]= fileparts(V(1).fname);
