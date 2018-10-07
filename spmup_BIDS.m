@@ -176,9 +176,8 @@ for s=1:size(subjs_ls,2)
     
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
     
-    % initialize bold file list so that new runs can be appended with end+1
-    % even if they are from different sessions
-    subjects{s}.func = cell(1);
+    % bold file counter to list theem across different sessions
+    bold_run_count = 1;
     
     for session = 1:size(sess_ls,2) % for each session
         
@@ -207,11 +206,12 @@ for s=1:size(subjs_ls,2)
             [ext,name,compressed] = iscompressed(ext,name);
             
             % we keep track of where the files are stored
-            subjects{s}.func{end+1} = fullfile(target_dir, [name ext]);
-            file_exists = exist(subjects{s}.func{end},'file');
+            subjects{s}.func{bold_run_count,1} = fullfile(target_dir, [name ext]);
+            file_exists = exist(subjects{s}.func{bold_run_count,1},'file');
             
             unzip_or_copy(compressed, options, file_exists, in, target_dir)
             
+            bold_run_count = bold_run_count + 1;
         end
         
         
@@ -328,20 +328,18 @@ for s=1:size(subjs_ls,2)
     
 end
 
-return
-
 disp('spmup has finished unpacking data')
 
 %% run preprocessing using options
 % -------------------------------------------------------------------------
-if isfield(options,'removeNvol') %% need to check BIDS spec (???)
+if isfield(options,'removeNvol')
     start_at = options.removeNvol;
 else
     start_at = 1;
 end
 
 % do the computation if needed
-for s=1%:size(subjs_ls,2)
+for s=1:size(subjs_ls,2)
     %     parfor s=1%:size(subjs_ls,2)
     spmup_BIDSjob(BIDS_dir,BIDS,subjects,s,options,start_at)
 end
