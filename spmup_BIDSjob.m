@@ -288,17 +288,17 @@ end
 % Coregistration / Segmentation / Normalization
 % ----------------------------------------------
 [filepath,filename,ext] = fileparts(subjects{s}.anat);
-normalization_file = [BIDS.dir filesep filepath filesep 'y_' filename ext];
-NormalizedAnat_file  = [BIDS.dir filesep filepath filesep 'wm' filename ext];
-class{1} = [BIDS.dir filesep filepath filesep 'c1' filename ext];
-class{2} = [BIDS.dir filesep filepath filesep 'c2' filename ext];
-class{3} = [BIDS.dir filesep filepath filesep 'c3' filename ext];
-EPI_class{1} = [BIDS.dir filesep filepath filesep 'c1r' filename ext];
-EPI_class{2} = [BIDS.dir filesep filepath filesep 'c2r' filename ext];
-EPI_class{3} = [BIDS.dir filesep filepath filesep 'c3r' filename ext];
-Normalized_class{1} = [BIDS.dir filesep filepath filesep 'wc1' filename ext];
-Normalized_class{2} = [BIDS.dir filesep filepath filesep 'wc2' filename ext];
-Normalized_class{3} = [BIDS.dir filesep filepath filesep 'wc3' filename ext];
+normalization_file = [filepath filesep 'y_' filename ext];
+NormalizedAnat_file  = [filepath filesep 'wm' filename ext];
+class{1} = [filepath filesep 'c1' filename ext];
+class{2} = [filepath filesep 'c2' filename ext];
+class{3} = [filepath filesep 'c3' filename ext];
+EPI_class{1} = [filepath filesep 'c1r' filename ext];
+EPI_class{2} = [filepath filesep 'c2r' filename ext];
+EPI_class{3} = [filepath filesep 'c3r' filename ext];
+Normalized_class{1} = [filepath filesep 'wc1' filename ext];
+Normalized_class{2} = [filepath filesep 'wc2' filename ext];
+Normalized_class{3} = [filepath filesep 'wc3' filename ext];
 for frun = 1:size(subjects{s}.func,1)
     [filepath,filename,ext] = fileparts(realigned_file{frun});
     Normalized_files{frun} = [filepath filesep 'w' filename ext];
@@ -374,7 +374,10 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
         
         % segment the coregistered T1 (not resliced)
         % -------------------------------------------
-        matlabbatch{3}.spm.spatial.preproc.channel.vols(1) = cfg_dep('Coregister: Estimate & Reslice: Coregistered Images', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','cfiles'));
+        matlabbatch{3}.spm.spatial.preproc.channel.vols(1) = ...
+            cfg_dep('Coregister: Estimate & Reslice: Coregistered Images', ...
+            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','cfiles'));
         matlabbatch{3}.spm.spatial.preproc.channel.biasreg = 0.001;
         matlabbatch{3}.spm.spatial.preproc.channel.biasfwhm = 60;
         matlabbatch{3}.spm.spatial.preproc.channel.write = [0 1];
@@ -432,6 +435,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
             cfg_dep('Segment: c3 Images', ...
             substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
+        
         matlabbatch{4}.spm.spatial.normalise.write.subj(2).def(1) = ...
             cfg_dep('Segment: Forward Deformations', ...
             substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
