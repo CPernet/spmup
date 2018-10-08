@@ -11,6 +11,7 @@ subjs_ls = spm_BIDS(BIDS,'subjects');
 runs_ls = spm_BIDS(BIDS,'runs', 'sub', subjs_ls{s});
 all_names = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
             'type', 'bold');
+  
         
 % ---------------------------------------
 % Despiking and slice timing for each run
@@ -20,6 +21,9 @@ for frun = 1:size(subjects{s}.func,1) % each run
     filesin = subjects{s}.func{frun};
     
     metadata = spm_BIDS(BIDS,'metadata', 'sub', subjs_ls{s}, 'run', runs_ls{frun});
+    hdr = spm_vol(subjects{s}.func{frun});
+    epi_res = diag(hdr(1).mat);
+    epi_res(end) = [];
     
     for i=1:numel(metadata)
         if isfield(metadata{i}, 'SliceTiming')
@@ -73,19 +77,24 @@ for frun = 1:size(subjects{s}.func,1) % each run
     
     [~,~,info_position] = intersect([filename(1:end-4) 'events.tsv'], all_names);
     
-    sliceorder  = SliceTiming; % time
-    refslice    = sliceorder(round(length(SliceTiming)/2));
-    timing      = [0 RepetitionTime];
-    if strcmp(options.despike,'on')
-        st_files{frun} = [filepath filesep 'st_despiked_' filename ext]; %#ok<*AGROW>
+    if exist('SliceTiming', 'var')
+        sliceorder  = SliceTiming; % time
+        refslice    = sliceorder(round(length(SliceTiming)/2));
+        timing      = [0 RepetitionTime];
+        if strcmp(options.despike,'on')
+            st_files{frun} = [filepath filesep 'st_despiked_' filename ext]; %#ok<*AGROW>
+        else
+            st_files{frun} = [filepath filesep 'st_' filename ext];
+        end
+        
+        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                && ~exist(st_files{frun},'file'))
+            fprintf('\n\nstarting slice timing correction run %g subject %g \n',frun,s)
+            spm_slice_timing(filesin, sliceorder, refslice, timing,'st_');
+        end
+        
     else
-        st_files{frun} = [filepath filesep 'st_' filename ext];
-    end
-    
-    if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-            && ~exist(st_files{frun},'file'))
-        fprintf('\n\nstarting slice timing correction run %g subject %g \n',frun,s)
-        spm_slice_timing(filesin, sliceorder, refslice, timing,'st_');
+        st_files = subjects{s}.func;
     end
        
     % ----------------------
@@ -251,30 +260,30 @@ else
             && ~exist(mean_realigned_file,'file'))
         for frun = 1:size(subjects{s}.func,1)
             matlabbatch{1}.spm.spatial.realignunwarp.data(frun).scans = {st_files{frun}};
-            matlabbatch{1}.spm.spatial.realignunwarp.data(frun).pmscan = {vdm{frun}};
+            matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {vdm{frun}};
         end
-        matlabbatch{1}.spm.spatial.realignunwarp.eoptions.quality    = 1;
-        matlabbatch{1}.spm.spatial.realignunwarp.eoptions.sep        = 4;
-        matlabbatch{1}.spm.spatial.realignunwarp.eoptions.fwhm       = 5;
-        matlabbatch{1}.spm.spatial.realignunwarp.eoptions.rtm        = 1;
-        matlabbatch{1}.spm.spatial.realignunwarp.eoptions.einterp    = 4;
-        matlabbatch{1}.spm.spatial.realignunwarp.eoptions.ewrap      = [0 0 0];
-        matlabbatch{1}.spm.spatial.realignunwarp.eoptions.weight     = '';
-        matlabbatch{1}.spm.spatial.realignunwarp.uweoptions.basfcn   = [12 12];
-        matlabbatch{1}.spm.spatial.realignunwarp.uweoptions.regorder = 1;
-        matlabbatch{1}.spm.spatial.realignunwarp.uweoptions.lambda   = 100000;
-        matlabbatch{1}.spm.spatial.realignunwarp.uweoptions.jm       = 0;
-        matlabbatch{1}.spm.spatial.realignunwarp.uweoptions.fot      = [4 5];
-        matlabbatch{1}.spm.spatial.realignunwarp.uweoptions.sot      = [];
-        matlabbatch{1}.spm.spatial.realignunwarp.uweoptions.uwfwhm   = 4;
-        matlabbatch{1}.spm.spatial.realignunwarp.uweoptions.rem      = 1;
-        matlabbatch{1}.spm.spatial.realignunwarp.uweoptions.noi      = 5;
-        matlabbatch{1}.spm.spatial.realignunwarp.uweoptions.expround = 'Average';
-        matlabbatch{1}.spm.spatial.realignunwarp.uwroptions.uwwhich  = [2 1];
-        matlabbatch{1}.spm.spatial.realignunwarp.uwroptions.rinterp  = 4;
-        matlabbatch{1}.spm.spatial.realignunwarp.uwroptions.wrap     = [0 0 0];
-        matlabbatch{1}.spm.spatial.realignunwarp.uwroptions.mask     = 1;
-        matlabbatch{1}.spm.spatial.realignunwarp.uwroptions.prefix   = 'ur';
+        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.quality    = 1;
+        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.sep        = 4;
+        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.fwhm       = 5;
+        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.rtm        = 1;
+        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.einterp    = 4;
+        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.ewrap      = [0 0 0];
+        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.weight     = '';
+        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.basfcn   = [12 12];
+        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.regorder = 1;
+        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.lambda   = 100000;
+        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.jm       = 0;
+        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.fot      = [4 5];
+        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.sot      = [];
+        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.uwfwhm   = 4;
+        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.rem      = 1;
+        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.noi      = 5;
+        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.expround = 'Average';
+        matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.uwwhich  = [2 1];
+        matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.rinterp  = 4;
+        matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.wrap     = [0 0 0];
+        matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.mask     = 1;
+        matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.prefix   = 'ur';
         spm_jobman('run',matlabbatch); clear matlabbatch;
     end
     disp('setting up AC coordinate based on template')
@@ -282,36 +291,21 @@ else
     spmup_auto_reorient(tmp',length(tmp)); clear tmp;
 end
 
-% ---------------
-% Normalization
-% ---------------
 
-% Coregistration / Segmentation / Normalization
-% ----------------------------------------------
+% ---------------
+% Coregistration / Segmentation
+% ---------------
 [filepath,filename,ext] = fileparts(subjects{s}.anat);
-normalization_file = [filepath filesep 'y_' filename ext];
-NormalizedAnat_file  = [filepath filesep 'wm' filename ext];
-class{1} = [filepath filesep 'c1' filename ext];
-class{2} = [filepath filesep 'c2' filename ext];
-class{3} = [filepath filesep 'c3' filename ext];
 EPI_class{1} = [filepath filesep 'c1r' filename ext];
 EPI_class{2} = [filepath filesep 'c2r' filename ext];
 EPI_class{3} = [filepath filesep 'c3r' filename ext];
-Normalized_class{1} = [filepath filesep 'wc1' filename ext];
-Normalized_class{2} = [filepath filesep 'wc2' filename ext];
-Normalized_class{3} = [filepath filesep 'wc3' filename ext];
-for frun = 1:size(subjects{s}.func,1)
-    [filepath,filename,ext] = fileparts(realigned_file{frun});
-    Normalized_files{frun} = [filepath filesep 'w' filename ext];
-end
-
 if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-        && ~exist(normalization_file,'file'))
-    fprintf('\n\nsubject %g: coregister, segment and normalize \n',s)
+        && ~exist(EPI_class{1},'file'))
+    fprintf('\n\nsubject %g: coregister, segment \n',s)
     if exist('matlabbatch','var')
         clear matlabbatch
     end
-    
+
     % coregister anatomical to mean EPI
     % ---------------------------------
     matlabbatch{1}.spm.spatial.coreg.estimate.ref = {mean_realigned_file};
@@ -373,6 +367,37 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
     matlabbatch{end}.spm.spatial.preproc.warp.fwhm = 0;
     matlabbatch{end}.spm.spatial.preproc.warp.samp = 3;
     matlabbatch{end}.spm.spatial.preproc.warp.write = [0 0];
+
+    spm_jobman('run',matlabbatch);
+    clear matlabbatch;
+end
+
+return
+
+% ---------------
+% Normalization
+% ---------------
+[filepath,filename,ext] = fileparts(subjects{s}.anat);
+% Normalization_file = [filepath filesep 'y_' filename ext];
+NormalizedAnat_file  = [filepath filesep 'wm' filename ext];
+% NormalizedReslicedAnat_file  = [filepath filesep 'wr' filename ext];
+class{1} = [filepath filesep 'c1' filename ext];
+class{2} = [filepath filesep 'c2' filename ext];
+class{3} = [filepath filesep 'c3' filename ext];
+Normalized_class{1} = [filepath filesep 'wc1' filename ext];
+Normalized_class{2} = [filepath filesep 'wc2' filename ext];
+Normalized_class{3} = [filepath filesep 'wc3' filename ext];
+for frun = 1:size(subjects{s}.func,1)
+    [filepath,filename,ext] = fileparts(realigned_file{frun});
+    Normalized_files{frun} = [filepath filesep 'w' filename ext];
+end
+
+if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+        && ~exist(Normalized_files{end},'file'))
+    fprintf('\n\nsubject %g: normalize \n',s)
+    if exist('matlabbatch','var')
+        clear matlabbatch
+    end
     
     % if field maps, normalize EPI from T1
     % -------------------------------------
@@ -380,10 +405,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
         
         % segment the coregistered T1 (not resliced)
         % -------------------------------------------
-        matlabbatch{4}.spm.spatial.preproc.channel.vols(1) = ...
-        cfg_dep('Coregister: Estimate: Coregistered Images', ...
-        substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
-        substruct('.','cfiles'));
+        matlabbatch{1}.spm.spatial.preproc.channel.vols = {subjects{s}.anat};
         matlabbatch{end}.spm.spatial.preproc.channel.biasreg = 0.001;
         matlabbatch{end}.spm.spatial.preproc.channel.biasfwhm = 60;
         matlabbatch{end}.spm.spatial.preproc.channel.write = [0 1];
@@ -422,44 +444,45 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
         % normalize EPI using T1 info
         % ----------------------------
         % normalize T1 
-        matlabbatch{end}.spm.spatial.normalise.write.subj(1).def(1) = ...
+        matlabbatch{2}.spm.spatial.normalise.write.subj(1).def(1) = ...
             cfg_dep('Segment: Forward Deformations', ...
-            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','fordef', '()',{':'}));
         matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(1) = ...
             cfg_dep('Segment: Bias Corrected (1)', ...
-            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','channel', '()',{1}, '.','biascorr', '()',{':'}));
         matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(2) = ...
             cfg_dep('Segment: c1 Images', ...
-            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
         matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(3) = ...
             cfg_dep('Segment: c2 Images', ...
-            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
         matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(4) = ...
             cfg_dep('Segment: c3 Images', ...
-            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
 
         % normalize EPI
         matlabbatch{end}.spm.spatial.normalise.write.subj(2).def(1) = ...
             cfg_dep('Segment: Forward Deformations', ...
-            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','fordef', '()',{':'}));
         for frun = 1:size(subjects{s}.func,1)
             matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(frun,:) = {realigned_file{frun}};
         end
+        matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(end+1,:) = {mean_realigned_file}; % adding mean image
         
         matlabbatch{end}.spm.spatial.normalise.write.woptions.bb = [-78 -112 -70 ; 78 76 85];
-        matlabbatch{end}.spm.spatial.normalise.write.woptions.vox = [2 2 2]; %might wanna change that to EPI original res
+        matlabbatch{end}.spm.spatial.normalise.write.woptions.vox = epi_res;
         matlabbatch{end}.spm.spatial.normalise.write.woptions.interp = 4;
         matlabbatch{end}.spm.spatial.normalise.write.woptions.prefix = 'w';
         
     else  % normalize EPI on EPI template (old routine)
         % -------------------------------------------
-        matlabbatch{4}.spm.tools.oldnorm.estwrite.subj.source(1) = {mean_realigned_file};
+        matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.source(1) = {mean_realigned_file};
         matlabbatch{end}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
         for frun = 1:size(subjects{s}.func,1)
             matlabbatch{end}.spm.tools.oldnorm.estwrite.subj.resample(frun,:) = {realigned_file{frun}};
@@ -475,13 +498,12 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
         matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.reg = 1;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.bb = [-78 -112 -70 ; 78 76 85];
-        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.vox = [2 2 2]; %might wanna change that to EPI original res
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.vox = epi_res;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.interp = 4;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.prefix = 'w';
         
     end
-    
     save('batch.mat', 'matlabbatch')
     spm_jobman('run',matlabbatch);
     clear matlabbatch;
@@ -492,6 +514,7 @@ if strcmpi(options.keep_data,'off')
         delete(realigned_file{frun});
     end
 end
+
 
 % --------------
 % Smoothing
@@ -517,6 +540,7 @@ else
     stats_ready = Normalized_files;
 end
 
+
 % ----------------------------
 % QC and additional regressors
 % ----------------------------
@@ -524,6 +548,10 @@ if strcmp(options.QC,'on') %
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
             && ~exist([fileparts(NormalizedAnat_file) filesep 'anatQA.mat'],'file'))
         fprintf('subject %g: Anatomical Quality control \n',s)
+        % sanity check that all images are in the same space.
+        V_to_check = Normalized_class';
+        V_to_check{end+1} = NormalizedAnat_file;
+        spm_check_orientations(spm_vol(char(V_to_check)));
         % Basic QA for anatomical data is to get SNR, CNR, FBER and Entropy
         % This is useful to check coregistration and normalization worked fine
         tmp = spmup_anatQA(NormalizedAnat_file,Normalized_class{1},Normalized_class{2});
@@ -532,7 +560,7 @@ if strcmp(options.QC,'on') %
     end
     
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-            && ~exist([fileparts(Normalized_files{1}) filesep 'fMRIQA.mat'],'file'))
+            && ~exist([fileparts(Normalized_files{end}) filesep 'fMRIQA.mat'],'file'))
         fprintf('subject %g: fMRI Quality control \n',s)
         % For functional data, QA is consists in getting temporal SNR and then
         % check for motion - here we also compute additional regressors to
@@ -547,8 +575,14 @@ if strcmp(options.QC,'on') %
         end
         
         for frun = 1:size(subjects{s}.func,1)
-            fMRIQA.tSNR{s, frun} = spmup_temporalSNR(stats_ready{frun},EPI_class,0);
-            tmp = spmup_first_level_qa(NormalizedAnat_file,cell2mat(Normalized_files(frun)),flags);
+            % sanity check that all images are in the same space.
+            V_to_check = Normalized_class';
+            V_to_check{end+1} = stats_ready{frun};
+            spm_check_orientations(spm_vol(char(V_to_check)));
+            
+            fMRIQA.tSNR{s, frun} = spmup_temporalSNR(Normalized_files{frun},Normalized_class,0);
+            tmp = spmup_first_level_qa(NormalizedAnat_file,cell2mat(stats_ready(frun)),flags);
+            
             fMRIQA.meanFD{s,frun} = mean(spmup_FD(cell2mat(tmp))); clear tmp
             QA.tSNR = fMRIQA.tSNR{s,frun}; QA.meanFD = fMRIQA.meanFD{s,frun};
             save([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA'); clear QA
@@ -698,8 +732,8 @@ if size(subjects{s}.func,1) > 1
 end
 
 end
-%% field map sub-routine
 
+%% field map sub-routine
 function matlabbatch = get_FM_workflow(type)
 
 if strcmpi(type,'phasediff')
