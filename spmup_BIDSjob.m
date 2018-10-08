@@ -221,18 +221,19 @@ if isempty(BIDS.subjects(s).fmap)
         for frun = 1:size(subjects{s}.func,1)
             matlabbatch{1}.spm.spatial.realign.estwrite.data{frun} = {st_files{frun}};
         end
-        matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.quality = 1;
-        matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.sep     = 4;
-        matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.fwhm    = 5;
-        matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.rtm     = 1;
-        matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.interp  = 4;
-        matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.wrap    = [0 0 0];
-        matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.weight  = '';
-        matlabbatch{1}.spm.spatial.realign.estwrite.roptions.which   = [0 1];
-        matlabbatch{1}.spm.spatial.realign.estwrite.roptions.interp  = 4;
-        matlabbatch{1}.spm.spatial.realign.estwrite.roptions.wrap    = [0 0 0];
-        matlabbatch{1}.spm.spatial.realign.estwrite.roptions.mask    = 1;
-        matlabbatch{1}.spm.spatial.realign.estwrite.roptions.prefix  = 'r';
+        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.quality = 1;
+        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.sep     = 4;
+        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.fwhm    = 5;
+        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.rtm     = 1;
+        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.interp  = 4;
+        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.wrap    = [0 0 0];
+        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.weight  = '';
+        matlabbatch{end}.spm.spatial.realign.estwrite.roptions.which   = [0 1]; %only reslice the mean
+        matlabbatch{end}.spm.spatial.realign.estwrite.roptions.interp  = 4;
+        matlabbatch{end}.spm.spatial.realign.estwrite.roptions.wrap    = [0 0 0];
+        matlabbatch{end}.spm.spatial.realign.estwrite.roptions.mask    = 1;
+        matlabbatch{end}.spm.spatial.realign.estwrite.roptions.prefix  = 'r';
+        
         spm_jobman('run',matlabbatch); clear matlabbatch;
     end
 else
@@ -311,167 +312,177 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
         clear matlabbatch
     end
     
-    % coregister and reslice anatomical to mean EPI
+    % coregister anatomical to mean EPI
     % ---------------------------------
-    matlabbatch{1}.spm.spatial.coreg.estwrite.ref = {mean_realigned_file};
-    matlabbatch{1}.spm.spatial.coreg.estwrite.source = {subjects{s}.anat};
-    matlabbatch{1}.spm.spatial.coreg.estwrite.other = {''};
-    matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.cost_fun = 'nmi';
-    matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.sep = [4 2];
-    matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.tol = ...
+    matlabbatch{1}.spm.spatial.coreg.estimate.ref = {mean_realigned_file};
+    matlabbatch{end}.spm.spatial.coreg.estimate.source = {subjects{s}.anat};
+    matlabbatch{end}.spm.spatial.coreg.estimate.other = {''};
+    matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.cost_fun = 'nmi';
+    matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.sep = [4 2];
+    matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.tol = ...
         [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
-    matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.fwhm = [7 7];
-    matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.interp = 4;
-    matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.wrap = [0 0 0];
-    matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.mask = 0;
-    matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.prefix = 'r';
+    matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.fwhm = [7 7];
+
+    % reslice anatomical to mean EPI
+    matlabbatch{2}.spm.spatial.coreg.write.ref = {mean_realigned_file};
+    matlabbatch{end}.spm.spatial.coreg.write.source = {subjects{s}.anat};
+    matlabbatch{end}.spm.spatial.coreg.write.roptions.interp = 4;
+    matlabbatch{end}.spm.spatial.coreg.write.roptions.wrap = [0 0 0];
+    matlabbatch{end}.spm.spatial.coreg.write.roptions.mask = 0;
+    matlabbatch{end}.spm.spatial.coreg.write.roptions.prefix = 'r';
+    
     
     % run the segmentation on the resliced T1 to get tissue classes
     % in the same space as the EPI data before mormalization
     % -------------------------------------------------------
-    matlabbatch{2}.spm.spatial.preproc.channel.vols(1) = ...
-        cfg_dep('Coregister: Estimate & Reslice: Resliced Images', ...
-        substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
-        substruct('.','rfiles'));
-    matlabbatch{2}.spm.spatial.preproc.channel.biasreg = 0.001;
-    matlabbatch{2}.spm.spatial.preproc.channel.biasfwhm = 60;
-    matlabbatch{2}.spm.spatial.preproc.channel.write = [0 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(1).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,1']};
-    matlabbatch{2}.spm.spatial.preproc.tissue(1).ngaus = 2;
-    matlabbatch{2}.spm.spatial.preproc.tissue(1).native = [1 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(1).warped = [0 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(2).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,2']};
-    matlabbatch{2}.spm.spatial.preproc.tissue(2).ngaus = 2;
-    matlabbatch{2}.spm.spatial.preproc.tissue(2).native = [1 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(2).warped = [0 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(3).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,3']};
-    matlabbatch{2}.spm.spatial.preproc.tissue(3).ngaus = 2;
-    matlabbatch{2}.spm.spatial.preproc.tissue(3).native = [1 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(3).warped = [0 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(4).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,4']};
-    matlabbatch{2}.spm.spatial.preproc.tissue(4).ngaus = 3;
-    matlabbatch{2}.spm.spatial.preproc.tissue(4).native = [0 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(4).warped = [0 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(5).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,5']};
-    matlabbatch{2}.spm.spatial.preproc.tissue(5).ngaus = 4;
-    matlabbatch{2}.spm.spatial.preproc.tissue(5).native = [0 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(5).warped = [0 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(6).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,6']};
-    matlabbatch{2}.spm.spatial.preproc.tissue(6).ngaus = 2;
-    matlabbatch{2}.spm.spatial.preproc.tissue(6).native = [0 0];
-    matlabbatch{2}.spm.spatial.preproc.tissue(6).warped = [0 0];
-    matlabbatch{2}.spm.spatial.preproc.warp.mrf = 1;
-    matlabbatch{2}.spm.spatial.preproc.warp.cleanup = 1;
-    matlabbatch{2}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
-    matlabbatch{2}.spm.spatial.preproc.warp.affreg = 'mni';
-    matlabbatch{2}.spm.spatial.preproc.warp.fwhm = 0;
-    matlabbatch{2}.spm.spatial.preproc.warp.samp = 3;
-    matlabbatch{2}.spm.spatial.preproc.warp.write = [0 0];
+    matlabbatch{3}.spm.spatial.preproc.channel.vols(1) = ...
+        cfg_dep('Coregister: Reslice: Resliced Images', ...
+        substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+        substruct('.','rfiles'));  
+    matlabbatch{end}.spm.spatial.preproc.channel.biasreg = 0.001;
+    matlabbatch{end}.spm.spatial.preproc.channel.biasfwhm = 60;
+    matlabbatch{end}.spm.spatial.preproc.channel.write = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(1).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,1']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(1).ngaus = 2;
+    matlabbatch{end}.spm.spatial.preproc.tissue(1).native = [1 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(1).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(2).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,2']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(2).ngaus = 2;
+    matlabbatch{end}.spm.spatial.preproc.tissue(2).native = [1 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(2).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(3).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,3']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(3).ngaus = 2;
+    matlabbatch{end}.spm.spatial.preproc.tissue(3).native = [1 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(3).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(4).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,4']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(4).ngaus = 3;
+    matlabbatch{end}.spm.spatial.preproc.tissue(4).native = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(4).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(5).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,5']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(5).ngaus = 4;
+    matlabbatch{end}.spm.spatial.preproc.tissue(5).native = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(5).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(6).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,6']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(6).ngaus = 2;
+    matlabbatch{end}.spm.spatial.preproc.tissue(6).native = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(6).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.warp.mrf = 1;
+    matlabbatch{end}.spm.spatial.preproc.warp.cleanup = 1;
+    matlabbatch{end}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
+    matlabbatch{end}.spm.spatial.preproc.warp.affreg = 'mni';
+    matlabbatch{end}.spm.spatial.preproc.warp.fwhm = 0;
+    matlabbatch{end}.spm.spatial.preproc.warp.samp = 3;
+    matlabbatch{end}.spm.spatial.preproc.warp.write = [0 0];
     
     % if field maps, normalize EPI from T1
     % -------------------------------------
-    if ~isempty(BIDS.subjects(s).fmap)
+    if strcmpi(options.norm,'T1norm') % ~isempty(BIDS.subjects(s).fmap)
         
         % segment the coregistered T1 (not resliced)
         % -------------------------------------------
-        matlabbatch{3}.spm.spatial.preproc.channel.vols(1) = ...
-            cfg_dep('Coregister: Estimate & Reslice: Coregistered Images', ...
-            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
-            substruct('.','cfiles'));
-        matlabbatch{3}.spm.spatial.preproc.channel.biasreg = 0.001;
-        matlabbatch{3}.spm.spatial.preproc.channel.biasfwhm = 60;
-        matlabbatch{3}.spm.spatial.preproc.channel.write = [0 1];
-        matlabbatch{3}.spm.spatial.preproc.tissue(1).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,1']};
-        matlabbatch{3}.spm.spatial.preproc.tissue(1).ngaus = 2;
-        matlabbatch{3}.spm.spatial.preproc.tissue(1).native = [1 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(1).warped = [0 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(2).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,2']};
-        matlabbatch{3}.spm.spatial.preproc.tissue(2).ngaus = 2;
-        matlabbatch{3}.spm.spatial.preproc.tissue(2).native = [1 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(2).warped = [0 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(3).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,3']};
-        matlabbatch{3}.spm.spatial.preproc.tissue(3).ngaus = 2;
-        matlabbatch{3}.spm.spatial.preproc.tissue(3).native = [1 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(3).warped = [0 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(4).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,4']};
-        matlabbatch{3}.spm.spatial.preproc.tissue(4).ngaus = 3;
-        matlabbatch{3}.spm.spatial.preproc.tissue(4).native = [0 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(4).warped = [0 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(5).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,5']};
-        matlabbatch{3}.spm.spatial.preproc.tissue(5).ngaus = 4;
-        matlabbatch{3}.spm.spatial.preproc.tissue(5).native = [0 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(5).warped = [0 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(6).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,6']};
-        matlabbatch{3}.spm.spatial.preproc.tissue(6).ngaus = 2;
-        matlabbatch{3}.spm.spatial.preproc.tissue(6).native = [0 0];
-        matlabbatch{3}.spm.spatial.preproc.tissue(6).warped = [0 0];
-        matlabbatch{3}.spm.spatial.preproc.warp.mrf = 1;
-        matlabbatch{3}.spm.spatial.preproc.warp.cleanup = 1;
-        matlabbatch{3}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
-        matlabbatch{3}.spm.spatial.preproc.warp.affreg = 'mni';
-        matlabbatch{3}.spm.spatial.preproc.warp.fwhm = 0;
-        matlabbatch{3}.spm.spatial.preproc.warp.samp = 3;
-        matlabbatch{3}.spm.spatial.preproc.warp.write = [1 1];
+        matlabbatch{4}.spm.spatial.preproc.channel.vols(1) = ...
+        cfg_dep('Coregister: Estimate: Coregistered Images', ...
+        substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+        substruct('.','cfiles'));
+        matlabbatch{end}.spm.spatial.preproc.channel.biasreg = 0.001;
+        matlabbatch{end}.spm.spatial.preproc.channel.biasfwhm = 60;
+        matlabbatch{end}.spm.spatial.preproc.channel.write = [0 1];
+        matlabbatch{end}.spm.spatial.preproc.tissue(1).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,1']};
+        matlabbatch{end}.spm.spatial.preproc.tissue(1).ngaus = 2;
+        matlabbatch{end}.spm.spatial.preproc.tissue(1).native = [1 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(1).warped = [0 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(2).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,2']};
+        matlabbatch{end}.spm.spatial.preproc.tissue(2).ngaus = 2;
+        matlabbatch{end}.spm.spatial.preproc.tissue(2).native = [1 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(2).warped = [0 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(3).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,3']};
+        matlabbatch{end}.spm.spatial.preproc.tissue(3).ngaus = 2;
+        matlabbatch{end}.spm.spatial.preproc.tissue(3).native = [1 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(3).warped = [0 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(4).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,4']};
+        matlabbatch{end}.spm.spatial.preproc.tissue(4).ngaus = 3;
+        matlabbatch{end}.spm.spatial.preproc.tissue(4).native = [0 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(4).warped = [0 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(5).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,5']};
+        matlabbatch{end}.spm.spatial.preproc.tissue(5).ngaus = 4;
+        matlabbatch{end}.spm.spatial.preproc.tissue(5).native = [0 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(5).warped = [0 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(6).tpm = {[spm_root filesep 'tpm' filesep 'TPM.nii,6']};
+        matlabbatch{end}.spm.spatial.preproc.tissue(6).ngaus = 2;
+        matlabbatch{end}.spm.spatial.preproc.tissue(6).native = [0 0];
+        matlabbatch{end}.spm.spatial.preproc.tissue(6).warped = [0 0];
+        matlabbatch{end}.spm.spatial.preproc.warp.mrf = 1;
+        matlabbatch{end}.spm.spatial.preproc.warp.cleanup = 1;
+        matlabbatch{end}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];
+        matlabbatch{end}.spm.spatial.preproc.warp.affreg = 'mni';
+        matlabbatch{end}.spm.spatial.preproc.warp.fwhm = 0;
+        matlabbatch{end}.spm.spatial.preproc.warp.samp = 3;
+        matlabbatch{end}.spm.spatial.preproc.warp.write = [1 1];
         
         % normalize EPI using T1 info
         % ----------------------------
-        matlabbatch{4}.spm.spatial.normalise.write.subj.def(1) = ...
+        % normalize T1 
+        matlabbatch{end}.spm.spatial.normalise.write.subj(1).def(1) = ...
             cfg_dep('Segment: Forward Deformations', ...
-            substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','fordef', '()',{':'}));
-        matlabbatch{4}.spm.spatial.normalise.write.subj.resample(1) = ...
+        matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(1) = ...
             cfg_dep('Segment: Bias Corrected (1)', ...
-            substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','channel', '()',{1}, '.','biascorr', '()',{':'}));
-        matlabbatch{4}.spm.spatial.normalise.write.subj.resample(2) = ...
+        matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(2) = ...
             cfg_dep('Segment: c1 Images', ...
-            substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
-        matlabbatch{4}.spm.spatial.normalise.write.subj.resample(3) = ...
+        matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(3) = ...
             cfg_dep('Segment: c2 Images', ...
-            substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
-        matlabbatch{4}.spm.spatial.normalise.write.subj.resample(4) = ...
+        matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(4) = ...
             cfg_dep('Segment: c3 Images', ...
-            substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
-        
-        matlabbatch{4}.spm.spatial.normalise.write.subj(2).def(1) = ...
+
+        % normalize EPI
+        matlabbatch{end}.spm.spatial.normalise.write.subj(2).def(1) = ...
             cfg_dep('Segment: Forward Deformations', ...
-            substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+            substruct('.','val', '{}',{4}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','fordef', '()',{':'}));
         for frun = 1:size(subjects{s}.func,1)
-            matlabbatch{4}.spm.spatial.normalise.write.subj(2).resample(frun,:) = {realigned_file{frun}};
+            matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(frun,:) = {realigned_file{frun}};
         end
-        matlabbatch{4}.spm.spatial.normalise.write.woptions.bb = [-78 -112 -70 ; 78 76 85];
-        matlabbatch{4}.spm.spatial.normalise.write.woptions.vox = [2 2 2];
-        matlabbatch{4}.spm.spatial.normalise.write.woptions.interp = 4;
-        matlabbatch{4}.spm.spatial.normalise.write.woptions.prefix = 'w';
+        
+        matlabbatch{end}.spm.spatial.normalise.write.woptions.bb = [-78 -112 -70 ; 78 76 85];
+        matlabbatch{end}.spm.spatial.normalise.write.woptions.vox = [2 2 2]; %might wanna change that to EPI original res
+        matlabbatch{end}.spm.spatial.normalise.write.woptions.interp = 4;
+        matlabbatch{end}.spm.spatial.normalise.write.woptions.prefix = 'w';
         
     else  % normalize EPI on EPI template (old routine)
         % -------------------------------------------
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.subj.source(1) = {mean_realigned_file};
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
+        matlabbatch{4}.spm.tools.oldnorm.estwrite.subj.source(1) = {mean_realigned_file};
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
         for frun = 1:size(subjects{s}.func,1)
-            matlabbatch{3}.spm.tools.oldnorm.estwrite.subj.resample(frun,:) = {realigned_file{frun}};
+            matlabbatch{end}.spm.tools.oldnorm.estwrite.subj.resample(frun,:) = {realigned_file{frun}};
         end
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.eoptions.template = ...
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.template = ...
             {[spm_root filesep 'toolbox' filesep 'OldNorm' filesep 'EPI.nii,1']};
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.eoptions.weight = '';
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.eoptions.smosrc = 8;
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.eoptions.smoref = 0;
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.eoptions.regtype = 'mni';
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.eoptions.cutoff = 25;
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.eoptions.nits = 16;
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.eoptions.reg = 1;
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.roptions.bb = [-78 -112 -70 ; 78 76 85];
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.roptions.vox = [2 2 2];
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.roptions.interp = 4;
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
-        matlabbatch{3}.spm.tools.oldnorm.estwrite.roptions.prefix = 'w';
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.weight = '';
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.smosrc = 8;
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.smoref = 0;
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.regtype = 'mni';
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.cutoff = 25;
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.nits = 16;
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.reg = 1;
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.bb = [-78 -112 -70 ; 78 76 85];
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.vox = [2 2 2]; %might wanna change that to EPI original res
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.interp = 4;
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.prefix = 'w';
         
     end
+    
+    save('batch.mat', 'matlabbatch')
     spm_jobman('run',matlabbatch);
     clear matlabbatch;
 end
