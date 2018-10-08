@@ -111,7 +111,7 @@ if strcmp(flags.T1, 'on')
     slices = find(search>10-3); slices = [slices(4):6:slices(end)];
     
     figure('Name','Average T1 vs T2*'); colormap('gray')
-    for s=1:8
+    for s=1:numel(slices)
         A = flipud(squeeze(Ref(:,:,slices(s)))'); subplot(3,8,s); imagesc(A);
         if s ==4; title('Normalized T1 weighted image','Fontsize',14); end
         B = flipud(squeeze(Average(:,:,slices(s)))'); subplot(3,8,s+8); imagesc(B);
