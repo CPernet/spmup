@@ -3,7 +3,7 @@ function RM = spmup_auto_reorient(P,which_image)
 % FORMAT: reorientation_matrix = spmup_auto_reorient(p,which_image)
 %
 % IMPUT: p is a cell string of images to process (see spm_select)
-%        which_image is a integer for wich image to obtain M
+%        which_image is a integer for wich image to obtain RM
 %
 % OUTPUT: RM is the reorientation matrix obtain from affine reg to the
 %         template - assuming the T1 and EPI are pretty much aligned, it
