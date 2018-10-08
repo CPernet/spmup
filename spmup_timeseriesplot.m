@@ -14,7 +14,7 @@ function M = spmup_timeseriesplot(fmridata,c1,c2,c3,varargin)
 %              (see also spmup_FD.m)
 %       'correlation' 'on' (default) 'off' or a vector/matrix associated to the data
 %               --> for resting fMRI this is useful to check against motion
-%               and nuisance that volumes don't get decorreated 
+%               and nuisance that volumes don't get decorrelated 
 %               (see also spmup_volumecorr.m)
 %       'nuisances' 'on' (default) 'off' or a matrix (n*2) of noise computed from c2 and c3
 %               --> these typically reflect changes in globals, respiration and
