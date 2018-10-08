@@ -153,7 +153,16 @@ for s=1:size(subjs_ls,2) % for each subject
             unzip_or_copy(compressed, options, file_exists, in, target_dir)
             
             % reorient the file to template
-            spmup_auto_reorient(subjects{s}.anat); disp(' anat reoriented');
+            file_exists = spm_select('FPList',target_dir,'^reorient_mat_anat.*' );
+            if strcmp(options.overwrite_data,'on') || ( strcmp(options.overwrite_data,'off') ...
+                    && isempty(file_exists) )
+                RM = spmup_auto_reorient(subjects{s}.anat); disp(' anat reoriented'); %#ok<NASGU>
+                % saves reorient matrix
+                date_format = 'yyyy_mm_dd_HH_MM';
+                saved_RM_file = fullfile(target_dir, ...
+                    strcat('reorient_mat_anat', datestr(now, date_format), '.mat'));
+                save(saved_RM_file, 'RM')
+            end
         end
     end
     
@@ -339,7 +348,7 @@ else
 end
 
 % do the computation if needed
-for s=1:size(subjs_ls,2)
+for s=1%:size(subjs_ls,2)
     %     parfor s=1%:size(subjs_ls,2)
     spmup_BIDSjob(BIDS_dir,BIDS,subjects,s,options,start_at)
 end
