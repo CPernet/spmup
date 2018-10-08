@@ -88,8 +88,13 @@ if iscell(P)
 else
     V = spm_vol(P);
 end
-[folder,name,ext] = fileparts(V(1).fname);
-cd(folder); average = dir('mean*.nii');
+[folder,name,~] = fileparts(V(1).fname);
+if strcmp(V(1).descrip, 'Warped') %in case we are dealing with a normalized image
+    average = spm_select('FPList',folder,['^wmean' name(2:end)]);
+else
+    average = spm_select('FPList',folder,['^mean' name]);
+end
+cd(folder);
 
 % if distance we need the mean image
 if strcmp(flags.volume_distance,'on')
@@ -97,7 +102,7 @@ if strcmp(flags.volume_distance,'on')
         disp('mean image not found - computing one .. ')
         average = mean(spm_read_vols(V),4);
     else
-        average =  spm_read_vols(spm_vol([folder filesep average.name]));
+        average =  spm_read_vols(spm_vol(average));
     end
 end
 
