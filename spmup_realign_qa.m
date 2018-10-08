@@ -245,7 +245,7 @@ end
 
 if strcmp(flags.volume_distance, 'on')
     
-    n = size(P,1);
+    n = numel(V);
     distance_to_mean = zeros(n,1);
     distance_between = zeros(n-1,1);
     % mean_data = spm_read_vols(spm_vol(average));
