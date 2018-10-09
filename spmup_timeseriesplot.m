@@ -231,7 +231,7 @@ roi_values(roi_values==0) = [];
 for r = 1:length(roi_values)
     [x,y,z]=ind2sub(size(ROIdata),intersect(find(ROIdata==r),find(c1)));
     tmp = spm_get_data(Vfmri,[x y z]')';
-    tmp(find(sum(isnan(tmp))),:) = []; % removes rows of NaN;
+    tmp(find(sum(isnan(tmp),2)),:) = []; % removes rows of NaN;
     M = [M ; tmp];
 end
 
