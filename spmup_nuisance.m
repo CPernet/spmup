@@ -60,8 +60,8 @@ csf = csf > 0.7;
 % noise regressor comes from the white matter and csf images
 index = find(whitematter);
 [x,y,z]=ind2sub(size(whitematter),index);
-nuisances.WM = mean(spm_detrend(spm_get_data(Vfmri,[x y z]'),1),2);
+nuisances.WM = nanmean(spm_detrend(spm_get_data(Vfmri,[x y z]'),1),2);
 
 index = find(csf);
 [x,y,z]=ind2sub(size(csf),index);
-nuisances.CSF = mean(spm_detrend(spm_get_data(Vfmri,[x y z]'),1),2);
+nuisances.CSF = nanmean(spm_detrend(spm_get_data(Vfmri,[x y z]'),1),2);
