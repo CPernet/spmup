@@ -102,6 +102,10 @@ for inputs = 1:nargin
     end
 end
 
+if nargout == 3
+    QC = [];
+end
+
 % quickly check dimensions and if the masks are binary.
 % If masks are not binary, threshold at 5% of the max assuming these images
 % reflect probability maps (allows removing partial volumes)
@@ -245,6 +249,8 @@ if exist('anoise','var')
     varargout{1} = anoise;
     if nargout == 2
         varargout{2} = QC;
+    elseif nargout == 3
+        varargout{3} = QC;
     end
 end
 
@@ -299,10 +305,10 @@ if exist('tnoise','var')
         Vbrainmask.descrip = 'robust temporal SNR image';
         QC.SNR.V = Vbrainmask;
         QC.SNR.img = SNRimg;
-        QC.spectral = norm_power(tnoise);
+        QC.spectral.tnoise = norm_power(tnoise);
     end
     
-    if nargout == 3 && nargin == 5
+    if nargout == 3 && nargin >= 4
         varargout{2} = tnoise;
         varargout{3} = QC;
     elseif nargout <= 2
