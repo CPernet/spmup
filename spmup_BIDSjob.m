@@ -20,7 +20,11 @@ for frun = 1:size(subjects{s}.func,1) % each run
 
     filesin = subjects{s}.func{frun};
     
-    metadata = spm_BIDS(BIDS,'metadata', 'sub', subjs_ls{s}, 'run', runs_ls{frun});
+    try
+        metadata = spm_BIDS(BIDS,'metadata', 'sub', subjs_ls{s}, 'run', runs_ls{frun});
+    catch
+        metadata{1} = spm_BIDS(BIDS,'metadata', 'sub', subjs_ls{s}, 'type', 'bold');
+    end
     hdr = spm_vol(subjects{s}.func{frun});
     epi_res = diag(hdr(1).mat);
     epi_res(end) = [];
@@ -47,6 +51,10 @@ for frun = 1:size(subjects{s}.func,1) % each run
         spm_file_merge(V,filesin);
         spm_unlink(three_dim_files.fname)
         
+        %
+        % ADD SOMETHING SO THAT THIS STEP IS NOT RERUN OVERWRITE DATA IS
+        % OFF
+        %
     end
     [filepath,filename,ext] = fileparts(filesin);
     
@@ -244,6 +252,11 @@ if isempty(BIDS.subjects(s).fmap)
         matlabbatch{end}.spm.spatial.realign.estwrite.roptions.prefix  = 'r';
         
         spm_jobman('run',matlabbatch); clear matlabbatch;
+        
+        disp('setting up AC coordinate based on template')
+        tmp = realigned_file; tmp{length(tmp)+1} = mean_realigned_file;
+        spmup_auto_reorient(tmp',length(tmp)); clear tmp;
+        
     end
 else
     fprintf('subject %g: starting realignment and unwarping \n',s)
@@ -284,11 +297,15 @@ else
         matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.wrap     = [0 0 0];
         matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.mask     = 1;
         matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.prefix   = 'ur';
+        
         spm_jobman('run',matlabbatch); clear matlabbatch;
+        
+        disp('setting up AC coordinate based on template')
+        tmp = realigned_file; tmp{length(tmp)+1} = mean_realigned_file;
+        spmup_auto_reorient(tmp',length(tmp)); clear tmp;
+        
     end
-    disp('setting up AC coordinate based on template')
-    tmp = realigned_file; tmp{length(tmp)+1} = mean_realigned_file;
-    spmup_auto_reorient(tmp',length(tmp)); clear tmp;
+
 end
 
 
@@ -312,7 +329,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
     matlabbatch{end}.spm.spatial.coreg.estimate.source = {subjects{s}.anat};
     matlabbatch{end}.spm.spatial.coreg.estimate.other = {''};
     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.cost_fun = 'nmi';
-    matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.sep = [4 2];
+    matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.sep = [16 8 4 2 1];
     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.tol = ...
         [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.fwhm = [7 7];
@@ -367,12 +384,11 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
     matlabbatch{end}.spm.spatial.preproc.warp.fwhm = 0;
     matlabbatch{end}.spm.spatial.preproc.warp.samp = 3;
     matlabbatch{end}.spm.spatial.preproc.warp.write = [0 0];
-
+    
     spm_jobman('run',matlabbatch);
     clear matlabbatch;
 end
 
-return
 
 % ---------------
 % Normalization
@@ -504,7 +520,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.prefix = 'w';
         
     end
-    save('batch.mat', 'matlabbatch')
+%     save('batch.mat', 'matlabbatch')
     spm_jobman('run',matlabbatch);
     clear matlabbatch;
 end
@@ -590,6 +606,7 @@ if strcmp(options.QC,'on') %
     end
 end
 
+% return
 
 % --------------------
 % 1st level modelling
