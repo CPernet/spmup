@@ -274,7 +274,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
         clear matlabbatch
     end
     
-    % coregister anotomical to mean EPI
+    % coregister anatomical to mean EPI
     % ---------------------------------
     matlabbatch{1}.spm.spatial.coreg.estwrite.ref = {mean_realigned_file};
     matlabbatch{1}.spm.spatial.coreg.estwrite.source = {subjects{s}.anat};

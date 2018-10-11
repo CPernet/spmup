@@ -46,7 +46,7 @@ if nargin == 0
     if size(fmridata,1) == 1 && strcmp(fmridata(length(fmridata)-1:end),',1')
         fmridata = fmridata(1:length(fmridata)-2); % in case picked 4D put left ,1
     end
-    [c1,sts]= spm_select(1,'image','Select white matter tissue image');
+    [c1,sts]= spm_select(1,'image','Select grey matter tissue image');
     if sts == 0; disp('selection aborded'); return; end
     [c2,sts]= spm_select(1,'image','Select white matter tissue image');
     if sts == 0; disp('selection aborded'); return; end
