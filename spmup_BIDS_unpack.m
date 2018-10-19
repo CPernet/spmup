@@ -1,14 +1,15 @@
-function [anatQA,fMRIQA]=spmup_BIDS_unpack(BIDS_dir,choices)
+function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 
 % routine to read and unpack BIDS fMRI and preprocess data, build the first
 % level analysis - with various options available
 %
-% FORMAT spmup_BIDS
-%        spmup_BIDS(BIDS_dir)
-%        spmup_BIDS(BIDS_dir,choices)
+% FORMAT spmup_BIDS_unpack
+%        spmup_BIDS_unpack(BIDS_dir)
+%        spmup_BIDS_unpack(BIDS_dir,choices)
 %
-% INPUTS BIDS_dir is the BIDS directory
-%        choices a structure with the following fields:
+% INPUTS 
+%           - BIDS_dir is the BIDS directory
+%           - choices a structure with the following fields:
 %               .outdir = where to write the data
 %               .removeNvol = number of initial volumes to remove
 %               .keep_data = 'off' (default) or 'on' to keep all steps - off means
@@ -28,24 +29,31 @@ function [anatQA,fMRIQA]=spmup_BIDS_unpack(BIDS_dir,choices)
 %               .derivatives = 'off', 1 or 2 to use for GLM
 %                              if dervatives are used, beta hrf get boosted
 %                              and smoothing is performed after the GLM
+% 
+% OUTPUTS 
+%           - BIDS: the structure returned by spm_BIDS and possibly modified
+%           by spmup_BIDS_unpack
+%           - subjects: a structure containing the fullpath of the unpacked anat,
+%           fmap and func files for each subject
+%           - options: a structure equal to the choices strucure + the
+%           default of all the non specified fields
 %
 % usage:
 % choice = struct('removeNvol', 0, 'keep_data', 'off',  'overwrite_data', 'on', ...
 %     'despike', 'off', 'drifter', 'off', 'motionexp', 'off', 'scrubbing', 'off', ...
 %     'compcor', 'off', 'norm', 'EPInorm', 'skernel', [8 8 8], 'derivatives', 'off', ...
 %     'ignore_fieldmaps', 'on',  'outdir', ['..' filesep 'derivatives' filesep 'spmup_BIDS_processed'], 'QC', 'off'); % standard SPM pipeline
-% [anatQA,fMRIQA]=spmup_BIDS(pwd,choice)
+% [BIDS,subjects,options]=spmup_BIDS_unpack(pwd,choice)
+%
 % Cyril Pernet - University of Edinburgh
 % -----------------------------------------
 % Copyright (c) SPM Utility Plus toolbox
 
 % TO DO:
-% - track which task for each bold run ? (Remi Gau)
 % - implement fieldmap and epi types for fieldmap modality ? (Remi Gau)
 % - function assumes no more than one T1w image for each subject for each
 %   session (can't deal with mutiple rec / acq) (Remi Gau)
-% - add an spm_check_coregistration to vizualize how the spmup_autoreorient
-%   worked on the anat data? (Remi Gau)
+
  
 % TESTED:
 % unpacking data tried on:
