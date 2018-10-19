@@ -11,6 +11,21 @@ subjs_ls = spm_BIDS(BIDS,'subjects');
 runs_ls = spm_BIDS(BIDS,'runs', 'sub', subjs_ls{s});
 all_names = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
             'type', 'bold');
+        
+% ---------------------------------------        
+% reorient anat file to template
+% ---------------------------------------
+target_dir = spm_fileparts(subjects{s}.anat);
+file_exists = spm_select('FPList',target_dir,'^reorient_mat_anat.*' );
+if strcmp(options.overwrite_data,'on') || ( strcmp(options.overwrite_data,'off') ...
+        && isempty(file_exists) )
+    RM = spmup_auto_reorient(subjects{s}.anat); disp(' anat reoriented'); %#ok<NASGU>
+    % saves reorient matrix
+    date_format = 'yyyy_mm_dd_HH_MM';
+    saved_RM_file = fullfile(target_dir, ...
+        strcat('reorient_mat_anat', datestr(now, date_format), '.mat'));
+    save(saved_RM_file, 'RM')
+end
   
         
 % ---------------------------------------
