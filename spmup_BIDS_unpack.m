@@ -1,4 +1,4 @@
-function [anatQA,fMRIQA]=spmup_BIDS(BIDS_dir,choices)
+function [anatQA,fMRIQA]=spmup_BIDS_unpack(BIDS_dir,choices)
 
 % routine to read and unpack BIDS fMRI and preprocess data, build the first
 % level analysis - with various options available
@@ -105,12 +105,13 @@ if ~exist(options.outdir,'dir')
 end
 
 subjs_ls = spm_BIDS(BIDS,'subjects');
+nb_sub = 2 %numel(subjs_ls);
 
 
 %% unpack anat and center [0 0 0]
 % this assumes that there is no more than one T1W image for each session
 % -------------------------------
-for s=1:size(subjs_ls,2) % for each subject
+for s=1:nb_sub % for each subject
     
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
     
@@ -180,8 +181,8 @@ end
 
 % unpack functional and field maps (still need to work out sessions here)
 % -----------------------------------------------------------------------
-for s=1:size(subjs_ls,2)
-    % parfor s=1:size(subjs_ls,2)
+for s=1:nb_sub
+    % parfor s=1:nb_sub
     
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
     
@@ -337,6 +338,7 @@ for s=1:size(subjs_ls,2)
     
 end
 
+
 disp('spmup has finished unpacking data')
 
 %% run preprocessing using options
@@ -348,7 +350,7 @@ else
 end
 
 % do the computation if needed
-for s=1%:size(subjs_ls,2)
+for s=1:nb_sub
     %     parfor s=1%:size(subjs_ls,2)
     spmup_BIDSjob(BIDS_dir,BIDS,subjects,s,options,start_at)
 end
