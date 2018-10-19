@@ -90,8 +90,6 @@ if isfield(options,'ignore_fieldmaps')
     end
 end
 
-anatQA = [];
-fMRIQA = [];
 
 %% unpack data
 % -------------------------------------------------------------------------
@@ -105,7 +103,7 @@ if ~exist(options.outdir,'dir')
 end
 
 subjs_ls = spm_BIDS(BIDS,'subjects');
-nb_sub = 2 %numel(subjs_ls);
+nb_sub = numel(subjs_ls);
 
 
 %% unpack anat and center [0 0 0]
@@ -327,25 +325,11 @@ for s=1:nb_sub
     
 end
 
-
 disp('spmup has finished unpacking data')
 
-%% run preprocessing using options
-% -------------------------------------------------------------------------
-if isfield(options,'removeNvol')
-    start_at = options.removeNvol;
-else
-    start_at = 1;
+try delete(gcp('nocreate')); 
+catch
 end
-
-% do the computation if needed
-for s=1:nb_sub
-    %     parfor s=1%:size(subjs_ls,2)
-    spmup_BIDSjob(BIDS_dir,BIDS,subjects,s,options,start_at)
-end
-
-disp('spmup BIDS done - all subjects processed')
-try delete(gcp('nocreate')); end
 
 end
 
