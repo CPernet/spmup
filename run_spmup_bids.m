@@ -44,8 +44,13 @@ BIDS_dir = 'D:\BIDS\ds001\rawdata';
 %% preprocess
 for s=1:numel(subjects)
 % parfor s=1%:size(subjs_ls,2)
-    spmup_BIDSjob(BIDS_dir,BIDS,subjects,s,options)
+    [anatQA, fMRIQA, subjects, options] = ...
+        spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s, options);
 end
 
 
 %% run first level GLM
+for s=1:numel(subjects)
+    [] = spmup_BIDS_1rstlevel(BIDS_dir, BIDS, subjects, s, options)
+end
+
