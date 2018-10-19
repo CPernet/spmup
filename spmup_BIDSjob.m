@@ -68,12 +68,15 @@ for frun = 1:size(subjects{s}.func,1) % each run
         end
         flags = struct('auto_mask','on', 'method','median', 'window', ...
             options.despiking_window,'skip',0);
-        [~,filename,ext] = fileparts(filesin);
+        
         if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
                 && ~exist([filepath filesep 'despiked_' filename ext],'file'))
-            Vin = spmup_despike(filesin,[],flags);
+            Vin = spmup_despike(fullfile(filepath,[filename,ext]),[],flags);
             filesin = Vin.fname; clear Vin;
         end
+        
+        [filepath,filename,ext] = fileparts(filesin);
+        
     end
     
     % -------------
@@ -89,11 +92,8 @@ for frun = 1:size(subjects{s}.func,1) % each run
         sliceorder  = SliceTiming; % time
         refslice    = sliceorder(round(length(SliceTiming)/2));
         timing      = [0 RepetitionTime];
-        if strcmp(options.despike,'on')
-            st_files{frun} = [filepath filesep 'st_despiked_' filename ext]; %#ok<*AGROW>
-        else
-            st_files{frun} = [filepath filesep 'st_' filename ext];
-        end
+        
+        st_files{frun} = [filepath filesep 'st_' filename ext]; %#ok<*AGROW>
         
         if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
                 && ~exist(st_files{frun},'file'))
@@ -102,7 +102,7 @@ for frun = 1:size(subjects{s}.func,1) % each run
         end
         
     else
-        st_files = subjects{s}.func;
+        st_files{frun} = fullfile(filepath, [filename ext]);
     end
        
     % ----------------------
@@ -228,7 +228,7 @@ if isempty(BIDS.subjects(s).fmap)
     mean_realigned_file = [filepath filesep 'mean' filename ext];
     for frun = 1:size(subjects{s}.func,1)
         realigned_file{frun} = st_files{frun}; % because we don't reslice, simple encode the linear transform in the header
-        [filepath,filename,ext] = fileparts(st_files{frun});
+        [filepath,filename] = fileparts(st_files{frun});
         multi_reg{frun} = [filepath filesep 'rp_' filename '.txt'];
     end
     
@@ -606,7 +606,7 @@ if strcmp(options.QC,'on') %
     end
 end
 
-% return
+return
 
 % --------------------
 % 1st level modelling
