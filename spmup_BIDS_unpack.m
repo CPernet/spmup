@@ -2,6 +2,7 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 
 % routine to read and unpack BIDS fMRI and preprocess data, build the first
 % level analysis - with various options available
+% can also be used to list files to be preprocessed to pass to spmup_BIDS_preprocess
 %
 % FORMAT spmup_BIDS_unpack
 %        spmup_BIDS_unpack(BIDS_dir)
@@ -9,6 +10,7 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 %
 % INPUTS 
 %           - BIDS_dir is the BIDS directory
+%
 %           - choices a structure with the following fields:
 %               .outdir = where to write the data
 %               .removeNvol = number of initial volumes to remove
@@ -33,8 +35,10 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 % OUTPUTS 
 %           - BIDS: the structure returned by spm_BIDS and possibly modified
 %           by spmup_BIDS_unpack
+%
 %           - subjects: a structure containing the fullpath of the unpacked anat,
 %           fmap and func files for each subject
+%
 %           - options: a structure equal to the choices strucure + the
 %           default of all the non specified fields
 %

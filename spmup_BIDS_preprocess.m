@@ -1,15 +1,52 @@
 function [anatQA, fMRIQA, subjects, options] = spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s, options)
 
 % routine to preprocess BIDS fMRI data - with various options available
-
-% run preprocessing using options
-% -------------------------------------------------------------------------
+% FORMAT spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s)
+%        spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s, options)
+%
+% INPUTS 
+%           - BIDS_dir is the BIDS directory
+%           - BIDS: the structure returned by spm_BIDS and possibly modified
+%           by spmup_BIDS_unpack
+%           - subjects: a structure containing the fullpath of the unpacked anat,
+%           fmap and func files for each subject (see spmup_BIDS_unpack)
+%           - s is the subject index to preprocess
+%           - options is a structure with the following fields:
+%               .outdir = where to write the data
+%               .removeNvol = number of initial volumes to remove
+%               .keep_data = 'off' (default) or 'on' to keep all steps - off means
+%                            only the last processed data are available
+%               .overwrite_data = 'on' turning it 'off' is useful to restart
+%                                  some processing while kepping previous steps
+%               .QC = 'on' (default) or 'off' performs quality controls for
+%                     anatomical (T1) scans and EPI time series
+%               .despike = 'on' (default) or 'off' runs median despiking
+%               .drifter = 'off' ('default') or 'on' removes cardiac and respiratory signals using the drifter toolbox
+%               .motionexp = 'off' (default) or 'on' compute 24 motion parameters
+%               .scrubbing = 'off' (default) or 'on' find outliers in motion derivatives and in globals
+%               .compcor = 'on' (default) or 'off' does the equivalent of compcor
+%               .norm = 'EPInorm' (default) or 'T1norm' choice of the type of template for normalization
+%               .ignore_fieldmaps = 'on' or 'off' (default) to include distorsion correction for T1norm
+%               .skernel = [8 8 8] by default is the smoothing kernel
+%               .derivatives = 'off', 1 or 2 to use for GLM
+%                              if dervatives are used, beta hrf get boosted
+%                              and smoothing is performed after the GLM
+%
+% usage:
+% choice = struct('removeNvol', 0, 'keep_data', 'off',  'overwrite_data', 'on', ...
+%     'despike', 'off', 'drifter', 'off', 'motionexp', 'off', 'scrubbing', 'off', ...
+%     'compcor', 'off', 'norm', 'EPInorm', 'skernel', [8 8 8], 'derivatives', 'off', ...
+%     'ignore_fieldmaps', 'on',  'outdir', ['..' filesep 'derivatives' filesep 'spmup_BIDS_processed'], 'QC', 'off'); % standard SPM pipeline
+% [BIDS,subjects,options]=spmup_BIDS_unpack(pwd,choice)
+% for s=1:numel(subjects)
+% [anatQA, fMRIQA, subjects, options] = spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s, options)
+% end
 
 % TO DO:
-% - track which task for each bold run ? (Remi Gau)
-% - implement fieldmap and epi types for fieldmap modality ? (Remi Gau)
+% - track which task for each bold run ?
+% - implement fieldmap and epi types for fieldmap modality ?
 % - add an spm_check_coregistration to vizualize how the spmup_autoreorient
-%   worked on the anat data? (Remi Gau)
+%   worked on the anat data?
 % - change prefix name appending of preprocessed data (i.e a la SPM) to
 % suffix name appending as per the BIDS derivative specs
 % - create json files for each preprocessing step (see bids derivative
