@@ -111,29 +111,34 @@ for frun = 1:size(subjects{s}.func,1) % each run
         end
     end
 
+    
     % -----------------------------------------
     % remove first volumes
     % -----------------------------------------
-    if start_at ~= 1
+    
+    file_exists = exist(fullfile(filepath,[filename '_removevol.json']),'file');
+    if start_at ~= 1 && ( strcmp(options.overwrite_data,'on')...
+            || (strcmp(options.overwrite_data,'off') && ~file_exists) )
         
         % remove from the 4D the files we don't want and proceed
         fprintf('\nadjusting 4D file sizes run %g \n',frun)
 
-        three_dim_files = spm_file_split(subjects{s}.func{frun});
+        three_dim_files = spm_file_split(filesin);
         V = three_dim_files; V(1:start_at) = [];
         spm_file_merge(V,filesin);
         spm_unlink(three_dim_files.fname)
         
-        %
-        % ADD SOMETHING SO THAT THIS STEP IS NOT RERUN OVERWRITE DATA IS
-        % OFF
-        %
+        % write a json file containing the details of what volumes were
+        % removed (see BIDS derivatives specs)
+        spm_jsonwrite(fullfile(filepath,[filename '_removevol.json']),'')
+
     end
-    [filepath,filename,ext] = fileparts(filesin);
+    
     
     % -----------------------------------------
     % despiking using adaptive median filter
     % -----------------------------------------
+    
     if strcmp(options.despike,'on')
         
         if ~isfield(options,'despiking_window')
