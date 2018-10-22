@@ -101,7 +101,6 @@ if strcmp(options.overwrite_data,'on') || ( strcmp(options.overwrite_data,'off')
     matlabbatch{1}.spm.util.reorient.prefix = '';
     
     spm_jobman('run',matlabbatch); clear matlabbatch;
-%     save('matlabbatch.mat', 'matlabbatch')
 end
 
     
@@ -701,6 +700,13 @@ if strcmp(options.QC,'on') %
             fMRIQA.meanFD{s,frun} = mean(spmup_FD(cell2mat(tmp))); clear tmp
             QA.tSNR = fMRIQA.tSNR{s,frun}; QA.meanFD = fMRIQA.meanFD{s,frun};
             save([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA'); clear QA
+            
+            fprintf('subject %g: fMRI Quality control: carpet plot \n',s)
+            P = subjects{s}.func{frun};
+            c1 = EPI_class{1};
+            c2 = EPI_class{2};
+            c3 = EPI_class{3};
+            spmup_timeseriesplot(P,c1, c2, c3, 'motion','on','nuisances','on','correlation','on');
         end
     end
 end
