@@ -69,29 +69,50 @@ subjs_ls = spm_BIDS(BIDS,'subjects');
 runs_ls = spm_BIDS(BIDS,'runs', 'sub', subjs_ls{s});
 all_names = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
             'type', 'bold');
+    
         
 % ---------------------------------------        
 % reorient anat file to template
 % ---------------------------------------
+
 target_dir = spm_fileparts(subjects{s}.anat);
 file_exists = spm_select('FPList',target_dir,'^reorient_mat_anat.*' );
 if strcmp(options.overwrite_data,'on') || ( strcmp(options.overwrite_data,'off') ...
         && isempty(file_exists) )
+    
     RM = spmup_auto_reorient(subjects{s}.anat); disp(' anat reoriented'); %#ok<NASGU>
+    
     % saves reorient matrix
     date_format = 'yyyy_mm_dd_HH_MM';
     saved_RM_file = fullfile(target_dir, ...
         strcat('reorient_mat_anat', datestr(now, date_format), '.mat'));
     save(saved_RM_file, 'RM')
+    
+    % apply reorientation to functional imges
+    matlabbatch{1}.spm.util.reorient.srcfiles = {};
+    for irun = 1:size(subjects{s}.func,1)
+        n_vol = numel(spm_vol(subjects{s}.func{irun}));
+        for i_vol = 1:n_vol
+            matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
+                [subjects{s}.func{irun} ',' num2str(i_vol)];
+        end
+    end
+    matlabbatch{1}.spm.util.reorient.transform.transM = RM;
+    matlabbatch{1}.spm.util.reorient.prefix = '';
+    
+    spm_jobman('run',matlabbatch); clear matlabbatch;
+%     save('matlabbatch.mat', 'matlabbatch')
 end
-  
-        
+
+    
 % ---------------------------------------
 % Despiking and slice timing for each run
 % ----------------------------------------
+
 for frun = 1:size(subjects{s}.func,1) % each run
 
     filesin = subjects{s}.func{frun};
+    [filepath,filename,ext] = fileparts(filesin);
     
     try
         metadata = spm_BIDS(BIDS,'metadata', 'sub', subjs_ls{s}, 'run', runs_ls{frun});
@@ -157,6 +178,7 @@ for frun = 1:size(subjects{s}.func,1) % each run
         
     end
     
+    
     % -------------
     % slice timing
     % -------------
@@ -183,6 +205,7 @@ for frun = 1:size(subjects{s}.func,1) % each run
         st_files{frun} = fullfile(filepath, [filename ext]);
     end
        
+    
     % ----------------------
     % Field Map - compute VDM
     % ----------------------
@@ -300,7 +323,9 @@ end % end processing per run
 % -----------------------
 % Realignment across runs
 % ------------------------
+
 if isempty(BIDS.subjects(s).fmap)
+    
     % file out of realign will be
     [filepath,filename,ext] = fileparts(st_files{1});
     mean_realigned_file = [filepath filesep 'mean' filename ext];
@@ -330,10 +355,6 @@ if isempty(BIDS.subjects(s).fmap)
         matlabbatch{end}.spm.spatial.realign.estwrite.roptions.prefix  = 'r';
         
         spm_jobman('run',matlabbatch); clear matlabbatch;
-        
-        disp('setting up AC coordinate based on template')
-        tmp = realigned_file; tmp{length(tmp)+1} = mean_realigned_file;
-        spmup_auto_reorient(tmp',length(tmp)); clear tmp;
         
     end
 else
@@ -377,11 +398,7 @@ else
         matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.prefix   = 'ur';
         
         spm_jobman('run',matlabbatch); clear matlabbatch;
-        
-        disp('setting up AC coordinate based on template')
-        tmp = realigned_file; tmp{length(tmp)+1} = mean_realigned_file;
-        spmup_auto_reorient(tmp',length(tmp)); clear tmp;
-        
+
     end
 
 end
@@ -390,6 +407,7 @@ end
 % ---------------
 % Coregistration / Segmentation
 % ---------------
+
 [filepath,filename,ext] = fileparts(subjects{s}.anat);
 EPI_class{1} = [filepath filesep 'c1r' filename ext];
 EPI_class{2} = [filepath filesep 'c2r' filename ext];
@@ -471,6 +489,7 @@ end
 % ---------------
 % Normalization
 % ---------------
+
 [filepath,filename,ext] = fileparts(subjects{s}.anat);
 % Normalization_file = [filepath filesep 'y_' filename ext];
 NormalizedAnat_file  = [filepath filesep 'wm' filename ext];
@@ -613,6 +632,7 @@ end
 % --------------
 % Smoothing
 % --------------
+
 if strcmp(options.derivatives,'off') % otherwise do it after stats
     for frun = 1:size(subjects{s}.func,1)
         [filepath,filename,ext] = fileparts(Normalized_files{frun});
@@ -638,6 +658,7 @@ end
 % ----------------------------
 % QC and additional regressors
 % ----------------------------
+
 if strcmp(options.QC,'on') %
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
             && ~exist([fileparts(NormalizedAnat_file) filesep 'anatQA.mat'],'file'))
