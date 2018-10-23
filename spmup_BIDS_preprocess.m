@@ -689,24 +689,30 @@ if strcmp(options.QC,'on') %
         end
         
         for frun = 1:size(subjects{s}.func,1)
+            
             % sanity check that all images are in the same space.
             V_to_check = Normalized_class';
             V_to_check{end+1} = stats_ready{frun};
             spm_check_orientations(spm_vol(char(V_to_check)));
             
-            fMRIQA.tSNR{s, frun} = spmup_temporalSNR(Normalized_files{frun},Normalized_class,0);
-            tmp = spmup_first_level_qa(NormalizedAnat_file,cell2mat(stats_ready(frun)),flags);
+            fMRIQA.tSNR{s, frun} = spmup_temporalSNR(Normalized_files{frun},vNormalized_class,v0);
             
-            fMRIQA.meanFD{s,frun} = mean(spmup_FD(cell2mat(tmp))); clear tmp
-            QA.tSNR = fMRIQA.tSNR{s,frun}; QA.meanFD = fMRIQA.meanFD{s,frun};
-            save([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA'); clear QA
+            tmp = spmup_first_level_qa(NormalizedAnat_file,vcell2mat(stats_ready(frun)),vflags);  
+            fMRIQA.meanFD{s,frun} = mean(spmup_FD(cell2mat(tmp),vdavg)); 
+            clear tmp
+            
+            QA.tSNR = fMRIQA.tSNR{s,vfrun}; 
+            QA.meanFD = fMRIQA.meanFD{s,vfrun};
+            save([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA'); 
+            clear QA
             
             fprintf('subject %g: fMRI Quality control: carpet plot \n',s)
             P = subjects{s}.func{frun};
             c1 = EPI_class{1};
             c2 = EPI_class{2};
             c3 = EPI_class{3};
-            spmup_timeseriesplot(P,c1, c2, c3, 'motion','on','nuisances','on','correlation','on');
+            spmup_timeseriesplot(P, c1, c2, c3, 'motion','on','nuisances','on','correlation','on');
+            
         end
     end
 end
