@@ -681,10 +681,12 @@ if strcmp(options.QC,'on') %
         % This is useful to check coregistration and normalization worked fine
         tmp = spmup_anatQA(NormalizedAnat_file,Normalized_class{1},Normalized_class{2});
         save([fileparts(NormalizedAnat_file) filesep 'anatQA.mat'],'tmp');
-
-        anatQA = tmp; clear tmp
+        
+    else
+        load([fileparts(NormalizedAnat_file) filesep 'anatQA.mat'],'tmp');
         
     end
+    anatQA = tmp; clear tmp
     
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
             && ~exist([fileparts(Normalized_files{end}) filesep 'fMRIQA.mat'],'file'))
@@ -711,26 +713,40 @@ if strcmp(options.QC,'on') %
             V_to_check{end+1} = stats_ready{frun};
             spm_check_orientations(spm_vol(char(V_to_check)));
             
-            fMRIQA.tSNR(1, frun) = spmup_temporalSNR(Normalized_files{frun},vNormalized_class,v0);
+            %             fMRIQA.tSNR(1, frun) = spmup_temporalSNR(Normalized_files{frun}, Normalized_class, 1);
+            fMRIQA.tSNR(1, frun) = spmup_temporalSNR(Normalized_files{frun}, Normalized_class, 0);
             
-            tmp = spmup_first_level_qa(NormalizedAnat_file,vcell2mat(stats_ready(frun)),vflags);  
-            fMRIQA.meanFD(1,frun) = mean(spmup_FD(cell2mat(tmp),davg)); 
+            tmp = spmup_first_level_qa(NormalizedAnat_file, cell2mat(stats_ready(frun)), flags);
+            fMRIQA.meanFD(1,frun) = mean(spmup_FD(cell2mat(tmp), davg));
             clear tmp
             
-            QA.tSNR = fMRIQA.tSNR(1,vfrun); 
-            QA.meanFD = fMRIQA.meanFD(1,vfrun);
-
-            save([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA'); 
+            QA.tSNR = fMRIQA.tSNR(1,frun);
+            QA.meanFD = fMRIQA.meanFD(1,frun);
+            
+            save([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA');
             clear QA
-            
-            fprintf('subject %g: fMRI Quality control: carpet plot \n',s)
-            P = subjects{s}.func{frun};
-            c1 = EPI_class{1};
-            c2 = EPI_class{2};
-            c3 = EPI_class{3};
-            spmup_timeseriesplot(P, c1, c2, c3, 'motion','on','nuisances','on','correlation','on');
-            
+
         end
+        
+        % create carpet plots
+        for frun = 1:size(subjects{s}.func,1)
+            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                    && ~exist(fullfile(fileparts(subjects{s}.func{frun}), 'voxplot.fig'), 'file'))
+                fprintf('subject %g: fMRI Quality control: carpet plot \n',s)
+                P = subjects{s}.func{frun};
+                c1 = EPI_class{1};
+                c2 = EPI_class{2};
+                c3 = EPI_class{3};
+                spmup_timeseriesplot(P, c1, c2, c3, 'motion','on','nuisances','on','correlation','on');
+            end
+        end
+        
+    else
+        load([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA');
+        
+        fMRIQA.tSNR(1, frun) = QA.tSNR;
+        fMRIQA.meanFD(1,frun) = QA.meanFD;
+        clear QA
     end
 end
 
