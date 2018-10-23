@@ -146,7 +146,7 @@ if strcmp(flags.motion_parameters,'on')
     end
     
     % robust outliers
-    m_outliers = spm_comp_robust_outliers(delta);
+    m_outliers = spmup_comp_robust_outliers(delta);
     
     if sum(m_outliers) > 0
         moutlier_matrix = zeros(size(motion_param,1),sum(m_outliers));
@@ -196,7 +196,7 @@ if strcmp(flags.globals,'on')
     glo = detrend(glo); % since in spm the data are detrended
     
     % robust outliers
-    g_outliers = spm_comp_robust_outliers(glo);
+    g_outliers = spmup_comp_robust_outliers(glo);
     
     if sum(g_outliers) > 0
         goutlier_matrix = zeros(size(motion_param,1),sum(g_outliers));
@@ -242,7 +242,7 @@ if strcmp(flags.volume_distance, 'on')
     end
     
     % robust outliers
-    dist_outliers = spm_comp_robust_outliers(distance_between);
+    dist_outliers = spmup_comp_robust_outliers(distance_between);
     
     figure('Name','Mean square distances between volumes','Visible','On');
     set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized', 'outerposition',[0 0 1 1]); 
