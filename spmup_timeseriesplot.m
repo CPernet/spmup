@@ -243,11 +243,11 @@ plot([1:size(M,2)],line_index.*ones(1,size(M,2)),'g','LineWidth',2)
 xlabel('Time (scans)'); ylabel('  CSF          White Matter           GM Networks');
 
 
-saveas(gcf, 'voxplot.fig','fig'); 
+saveas(gcf, fullfile(fileparts(fmridata), 'voxplot.fig'),'fig'); 
 try
-    print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'voxplot.ps']);
+    print (gcf,'-dpsc2', '-bestfit', fullfile(fileparts(fmridata), 'voxplot.ps'));
 catch
-    print (gcf,'-dpsc2', [pwd filesep 'voxplot.ps']);
+    print (gcf,'-dpsc2', fullfile(fileparts(fmridata), 'voxplot.ps'));
 end
 close(gcf)
 
