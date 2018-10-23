@@ -80,7 +80,7 @@ file_exists = spm_select('FPList',target_dir,'^reorient_mat_anat.*' );
 if strcmp(options.overwrite_data,'on') || ( strcmp(options.overwrite_data,'off') ...
         && isempty(file_exists) )
     
-    RM = spmup_auto_reorient(subjects{s}.anat); disp(' anat reoriented'); %#ok<NASGU>
+    RM = spmup_auto_reorient(subjects{s}.anat); disp(' anat reoriented');
     
     % saves reorient matrix
     date_format = 'yyyy_mm_dd_HH_MM';
@@ -709,14 +709,15 @@ if strcmp(options.QC,'on') %
             V_to_check{end+1} = stats_ready{frun};
             spm_check_orientations(spm_vol(char(V_to_check)));
             
-            fMRIQA.tSNR{s, frun} = spmup_temporalSNR(Normalized_files{frun},vNormalized_class,v0);
+            fMRIQA.tSNR(1, frun) = spmup_temporalSNR(Normalized_files{frun},vNormalized_class,v0);
             
             tmp = spmup_first_level_qa(NormalizedAnat_file,vcell2mat(stats_ready(frun)),vflags);  
-            fMRIQA.meanFD{s,frun} = mean(spmup_FD(cell2mat(tmp),vdavg)); 
+            fMRIQA.meanFD(1,frun) = mean(spmup_FD(cell2mat(tmp),davg)); 
             clear tmp
             
-            QA.tSNR = fMRIQA.tSNR{s,vfrun}; 
-            QA.meanFD = fMRIQA.meanFD{s,vfrun};
+            QA.tSNR = fMRIQA.tSNR(1,vfrun); 
+            QA.meanFD = fMRIQA.meanFD(1,vfrun);
+
             save([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA'); 
             clear QA
             
