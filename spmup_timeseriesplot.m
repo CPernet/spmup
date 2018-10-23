@@ -164,6 +164,38 @@ elseif isnumeric(correlation)
     figplot = figplot+1;
 end
 
+% get matrix to plot from fMRI data
+M = [];
+roi = [fileparts(which('spmup_timeseriesplot.m')) filesep 'external' filesep 'Yeo2011_7Networks_MNI152_FreeSurferConformed1mm_LiberalMask.nii'];
+Vroi = spm_vol(roi);
+if any(Vroi.dim ~= Vfmri(1).dim) % maybe we need to resize the ROI image
+    clear matlabbatch
+    matlabbatch{1}.spm.util.bbox.image = {Vfmri(1).fname};
+    matlabbatch{1}.spm.util.bbox.bbdef.fov = 'fv';
+    bb = spm_jobman('run',matlabbatch);
+    Vroi = spm_vol(cell2mat(spmup_resize(roi,bb{1}.bb,abs(diag(Vfmri(1).mat(1:3,1:3)))')));
+end
+
+% for each network, take gray matter voxels
+ROIdata = spm_read_vols(Vroi);
+roi_values = unique(ROIdata);
+roi_values(roi_values==0) = [];
+for r = 1:length(roi_values)
+    [x,y,z]=ind2sub(size(ROIdata),intersect(find(ROIdata==r),find(c1)));
+    tmp = spm_get_data(Vfmri,[x y z]')';
+    tmp(find(sum(isnan(tmp),2)),:) = []; % removes rows of NaN;
+    M = [M ; tmp];
+end
+line_index = size(M,1);
+
+% get data for white matter and CSF
+[x,y,z]=ind2sub(size(c3),[find(c2);find(c3)]);
+M = [M ; spm_get_data(Vfmri,[x y z]')'];
+
+% remove mean and linear trend
+X = [linspace(0,1,length(Vfmri))' ones(length(Vfmri),1)]; 
+cleanM = M - (X*(X\M'))'; 
+
 
 
 %% figure
@@ -203,36 +235,10 @@ end
 
 % plot is organized as follow: cortex (subdivided as Yeo et al networks), cerebellum, nuclei 
 % // thick line // white matter, ventricules
-
-M = [];
-roi = [fileparts(which('spmup_timeseriesplot.m')) filesep 'external' filesep 'Yeo2011_7Networks_MNI152_FreeSurferConformed1mm_LiberalMask.nii'];
-Vroi = spm_vol(roi);
-if any(Vroi.dim ~= Vfmri(1).dim) % maybe we need to resize the ROI image
-    clear matlabbatch
-    matlabbatch{1}.spm.util.bbox.image = {Vfmri(1).fname};
-    matlabbatch{1}.spm.util.bbox.bbdef.fov = 'fv';
-    bb = spm_jobman('run',matlabbatch);
-    Vroi = spm_vol(cell2mat(spmup_resize(roi,bb{1}.bb,abs(diag(Vfmri(1).mat(1:3,1:3)))')));
-end
-
-% for each network, take gray matter voxels
-ROIdata = spm_read_vols(Vroi);
-roi_values = unique(ROIdata);
-roi_values(roi_values==0) = [];
-for r = 1:length(roi_values)
-    [x,y,z]=ind2sub(size(ROIdata),intersect(find(ROIdata==r),find(c1)));
-    tmp = spm_get_data(Vfmri,[x y z]')';
-    tmp(find(sum(isnan(tmp),2)),:) = []; % removes rows of NaN;
-    M = [M ; tmp];
-end
-
-
-line_index = size(M,1);
-[x,y,z]=ind2sub(size(c3),[find(c2);find(c3)]);
-M = [M ; spm_get_data(Vfmri,[x y z]')'];
 subplot(figplot+4,1,[plotindex:figplot+4]);
-X = [linspace(0,1,length(Vfmri))' ones(length(Vfmri),1)]; % remove mean and linear trend
-cleanM = M - (X*(X\M'))'; imagesc(cleanM); colormap('gray'); hold on
+imagesc(cleanM); 
+colormap('gray'); 
+hold on
 plot([1:size(M,2)],line_index.*ones(1,size(M,2)),'g','LineWidth',2)
 xlabel('Time (scans)'); ylabel('  CSF          White Matter           GM Networks');
 
