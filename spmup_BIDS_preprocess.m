@@ -413,7 +413,9 @@ EPI_class{2} = [filepath filesep 'c2r' filename ext];
 EPI_class{3} = [filepath filesep 'c3r' filename ext];
 if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
         && ~exist(EPI_class{1},'file'))
+    
     fprintf('\n\nsubject %g: coregister, segment \n',s)
+    
     if exist('matlabbatch','var')
         clear matlabbatch
     end
@@ -482,6 +484,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
     
     spm_jobman('run',matlabbatch);
     clear matlabbatch;
+    
 end
 
 
@@ -506,7 +509,9 @@ end
 
 if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
         && ~exist(Normalized_files{end},'file'))
+    
     fprintf('\n\nsubject %g: normalize \n',s)
+    
     if exist('matlabbatch','var')
         clear matlabbatch
     end
@@ -616,9 +621,10 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.prefix = 'w';
         
     end
-%     save('batch.mat', 'matlabbatch')
+    
     spm_jobman('run',matlabbatch);
     clear matlabbatch;
+    
 end
 
 if strcmpi(options.keep_data,'off')
@@ -633,6 +639,7 @@ end
 % --------------
 
 if strcmp(options.derivatives,'off') % otherwise do it after stats
+    
     for frun = 1:size(subjects{s}.func,1)
         [filepath,filename,ext] = fileparts(Normalized_files{frun});
         stats_ready{frun} = [filepath filesep 's' filename ext];
@@ -661,20 +668,25 @@ end
 if strcmp(options.QC,'on') %
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
             && ~exist([fileparts(NormalizedAnat_file) filesep 'anatQA.mat'],'file'))
+        
         fprintf('subject %g: Anatomical Quality control \n',s)
         % sanity check that all images are in the same space.
         V_to_check = Normalized_class';
         V_to_check{end+1} = NormalizedAnat_file;
         spm_check_orientations(spm_vol(char(V_to_check)));
+        
         % Basic QA for anatomical data is to get SNR, CNR, FBER and Entropy
         % This is useful to check coregistration and normalization worked fine
         tmp = spmup_anatQA(NormalizedAnat_file,Normalized_class{1},Normalized_class{2});
         save([fileparts(NormalizedAnat_file) filesep 'anatQA.mat'],'tmp');
-        anatQA{s} = tmp; clear tmp
+
+        anatQA = tmp; clear tmp
+        
     end
     
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
             && ~exist([fileparts(Normalized_files{end}) filesep 'fMRIQA.mat'],'file'))
+        
         fprintf('subject %g: fMRI Quality control \n',s)
         % For functional data, QA is consists in getting temporal SNR and then
         % check for motion - here we also compute additional regressors to
