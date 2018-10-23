@@ -69,6 +69,8 @@ subjs_ls = spm_BIDS(BIDS,'subjects');
 runs_ls = spm_BIDS(BIDS,'runs', 'sub', subjs_ls{s});
 all_names = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
     'type', 'bold');
+tasks_ls = spm_BIDS(BIDS, 'tasks', 'sub', subjs_ls{s}, ...
+    'type', 'bold');
 
 
 % ---------------------------------------
@@ -112,7 +114,7 @@ for frun = 1:size(subjects{s}.func,1) % each run
     
     filesin = subjects{s}.func{frun};
     [filepath,filename,ext] = fileparts(filesin);
-    
+   
     try
         metadata = spm_BIDS(BIDS,'metadata', 'sub', subjs_ls{s}, 'run', runs_ls{frun});
     catch
@@ -206,109 +208,6 @@ for frun = 1:size(subjects{s}.func,1) % each run
         st_files{frun} = fullfile(filepath, [filename ext]);
     end
     
-    
-    % ----------------------
-    % Field Map - compute VDM
-    % ----------------------
-    
-    if ~isempty(BIDS.subjects(s).fmap)
-        fprintf('computing voxel displacement map %g subject %g \n',frun,s)
-        if strcmp(options.despike,'on')
-            avg = [filepath filesep 'spmup_mean_st_despiked_' filename ext];
-            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-                    && ~exist(avg,'file'))
-                spmup_bascis([filepath filesep 'despiked_st_' filename ext],'mean'); % use the mean despiked slice timed EPI for QC
-            end
-        else
-            avg = [filepath filesep 'spmup_mean_st_' filename ext];
-            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-                    && ~exist(avg,'file'))
-                spmup_bascis([filepath filesep 'st_' filename ext],'mean'); % use the mean slice timed EPI for QC
-            end
-        end
-        
-        % output images
-        if isfield(BIDS.subjects(s).fmap{frun},'phasediff')
-            % two magnitudes (use only 1) and 1 phase difference image
-            [~,name]=fileparts(subjects{s}.fieldmap(frun).phasediff);
-            vdm{frun} = [filepath filesep 'fieldmaps' filesep 'vdm5_sc' name ext];
-        else
-            % two magnitide images and 2 phase images
-            [~,name]=fileparts(subjects{s}.fieldmap(frun).phase1);
-            vdm{frun} = [filepath filesep 'fieldmaps' filesep 'vdm5_sc' name ext];
-        end
-        
-        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-                && ~exist(vdm{frun},'file'))
-            % input images
-            if isfield(BIDS.subjects(s).fmap{frun},'phasediff')
-                % two magnitudes (use only 1) and 1 phase difference image
-                matlabbatch = get_FM_workflow('phasediff');
-                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.phase = ...
-                    {[BIDS_dir filesep subjects{s}.fieldmap(frun).phasediff]};
-                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.magnitude = ...
-                    {[BIDS_dir filesep subjects{s}.fieldmap(frun).mag1]};
-            else
-                % two magnitide images and 2 phase images
-                matlabbatch = get_FM_workflow('phase&mag');
-                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.shortphase = ...
-                    {[BIDS_dir filesep subjects{s}.fieldmap.phase1]};
-                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.shortmag   = ...
-                    {[BIDS_dir filesep subjects{s}.fieldmap.mag1]};
-                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.longphase  = ...
-                    {[BIDS_dir filesep subjects{s}.fieldmap.phase2]};
-                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.longmag    = ...
-                    {[BIDS_dir filesep subjects{s}.fieldmap.mag2]};
-            end
-            
-            % update parameters
-            echotimes =  1000.*[BIDS.subjects(s).fmap{frun}.meta.EchoTime1 BIDS.subjects(s).fmap{frun}.meta.EchoTime2]; % change to ms
-            matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.et = echotimes;
-            
-            if isfield(BIDS.subjects(s).fmap{frun}.meta,'TotalReadoutTime')
-                TotalReadoutTime = BIDS.subjects(s).fmap{frun}.meta.TotalReadoutTime;
-            elseif isfield(BIDS.subjects(s).fmap{frun}.meta,'RepetitionTime')
-                TotalReadoutTime = BIDS.subjects(s).fmap{frun}.meta.RepetitionTime;
-            elseif isfield(BIDS.subjects(s).fmap{frun}.meta,'EffectiveEchoSpacing')
-                TotalReadoutTime = (BIDS.subjects(s).func{frun}.meta.NumberOfEchos-1)*BIDS.subjects(s).func{frun}.meta.EffectiveEchoSpacing;
-            end
-            matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.tert = TotalReadoutTime;
-            
-            if isfield(BIDS.subjects(s).fmap{frun}.meta,'PulseSequenceType')
-                if sum(findstr(BIDS.subjects(s).fmap{frun}.meta.PulseSequenceType,'EPI')) ~= 0
-                    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.epifm = 1;
-                else
-                    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.epifm = 0;
-                end
-            else
-                disp('using default sequence! assuming non-EPI acquisition')
-            end
-            
-            if isfield(BIDS.subjects(s).fmap{frun}.meta,'PhaseEncodingDirection')
-                if strcmp(BIDS.subjects(s).fmap{frun}.meta.PhaseEncodingDirection,'j') ...
-                        || strcmp(BIDS.subjects(s).fmap{frun}.meta.PhaseEncodingDirection,'y')
-                    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = 1;
-                elseif strcmp(BIDS.subjects(s).fmap{frun}.meta.PhaseEncodingDirection,'-j') ...
-                        || strcmp(BIDS.subjects(s).fmap{frun}.meta.PhaseEncodingDirection,'-y')
-                    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = -1;
-                end
-            elseif isfield(BIDS.subjects(s).func(frun).meta,'PhaseEncodingDirection')
-                if strcmp(BIDS.subjects(s).func(frun).meta.PhaseEncodingDirection,'j') ...
-                        || strcmp(BIDS.subjects(s).func(frun).meta.PhaseEncodingDirection,'y')
-                    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = 1;
-                elseif strcmp(BIDS.subjects(s).func(frun).meta.PhaseEncodingDirection,'-j') ...
-                        || strcmp(BIDS.subjects(s).func(frun).meta.PhaseEncodingDirection,'-y')
-                    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = -1;
-                end
-            else
-                error('No phase encoding direction found')
-            end
-            
-            matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.session.epi = {avg}; % use the mean despiked / slice timed image
-            spm_jobman('run',matlabbatch); clear matlabbatch;
-        end
-    end
-    
     % cleanup
     if strcmpi(options.keep_data,'off')
         delete(filesin); % original or despiked
@@ -319,6 +218,109 @@ for frun = 1:size(subjects{s}.func,1) % each run
     end
     
 end % end processing per run
+
+
+% ----------------------
+% Field Map - compute VDM
+% ----------------------
+
+if ~isempty(BIDS.subjects(s).fmap)
+    fprintf('computing voxel displacement map %g subject %g \n',frun,s)
+    if strcmp(options.despike,'on')
+        avg = [filepath filesep 'spmup_mean_st_despiked_' filename ext];
+        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                && ~exist(avg,'file'))
+            spmup_bascis([filepath filesep 'despiked_st_' filename ext],'mean'); % use the mean despiked slice timed EPI for QC
+        end
+    else
+        avg = [filepath filesep 'spmup_mean_st_' filename ext];
+        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                && ~exist(avg,'file'))
+            spmup_bascis([filepath filesep 'st_' filename ext],'mean'); % use the mean slice timed EPI for QC
+        end
+    end
+    
+    % output images
+    if isfield(BIDS.subjects(s).fmap{frun},'phasediff')
+        % two magnitudes (use only 1) and 1 phase difference image
+        [~,name]=fileparts(subjects{s}.fieldmap(frun).phasediff);
+        vdm{frun} = [filepath filesep 'fieldmaps' filesep 'vdm5_sc' name ext];
+    else
+        % two magnitide images and 2 phase images
+        [~,name]=fileparts(subjects{s}.fieldmap(frun).phase1);
+        vdm{frun} = [filepath filesep 'fieldmaps' filesep 'vdm5_sc' name ext];
+    end
+    
+    if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+            && ~exist(vdm{frun},'file'))
+        % input images
+        if isfield(BIDS.subjects(s).fmap{frun},'phasediff')
+            % two magnitudes (use only 1) and 1 phase difference image
+            matlabbatch = get_FM_workflow('phasediff');
+            matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.phase = ...
+                {[BIDS_dir filesep subjects{s}.fieldmap(frun).phasediff]};
+            matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.magnitude = ...
+                {[BIDS_dir filesep subjects{s}.fieldmap(frun).mag1]};
+        else
+            % two magnitide images and 2 phase images
+            matlabbatch = get_FM_workflow('phase&mag');
+            matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.shortphase = ...
+                {[BIDS_dir filesep subjects{s}.fieldmap.phase1]};
+            matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.shortmag   = ...
+                {[BIDS_dir filesep subjects{s}.fieldmap.mag1]};
+            matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.longphase  = ...
+                {[BIDS_dir filesep subjects{s}.fieldmap.phase2]};
+            matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.longmag    = ...
+                {[BIDS_dir filesep subjects{s}.fieldmap.mag2]};
+        end
+        
+        % update parameters
+        echotimes =  1000.*[BIDS.subjects(s).fmap{frun}.meta.EchoTime1 BIDS.subjects(s).fmap{frun}.meta.EchoTime2]; % change to ms
+        matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.et = echotimes;
+        
+        if isfield(BIDS.subjects(s).fmap{frun}.meta,'TotalReadoutTime')
+            TotalReadoutTime = BIDS.subjects(s).fmap{frun}.meta.TotalReadoutTime;
+        elseif isfield(BIDS.subjects(s).fmap{frun}.meta,'RepetitionTime')
+            TotalReadoutTime = BIDS.subjects(s).fmap{frun}.meta.RepetitionTime;
+        elseif isfield(BIDS.subjects(s).fmap{frun}.meta,'EffectiveEchoSpacing')
+            TotalReadoutTime = (BIDS.subjects(s).func{frun}.meta.NumberOfEchos-1)*BIDS.subjects(s).func{frun}.meta.EffectiveEchoSpacing;
+        end
+        matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.tert = TotalReadoutTime;
+        
+        if isfield(BIDS.subjects(s).fmap{frun}.meta,'PulseSequenceType')
+            if sum(findstr(BIDS.subjects(s).fmap{frun}.meta.PulseSequenceType,'EPI')) ~= 0
+                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.epifm = 1;
+            else
+                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.epifm = 0;
+            end
+        else
+            disp('using default sequence! assuming non-EPI acquisition')
+        end
+        
+        if isfield(BIDS.subjects(s).fmap{frun}.meta,'PhaseEncodingDirection')
+            if strcmp(BIDS.subjects(s).fmap{frun}.meta.PhaseEncodingDirection,'j') ...
+                    || strcmp(BIDS.subjects(s).fmap{frun}.meta.PhaseEncodingDirection,'y')
+                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = 1;
+            elseif strcmp(BIDS.subjects(s).fmap{frun}.meta.PhaseEncodingDirection,'-j') ...
+                    || strcmp(BIDS.subjects(s).fmap{frun}.meta.PhaseEncodingDirection,'-y')
+                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = -1;
+            end
+        elseif isfield(BIDS.subjects(s).func(frun).meta,'PhaseEncodingDirection')
+            if strcmp(BIDS.subjects(s).func(frun).meta.PhaseEncodingDirection,'j') ...
+                    || strcmp(BIDS.subjects(s).func(frun).meta.PhaseEncodingDirection,'y')
+                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = 1;
+            elseif strcmp(BIDS.subjects(s).func(frun).meta.PhaseEncodingDirection,'-j') ...
+                    || strcmp(BIDS.subjects(s).func(frun).meta.PhaseEncodingDirection,'-y')
+                matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = -1;
+            end
+        else
+            error('No phase encoding direction found')
+        end
+        
+        matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.session.epi = {avg}; % use the mean despiked / slice timed image
+        spm_jobman('run',matlabbatch); clear matlabbatch;
+    end
+end
 
 
 % -----------------------
@@ -725,7 +727,7 @@ if strcmp(options.QC,'on') %
             
             save([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA');
             clear QA
-
+            
         end
         
         % create carpet plots
