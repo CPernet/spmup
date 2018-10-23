@@ -4,7 +4,7 @@ function [anatQA, fMRIQA, subjects, options] = spmup_BIDS_preprocess(BIDS_dir, B
 % FORMAT spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s)
 %        spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s, options)
 %
-% INPUTS 
+% INPUTS
 %           - BIDS_dir is the BIDS directory
 %           - BIDS: the structure returned by spm_BIDS and possibly modified
 %           by spmup_BIDS_unpack
@@ -68,10 +68,10 @@ spm_jobman('initcfg');
 subjs_ls = spm_BIDS(BIDS,'subjects');
 runs_ls = spm_BIDS(BIDS,'runs', 'sub', subjs_ls{s});
 all_names = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
-            'type', 'bold');
-    
-        
-% ---------------------------------------        
+    'type', 'bold');
+
+
+% ---------------------------------------
 % reorient anat file to template
 % ---------------------------------------
 
@@ -103,13 +103,13 @@ if strcmp(options.overwrite_data,'on') || ( strcmp(options.overwrite_data,'off')
     spm_jobman('run',matlabbatch); clear matlabbatch;
 end
 
-    
+
 % ---------------------------------------
 % Despiking and slice timing for each run
 % ----------------------------------------
 
 for frun = 1:size(subjects{s}.func,1) % each run
-
+    
     filesin = subjects{s}.func{frun};
     [filepath,filename,ext] = fileparts(filesin);
     
@@ -130,7 +130,7 @@ for frun = 1:size(subjects{s}.func,1) % each run
             RepetitionTime = metadata{i}.RepetitionTime;
         end
     end
-
+    
     
     % -----------------------------------------
     % remove first volumes
@@ -142,7 +142,7 @@ for frun = 1:size(subjects{s}.func,1) % each run
         
         % remove from the 4D the files we don't want and proceed
         fprintf('\nadjusting 4D file sizes run %g \n',frun)
-
+        
         three_dim_files = spm_file_split(filesin);
         V = three_dim_files; V(1:start_at) = [];
         spm_file_merge(V,filesin);
@@ -151,7 +151,7 @@ for frun = 1:size(subjects{s}.func,1) % each run
         % write a json file containing the details of what volumes were
         % removed (see BIDS derivatives specs)
         spm_jsonwrite(fullfile(filepath,[filename '_removevol.json']),'')
-
+        
     end
     
     
@@ -205,7 +205,7 @@ for frun = 1:size(subjects{s}.func,1) % each run
     else
         st_files{frun} = fullfile(filepath, [filename ext]);
     end
-       
+    
     
     % ----------------------
     % Field Map - compute VDM
@@ -310,7 +310,7 @@ for frun = 1:size(subjects{s}.func,1) % each run
     end
     
     % cleanup
-    if strcmpi(options.keep_data,'off') 
+    if strcmpi(options.keep_data,'off')
         delete(filesin); % original or despiked
         if strcmp(options.despike,'on')
             [filepath,filename,ext]=fileparts(filesin);
@@ -399,9 +399,9 @@ else
         matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.prefix   = 'ur';
         
         spm_jobman('run',matlabbatch); clear matlabbatch;
-
+        
     end
-
+    
 end
 
 
@@ -421,7 +421,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
     if exist('matlabbatch','var')
         clear matlabbatch
     end
-
+    
     % coregister anatomical to mean EPI
     % ---------------------------------
     matlabbatch{1}.spm.spatial.coreg.estimate.ref = {mean_realigned_file};
@@ -432,7 +432,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.tol = ...
         [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.fwhm = [7 7];
-
+    
     % reslice anatomical to mean EPI
     matlabbatch{2}.spm.spatial.coreg.write.ref = {mean_realigned_file};
     matlabbatch{end}.spm.spatial.coreg.write.source = {subjects{s}.anat};
@@ -448,7 +448,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
     matlabbatch{3}.spm.spatial.preproc.channel.vols(1) = ...
         cfg_dep('Coregister: Reslice: Resliced Images', ...
         substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
-        substruct('.','rfiles'));  
+        substruct('.','rfiles'));
     matlabbatch{end}.spm.spatial.preproc.channel.biasreg = 0.001;
     matlabbatch{end}.spm.spatial.preproc.channel.biasfwhm = 60;
     matlabbatch{end}.spm.spatial.preproc.channel.write = [0 0];
@@ -562,7 +562,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
         
         % normalize EPI using T1 info
         % ----------------------------
-        % normalize T1 
+        % normalize T1
         matlabbatch{2}.spm.spatial.normalise.write.subj(1).def(1) = ...
             cfg_dep('Segment: Forward Deformations', ...
             substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
@@ -583,7 +583,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
             cfg_dep('Segment: c3 Images', ...
             substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
-
+        
         % normalize EPI
         matlabbatch{end}.spm.spatial.normalise.write.subj(2).def(1) = ...
             cfg_dep('Segment: Forward Deformations', ...
