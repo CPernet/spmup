@@ -171,6 +171,8 @@ for frun = 1:size(subjects{s}.func,1) % each run
                 && ~exist([filepath filesep 'despiked_' filename ext],'file'))
             Vin = spmup_despike(fullfile(filepath,[filename,ext]),[],flags);
             filesin = Vin.fname; clear Vin;
+        else
+            filesin = fullfile(filepath, ['despiked_' filename ext]);
         end
         
         [filepath,filename,ext] = fileparts(filesin);
