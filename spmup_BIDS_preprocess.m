@@ -680,6 +680,8 @@ if strcmp(options.QC,'on') %
         % check for motion - here we also compute additional regressors to
         % account for motion
         
+        davg = spmup_comp_dist2surf(subjects{s}.anat);
+        
         if strcmpi(options.scrubbing,'on')
             flags = struct('motion_parameters','on','globals','on','volume_distance','off','movie','off', ...
                 'AC', [], 'average','on', 'T1', 'on');
