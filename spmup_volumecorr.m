@@ -47,19 +47,9 @@ r_course = r_course(sub2ind(size(r_course),diag,(diag+1)));
 
 % get the outliers from the r_course
 if  nargout == 2
-    % interquartile range
-    y=sort(r_course);
-    j=floor(length(r_course)/4 + 5/12);
-    g=(length(r_course)/4)-j+(5/12);
-    ql=(1-g).*y(j)+g.*y(j+1); % lower quartile
-    k=length(r_course)-j+1;
-    qu=(1-g).*y(k)+g.*y(k-1); % higher quartile
-    value=qu-ql; % inter-quartile range
-    
+
     % robust outliers
-    M = median(r_course);
-    k=(17.63*length(r_course)-23.64)/(7.74*length(r_course)-3.71); % Carling's k
-    outliers=r_course<(M-k*value) | r_course>(M+k*value);
+    outliers = spmup_comp_robust_outliers(r_course);
     
     % quick plot
 %     figure; plot(r_course,'LineWidth',2); axis tight; grid on; title('Correlation time course','Fontsize',12)
