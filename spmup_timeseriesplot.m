@@ -129,16 +129,7 @@ if strcmpi(motion,'on') || ~exist('motion','var')
     figplot = figplot+1;
     
     % add outliers
-    y=sort(motion);
-    j=floor(length(motion)/4 + 5/12);
-    g=(length(motion)/4)-j+(5/12);
-    ql=(1-g).*y(j)+g.*y(j+1); % lower quartile
-    k=length(motion)-j+1;
-    qu=(1-g).*y(k)+g.*y(k-1); % higher quartile
-    value=qu-ql; % inter-quartile range
-    M = median(motion);
-    k=(17.63*length(motion)-23.64)/(7.74*length(motion)-3.71); % Carling's k
-    motion(2,:) = motion<(M-k*value) | motion>(M+k*value);
+    motion(2,:) = spmup_comp_robust_outliers(motion);
 
 elseif isnumeric(motion)
     motion = motion; 
