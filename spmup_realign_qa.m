@@ -140,19 +140,8 @@ if strcmp(flags.motion_parameters,'on')
             1.28*(temp_motion(i-1,6) - temp_motion(i,6))^2);
     end
     
-    % interquartile range
-    y=sort(delta);
-    j=floor(length(delta)/4 + 5/12);
-    g=(length(delta)/4)-j+(5/12);
-    ql=(1-g).*y(j)+g.*y(j+1); % lower quartile
-    k=length(delta)-j+1;
-    qu=(1-g).*y(k)+g.*y(k-1); % higher quartile
-    value=qu-ql; % inter-quartile range
-    
     % robust outliers
-    M = median(delta);
-    k=(17.63*n-23.64)/(7.74*n-3.71); % Carling's k
-    m_outliers=delta<(M-k*value) | delta>(M+k*value);
+    m_outliers = spm_comp_robust_outliers(delta);
     
     if sum(m_outliers) > 0
         moutlier_matrix = zeros(size(motion_param,1),sum(m_outliers));
@@ -201,19 +190,8 @@ if strcmp(flags.globals,'on')
     end
     glo = detrend(glo); % since in spm the data are detrended
     
-    % interquartile range
-    y=sort(glo);
-    j=floor(length(glo)/4 + 5/12);
-    g=(length(glo)/4)-j+(5/12);
-    ql=(1-g).*y(j)+g.*y(j+1); % lower quartile
-    k=length(glo)-j+1;
-    qu=(1-g).*y(k)+g.*y(k-1); % higher quartile
-    value=qu-ql; % inter-quartile range
-    
     % robust outliers
-    M = median(glo);
-    k=(17.63*n-23.64)/(7.74*n-3.71); % Carling's k
-    g_outliers=glo<(M-k*value) | glo>(M+k*value);
+    g_outliers = spm_comp_robust_outliers(glo);
     
     if sum(g_outliers) > 0
         goutlier_matrix = zeros(size(motion_param,1),sum(g_outliers));
@@ -258,19 +236,8 @@ if strcmp(flags.volume_distance, 'on')
         end
     end
     
-     % interquartile range
-    y=sort(distance_between);
-    j=floor(length(distance_between)/4 + 5/12);
-    g=(length(distance_between)/4)-j+(5/12);
-    ql=(1-g).*y(j)+g.*y(j+1); % lower quartile
-    k=length(distance_between)-j+1;
-    qu=(1-g).*y(k)+g.*y(k-1); % higher quartile
-    value=qu-ql; % inter-quartile range
-    
     % robust outliers
-    M = median(distance_between);
-    k=(17.63*n-1-23.64)/(7.74*n-1-3.71); % Carling's k (use n-1 because 1st image doesn't count)
-    dist_outliers=distance_between<(M-k*value) | distance_between>(M+k*value);
+    dist_outliers = spm_comp_robust_outliers(distance_between);
     
     figure('Name','Mean square distances between volumes','Visible','On');
     set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized', 'outerposition',[0 0 1 1]); 
