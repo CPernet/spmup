@@ -205,6 +205,9 @@ for s=1:nb_sub
         run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
             'ses', sess_ls{session}, 'type', 'bold');
         
+        metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
+            'ses', sess_ls{session}, 'type', 'bold');
+        
         %% functional
         for frun = 1:size(run_ls,1) % for each run
             
@@ -219,6 +222,7 @@ for s=1:nb_sub
             
             % we keep track of where the files are stored
             subjects{s}.func{bold_run_count,1} = fullfile(target_dir, [name ext]);
+            subjects{s}.func_metadata{bold_run_count,1} = metadata{frun};
             file_exists = exist(subjects{s}.func{bold_run_count,1},'file');
             
             unzip_or_copy(compressed, options, file_exists, in, target_dir)
@@ -263,7 +267,7 @@ for s=1:nb_sub
                     [ext,name,compressed] = iscompressed(ext,name);
                     
                     subjects{s}.fieldmap(fmap_run_count,1).metadata = ...
-                        metadata{ifmap}.IntendedFor;
+                        metadata{ifmap};
                         
                     
                     % different behavior depending on fielpmap type
@@ -273,18 +277,18 @@ for s=1:nb_sub
                             subjects{s}.fieldmap(fmap_run_count,1).phasediff = ...
                                 fullfile(target_dir, [name ext]);
                             subjects{s}.fieldmap(fmap_run_count,1).type = 'phasediff';
-                            file_exists = exist(subjects{s}.fieldmap(ifmap,:).phasediff,'file');
+                            file_exists = exist(subjects{s}.fieldmap(fmap_run_count,:).phasediff,'file');
                             
                         case 'phase12'
                             subjects{s}.fieldmap(fmap_run_count,1).type = 'phase12';
                             if contains(name,'phase1')
                                 subjects{s}.fieldmap(fmap_run_count,1).phase1 = ...
                                     fullfile(target_dir, [name ext]);
-                                file_exists = exist(subjects{s}.fieldmap(ifmap,:).phase1,'file');
+                                file_exists = exist(subjects{s}.fieldmap(fmap_run_count,:).phase1,'file');
                             elseif contains(name,'phase2')
                                 subjects{s}.fieldmap(fmap_run_count,1).phase2 = ...
                                     fullfile(target_dir, [name ext]);
-                                file_exists = exist(subjects{s}.fieldmap(ifmap,:).phase2,'file');
+                                file_exists = exist(subjects{s}.fieldmap(fmap_run_count,:).phase2,'file');
                             end
                             
                         case 'fieldmap'
