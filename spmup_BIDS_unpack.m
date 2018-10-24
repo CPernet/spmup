@@ -188,6 +188,9 @@ for s=1:nb_sub
     % bold file counter to list theem across different sessions
     bold_run_count = 1;
     
+    % fmap file counter to list theem across different sessions
+    fmap_run_count = 1;
+    
     for session = 1:size(sess_ls,2) % for each session
         
         fprintf('subject %g - session %i: checking functional data \n',s, session)
@@ -247,6 +250,10 @@ for s=1:nb_sub
                     'ses', sess_ls{session}, 'modality', 'fmap', ...
                     'type', fmap_type_ls{ifmap_type_ls});
                 
+                metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
+                    'ses', sess_ls{session}, 'modality', 'fmap', ...
+                    'type', fmap_type_ls{ifmap_type_ls});
+                
                 % for all the fieldmaps of that type
                 for ifmap = 1:size(fmap_ls,1)
                     
@@ -255,32 +262,41 @@ for s=1:nb_sub
                     
                     [ext,name,compressed] = iscompressed(ext,name);
                     
+                    subjects{s}.fieldmap(fmap_run_count,1).metadata = ...
+                        metadata{ifmap}.IntendedFor;
+                        
+                    
                     % different behavior depending on fielpmap type
                     switch fmap_type_ls{ifmap_type_ls}
                         
                         case 'phasediff'
-                            subjects{s}.fieldmap(ifmap,:).phasediff = ...
+                            subjects{s}.fieldmap(fmap_run_count,1).phasediff = ...
                                 fullfile(target_dir, [name ext]);
+                            subjects{s}.fieldmap(fmap_run_count,1).type = 'phasediff';
                             file_exists = exist(subjects{s}.fieldmap(ifmap,:).phasediff,'file');
                             
                         case 'phase12'
+                            subjects{s}.fieldmap(fmap_run_count,1).type = 'phase12';
                             if contains(name,'phase1')
-                                subjects{s}.fieldmap(ifmap,:).phase1 = ...
+                                subjects{s}.fieldmap(fmap_run_count,1).phase1 = ...
                                     fullfile(target_dir, [name ext]);
                                 file_exists = exist(subjects{s}.fieldmap(ifmap,:).phase1,'file');
                             elseif contains(name,'phase2')
-                                subjects{s}.fieldmap(ifmap,:).phase2 = ...
+                                subjects{s}.fieldmap(fmap_run_count,1).phase2 = ...
                                     fullfile(target_dir, [name ext]);
                                 file_exists = exist(subjects{s}.fieldmap(ifmap,:).phase2,'file');
                             end
                             
                         case 'fieldmap'
+                            subjects{s}.fieldmap(fmap_run_count,1).type = 'fieldmap';
                             warning('Fieldmap type of fielmaps not implemented')
                             
                         case 'epi'
+                            subjects{s}.fieldmap(fmap_run_count,1).type = 'epi';
                             warning('EPI type of fielmaps not implemented')
                             
                         otherwise
+                            subjects{s}.fieldmap(fmap_run_count,1).type = 'unknown';
                             warning('%s is an unsupported type of fieldmap', fmap_type_ls(ifmap_type_ls))
                     end
                     
@@ -310,13 +326,13 @@ for s=1:nb_sub
                                 [ext,name,compressed] = iscompressed(ext,name);
                                 
                                 if imag==1
-                                    subjects{s}.fieldmap(ifmap,:).mag1 = ...
+                                    subjects{s}.fieldmap(fmap_run_count,1).mag1 = ...
                                         fullfile(target_dir, [name ext]);
-                                    file_exists = exist(subjects{s}.fieldmap(ifmap,:).mag1,'file');
+                                    file_exists = exist(subjects{s}.fieldmap(fmap_run_count,1).mag1,'file');
                                 elseif imag==2
-                                    subjects{s}.fieldmap(ifmap,:).mag2 = ...
+                                    subjects{s}.fieldmap(fmap_run_count,1).mag2 = ...
                                         fullfile(target_dir, [name ext]);
-                                    file_exists = exist(subjects{s}.fieldmap(ifmap,:).mag2,'file');
+                                    file_exists = exist(subjects{s}.fieldmap(fmap_run_count,1).mag2,'file');
                                 end
                                 
                                 unzip_or_copy(compressed, options, file_exists, in, target_dir)
@@ -327,6 +343,8 @@ for s=1:nb_sub
                         
                     end
 
+                    fmap_run_count = fmap_run_count + 1;
+                    
                 end
                 
             end
