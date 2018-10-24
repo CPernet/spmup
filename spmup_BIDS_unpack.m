@@ -54,9 +54,9 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 % Copyright (c) SPM Utility Plus toolbox
 
 % TO DO:
-% - implement fieldmap and epi types for fieldmap modality ? (Remi Gau)
+% - implement fieldmap and epi types for fieldmap modality ?
 % - function assumes no more than one T1w image for each subject for each
-%   session (can't deal with mutiple rec / acq) (Remi Gau)
+%   session (can't deal with mutiple rec / acq)
 
  
 % TESTED:
@@ -156,7 +156,7 @@ for s=1:nb_sub % for each subject
             [ext,name,compressed] = iscompressed(ext,name);
             
             % keep track of where the file is
-            subjects{s}.anat = fullfile(target_dir, [name ext]);
+            subjects{s}.anat = fullfile(target_dir, [name ext]); %#ok<*AGROW>
             file_exists = exist(subjects{s}.anat,'file'); % necessary to avoid overwriting
             
             % unzip or copies the file to its target directory depending on
@@ -358,10 +358,16 @@ options.removeNvol = 0;
 options.outdir = [BIDS_dir filesep '..' filesep 'derivatives' filesep  ...
     'spmup_BIDS_processed'];
 
-% depiking
+% to specify which task or acquisition or recon to analyze 
+% (if none specified all will be done)
+options.task= [];
+options.rec = [];
+options.acq = [];
+
+% Despiking
 options.despike= 'off';
 options.despiking_window = [];
-% realign
+% Realign
 options.ignore_fieldmaps = 'on';
 % Drifter
 options.drifter= 'off';
