@@ -66,10 +66,7 @@ spm_root = fileparts(which('spm'));
 spm_jobman('initcfg');
 
 subjs_ls = spm_BIDS(BIDS,'subjects');
-runs_ls = spm_BIDS(BIDS,'runs', 'sub', subjs_ls{s});
 all_names = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
-    'type', 'bold');
-tasks_ls = spm_BIDS(BIDS, 'tasks', 'sub', subjs_ls{s}, ...
     'type', 'bold');
 
 
@@ -142,112 +139,139 @@ end
 % ---------------------------------------
 % Despiking and slice timing for each run
 % ----------------------------------------
-
-for frun = 1:size(subjects{s}.func,1) % each run
+bold_include = [];
+for frun = 1:size(subjects{s}.func, 1) % each run
     
     filesin = subjects{s}.func{frun};
     [filepath,filename,ext] = fileparts(filesin);
-   
-    try
-        metadata = spm_BIDS(BIDS,'metadata', 'sub', subjs_ls{s}, 'run', runs_ls{frun});
-    catch
-        metadata{1} = spm_BIDS(BIDS,'metadata', 'sub', subjs_ls{s}, 'type', 'bold');
-    end
-    hdr = spm_vol(subjects{s}.func{frun});
-    epi_res = diag(hdr(1).mat);
-    epi_res(end) = [];
     
-    for i=1:numel(metadata)
-        if isfield(metadata{i}, 'SliceTiming')
-            SliceTiming = metadata{i}.SliceTiming;
-        end
-        if isfield(metadata{i}, 'RepetitionTime')
-            RepetitionTime = metadata{i}.RepetitionTime;
-        end
-    end
-    
-    
-    % -----------------------------------------
-    % remove first volumes
-    % -----------------------------------------
-    
-    file_exists = exist(fullfile(filepath,[filename '_removevol.json']),'file');
-    if start_at ~= 1 && ( strcmp(options.overwrite_data,'on')...
-            || (strcmp(options.overwrite_data,'off') && ~file_exists) )
-        
-        % remove from the 4D the files we don't want and proceed
-        fprintf('\nadjusting 4D file sizes run %g \n',frun)
-        
-        three_dim_files = spm_file_split(filesin);
-        V = three_dim_files; V(1:start_at) = [];
-        spm_file_merge(V,filesin);
-        spm_unlink(three_dim_files.fname)
-        
-        % write a json file containing the details of what volumes were
-        % removed (see BIDS derivatives specs)
-        spm_jsonwrite(fullfile(filepath,[filename '_removevol.json']),'')
-        
-    end
-    
-    
-    % -----------------------------------------
-    % despiking using adaptive median filter
-    % -----------------------------------------
-    
-    if strcmp(options.despike,'on')
-        
-        if ~isfield(options,'despiking_window')
-            options.despiking_window = [];
-        end
-        flags = struct('auto_mask','on', 'method','median', 'window', ...
-            options.despiking_window,'skip',0);
-        
-        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-                && ~exist([filepath filesep 'despiked_' filename ext],'file'))
-            Vin = spmup_despike(fullfile(filepath,[filename,ext]),[],flags);
-            filesin = Vin.fname; clear Vin;
-        else
-            filesin = fullfile(filepath, ['despiked_' filename ext]);
-        end
-        
-        [filepath,filename,ext] = fileparts(filesin);
-        
-    end
-    
-    
-    % -------------
-    % slice timing
-    % -------------
-    % sliceorder - vector containig the acquisition time for each slice in milliseconds
-    % refslice   - time in milliseconds for the reference slice
-    % timing     - [0 TR]
-    
-    [~,~,info_position] = intersect([filename(1:end-4) 'events.tsv'], all_names);
-    
-    if exist('SliceTiming', 'var')
-        sliceorder  = SliceTiming; % time
-        refslice    = sliceorder(round(length(SliceTiming)/2));
-        timing      = [0 RepetitionTime];
-        
-        st_files{frun} = [filepath filesep 'st_' filename ext]; %#ok<*AGROW>
-        
-        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-                && ~exist(st_files{frun},'file'))
-            fprintf('\n\nstarting slice timing correction run %g subject %g \n',frun,s)
-            spm_slice_timing(filesin, sliceorder, refslice, timing,'st_');
-        end
-        
+    % check that this BOLD file is of the right task, acquisition,
+    % reconstruction
+    if ~isempty(options.acq)
+        acq = contains(filename, ['acq-' options.acq]);
     else
-        st_files{frun} = fullfile(filepath, [filename ext]);
+        acq = 1;
     end
     
-    % cleanup
-    if strcmpi(options.keep_data,'off')
-        delete(filesin); % original or despiked
-        if strcmp(options.despike,'on')
-            [filepath,filename,ext]=fileparts(filesin);
-            delete([filepath filesep filename(10:end) ext]);
+    if ~isempty(options.rec)
+        rec = contains(filename, ['rec-' options.rec]);
+    else
+        rec = 1;
+    end
+    
+    if ~isempty(options.task)
+        task = contains(filename, ['task-' options.task]);
+    else
+        task = 1;
+    end
+    
+    % only preprocess this file if it fits what has been requested
+    bold_include(frun) = all([task acq rec]);
+    if bold_include(frun)
+        
+        
+        
+        % !!!! TO DO: this will need to be passed on to the
+        % spmup_BIDS_1rstlevel !!!
+        
+        [~,~,info_position] = intersect([filename(1:end-4) 'events.tsv'], all_names);
+        
+        
+        
+        hdr = spm_vol(subjects{s}.func{frun});
+        epi_res = diag(hdr(1).mat);
+        epi_res(end) = [];
+        
+        if isfield(subjects{s}.func_metadata{frun}, 'SliceTiming')
+            SliceTiming = subjects{s}.func_metadata{frun}.SliceTiming;
         end
+        if isfield(subjects{s}.func_metadata{frun}, 'RepetitionTime')
+            RepetitionTime = subjects{s}.func_metadata{frun}.RepetitionTime;
+        end
+        
+        
+        % -----------------------------------------
+        % remove first volumes
+        % -----------------------------------------
+        
+        file_exists = exist(fullfile(filepath,[filename '_removevol.json']),'file');
+        if start_at ~= 1 && ( strcmp(options.overwrite_data,'on')...
+                || (strcmp(options.overwrite_data,'off') && ~file_exists) )
+            
+            % remove from the 4D the files we don't want and proceed
+            fprintf('\nadjusting 4D file sizes run %g \n',frun)
+            
+            three_dim_files = spm_file_split(filesin);
+            V = three_dim_files; V(1:start_at) = [];
+            spm_file_merge(V,filesin);
+            spm_unlink(three_dim_files.fname)
+            
+            % write a json file containing the details of what volumes were
+            % removed (see BIDS derivatives specs)
+            spm_jsonwrite(fullfile(filepath,[filename '_removevol.json']),'')
+            
+        end
+        
+        
+        % -----------------------------------------
+        % despiking using adaptive median filter
+        % -----------------------------------------
+        
+        if strcmp(options.despike,'on')
+            
+            if ~isfield(options,'despiking_window')
+                options.despiking_window = [];
+            end
+            flags = struct('auto_mask','on', 'method','median', 'window', ...
+                options.despiking_window,'skip',0);
+            
+            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                    && ~exist([filepath filesep 'despiked_' filename ext],'file'))
+                Vin = spmup_despike(fullfile(filepath,[filename,ext]),[],flags);
+                filesin = Vin.fname; clear Vin;
+            else
+                filesin = fullfile(filepath, ['despiked_' filename ext]);
+            end
+            
+            [filepath,filename,ext] = fileparts(filesin);
+            
+        end
+        
+        
+        % -------------
+        % slice timing
+        % -------------
+        % sliceorder - vector containig the acquisition time for each slice in milliseconds
+        % refslice   - time in milliseconds for the reference slice
+        % timing     - [0 TR]
+        
+        if exist('SliceTiming', 'var')
+            sliceorder  = SliceTiming; % time
+            refslice    = sliceorder(round(length(SliceTiming)/2));
+            timing      = [0 RepetitionTime];
+            
+            st_files{frun} = [filepath filesep 'st_' filename ext]; %#ok<*AGROW>
+            
+            if strcmp(options.overwrite_data, 'on') || (strcmp(options.overwrite_data, 'off') ...
+                    && ~exist(st_files{frun}, 'file'))
+                fprintf('\n\nstarting slice timing correction run %g subject %g \n',frun,s)
+                spm_slice_timing(filesin, sliceorder, refslice, timing, 'st_');
+            end
+            
+        else
+            st_files{frun} = fullfile(filepath, [filename ext]);
+        end
+        
+        % cleanup
+        if strcmpi(options.keep_data,'off')
+            delete(filesin); % original or despiked
+            if strcmp(options.despike,'on')
+                [filepath,filename,ext]=fileparts(filesin);
+                delete([filepath filesep filename(10:end) ext]);
+            end
+        end
+        
+        
     end
     
 end % end processing per run
@@ -860,7 +884,7 @@ if strcmp(options.QC,'on') %
     else
         load([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA');
         
-        fMRIQA.tSNR(1, frun) = QA.tSNR;
+        fMRIQA.tSNR(1, frun) = QA.tSNR;  %#ok<NODEF>
         fMRIQA.meanFD(1,frun) = QA.meanFD;
         clear QA
     end
