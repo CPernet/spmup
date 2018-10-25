@@ -10,24 +10,10 @@ function [despiked,filtered] = spmup_despike(varargin)
 %        spmup_despike(P,[],flags)
 %
 % INPUT if none the user is prompted
-%       P the names of the 3D or 4D fMRI images (time-series) 
+%
+%       P the names of the fMRI images (time-series) or the 4D matrix of data 
 %       M the name of the mask or the 3D binary matrix 
 %       flags defines options to be used
-%             - flags.auto_mask,'off' or 'on' if M is not provided,
-%             auto_mask is 'on' but if set to 'off' the user is prompted 
-%             to select a mask
-%             - flags.method is 'median' or any of the option of the
-%             'smooth' matlab function - in all cases the span is function 
-%             of the autocorrelation unless window is specified
-%             - flags.window defines the number of consecutive images to
-%             use to despike the data ; for instance flags.method = 'median'
-%             and flags.window = 3 means that each data point is 1st
-%             substituted by a moving 3 points median and the resulting
-%             fit is used to determine outliers (see below)
-%
-%       P the names of the fMRI images (time-series) or the 4D matrix of
-%       data M the name of the mask or the 3D binary matrix flags defines
-%       options to be used
 %             - flags.auto_mask,'off' or 'on' if M is not provided, auto_mask is
 %                               'on' but if set to 'off' the user is prompted to 
 %                               select a mask
