@@ -391,6 +391,7 @@ options.despike= 'off';
 options.despiking_window = [];
 % Realign
 options.ignore_fieldmaps = 'on';
+options.realign_unwarp = 'off';
 % Drifter
 options.drifter= 'off';
 % Noise regressors
