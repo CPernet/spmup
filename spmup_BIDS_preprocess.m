@@ -467,21 +467,23 @@ end
 % Realignment across runs
 % ------------------------
 
-if isempty(BIDS.subjects(s).fmap)
+if strcmp(options.realign_unwarp, 'off')
     
     % file out of realign will be
     [filepath,filename,ext] = fileparts(st_files{1});
     mean_realigned_file = [filepath filesep 'mean' filename ext];
-    for frun = 1:size(subjects{s}.func,1)
-        realigned_file{frun} = st_files{frun}; % because we don't reslice, simple encode the linear transform in the header
+    for frun = 1:size(st_files,1)
+        realigned_files{frun,1} = st_files{frun}; % because we don't reslice, simple encode the linear transform in the header
         [filepath,filename] = fileparts(st_files{frun});
-        multi_reg{frun} = [filepath filesep 'rp_' filename '.txt'];
+        multi_reg{frun,1} = [filepath filesep 'rp_' filename '.txt'];
     end
     
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
             && ~exist(mean_realigned_file,'file'))
+        
         fprintf('subject %g: starting realignment \n',s)
-        for frun = 1:size(subjects{s}.func,1)
+        
+        for frun = 1:size(st_files,1)
             matlabbatch{1}.spm.spatial.realign.estwrite.data{frun} = {st_files{frun}};
         end
         matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.quality = 1;
@@ -507,17 +509,20 @@ else
     which_fmap = subjects{s}.which_fmap(find(bold_include)); 
     
     % file out of realign will be
-    [~,filename,ext] = fileparts(st_files{1});
+    [filepath,filename,ext] = fileparts(st_files{1});
     mean_realigned_file = [filepath filesep 'meanur' filename ext];
-    for frun = 1:size(subjects{s}.func,1)
-        [~,filename,ext] = fileparts(st_files{frun});
-        realigned_file{frun} = [filepath filesep 'ur' filename ext]; % because we have the reslice here (not linear)
-        multi_reg{frun} = [filepath filesep 'rp_' filename '.txt'];
+    for frun = 1:size(st_files,1)
+        [filepath,filename,ext] = fileparts(st_files{frun});
+        realigned_files{frun,1} = [filepath filesep 'ur' filename ext]; % because we have the reslice here (not linear)
+        multi_reg{frun,1} = [filepath filesep 'rp_' filename '.txt'];
     end
     
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
             && ~exist(mean_realigned_file,'file'))
-        for frun = 1:size(subjects{s}.func,1)
+        
+        fprintf('subject %g: starting realignment and unwarping \n',s)
+        
+        for frun = 1:size(st_files,1)
             matlabbatch{1}.spm.spatial.realignunwarp.data(frun).scans = {st_files{frun}};
             if strcmp(options.ignore_fieldmaps, 'off') && isfield(subjects{s}, 'fieldmap')
                 matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {vdm{which_fmap(frun)}};
@@ -654,9 +659,9 @@ class{3} = [filepath filesep 'c3' filename ext];
 Normalized_class{1} = [filepath filesep 'wc1' filename ext];
 Normalized_class{2} = [filepath filesep 'wc2' filename ext];
 Normalized_class{3} = [filepath filesep 'wc3' filename ext];
-for frun = 1:size(subjects{s}.func,1)
-    [filepath,filename,ext] = fileparts(realigned_file{frun});
-    Normalized_files{frun} = [filepath filesep 'w' filename ext];
+for frun = 1:size(realigned_files,1)
+    [filepath,filename,ext] = fileparts(realigned_files{frun});
+    Normalized_files{frun,1} = [filepath filesep 'w' filename ext];
 end
 
 if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
@@ -739,8 +744,8 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
             cfg_dep('Segment: Forward Deformations', ...
             substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','fordef', '()',{':'}));
-        for frun = 1:size(subjects{s}.func,1)
-            matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(frun,:) = {realigned_file{frun}};
+        for frun = 1:size(realigned_files,1)
+            matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(frun,:) = {realigned_files{frun}};
         end
         matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(end+1,:) = {mean_realigned_file}; % adding mean image
         
@@ -753,8 +758,8 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
         % -------------------------------------------
         matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.source(1) = {mean_realigned_file};
         matlabbatch{end}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
-        for frun = 1:size(subjects{s}.func,1)
-            matlabbatch{end}.spm.tools.oldnorm.estwrite.subj.resample(frun,:) = {realigned_file{frun}};
+        for frun = 1:size(realigned_files,1)
+            matlabbatch{end}.spm.tools.oldnorm.estwrite.subj.resample(frun,:) = {realigned_files{frun}};
         end
         matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.template = ...
             {[spm_root filesep 'toolbox' filesep 'OldNorm' filesep 'EPI.nii,1']};
@@ -780,8 +785,8 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
 end
 
 if strcmpi(options.keep_data,'off')
-    for frun = size(subjects{s}.func,1):-1:1
-        delete(realigned_file{frun});
+    for frun = size(realigned_files,1):-1:1
+        delete(realigned_files{frun});
     end
 end
 
@@ -794,7 +799,7 @@ if strcmp(options.derivatives,'off') % otherwise do it after stats
     
     for frun = 1:size(subjects{s}.func,1)
         [filepath,filename,ext] = fileparts(Normalized_files{frun});
-        stats_ready{frun} = [filepath filesep 's' filename ext];
+        stats_ready{frun,1} = [filepath filesep 's' filename ext];
         if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
                 && ~exist(stats_ready{frun},'file'))
             fprintf('subject %g: smoothing run %g \n',s,frun);
@@ -834,12 +839,12 @@ if strcmp(options.QC,'on') %
         
     else
         load([fileparts(NormalizedAnat_file) filesep 'anatQA.mat'],'tmp');
-        
     end
+    
     anatQA = tmp; clear tmp
     
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-            && ~exist([fileparts(Normalized_files{end}) filesep 'fMRIQA.mat'],'file'))
+            && ~exist([fileparts(Normalized_files{end}) filesep 'fMRIQA.mat'],'file') )
         
         fprintf('subject %g: fMRI Quality control \n',s)
         % For functional data, QA is consists in getting temporal SNR and then
@@ -856,7 +861,7 @@ if strcmp(options.QC,'on') %
                 'AC', [], 'average','on', 'T1', 'on');
         end
         
-        for frun = 1:size(subjects{s}.func,1)
+        for frun = 1:size(stats_ready,1)
             
             % sanity check that all images are in the same space.
             V_to_check = Normalized_class';
