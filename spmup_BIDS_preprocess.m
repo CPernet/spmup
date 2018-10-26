@@ -266,16 +266,6 @@ for frun = 1:size(subjects{s}.func, 1) % each run
             st_files{included_idx,1} = fullfile(filepath, [filename ext]);
         end
         
-        % cleanup
-        if strcmpi(options.keep_data,'off')
-            delete(filesin); % original or despiked
-            if strcmp(options.despike,'on')
-                [filepath,filename,ext]=fileparts(filesin);
-                delete([filepath filesep filename(10:end) ext]);
-            end
-        end
-        
-        
     end
     
 end % end processing per run
@@ -557,6 +547,12 @@ else
         
         spm_jobman('run',matlabbatch); clear matlabbatch;
         
+        
+        % cleanup
+        if strcmpi(options.keep_data,'off')
+            delete(st_files);
+        end
+        
     end
     
 end
@@ -786,12 +782,6 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
     
 end
 
-if strcmpi(options.keep_data,'off')
-    for frun = size(realigned_files,1):-1:1
-        delete(realigned_files{frun});
-    end
-end
-
 
 % --------------
 % Smoothing
@@ -808,13 +798,7 @@ if strcmp(options.derivatives,'off') % otherwise do it after stats
             spm_smooth(Normalized_files{frun},stats_ready{frun},options.skernel);
         end
     end
-    
-    if strcmpi(options.keep_data,'off')
-        for frun = size(subjects{s}.func,1):-1:1
-            delete(Normalized_files{frun});
-        end
-    end
-    
+
 else
     stats_ready = Normalized_files;
 end
@@ -892,24 +876,52 @@ if strcmp(options.QC,'on') %
         fMRIQA.meanFD(1,frun) = QA.meanFD;
         clear QA
     end
-   
+    
 end
 
 if strcmp(options.carpet_plot,'on')
     % create carpet plots
-    for frun = 1:size(realigned_files,1)
-        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-                && ~exist(fullfile(fileparts(realigned_files{frun}), 'voxplot.fig'), 'file'))
-            fprintf('subject %g: fMRI Quality control: carpet plot \n',s)
-            P = realigned_files{frun};
-            c1 = EPI_class{1};
-            c2 = EPI_class{2};
-            c3 = EPI_class{3};
-            spmup_timeseriesplot(P, c1, c2, c3, 'motion','on','nuisances','on','correlation','on');
+    for frun = 1:size(subjects{s}.func, 1)
+        if bold_include(frun)
+            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                    && ~exist(fullfile(fileparts(realigned_files{frun}), 'voxplot.fig'), 'file'))
+                fprintf('subject %g: fMRI Quality control: carpet plot \n',s)
+                P = subjects{s}.func{frun};
+                c1 = EPI_class{1};
+                c2 = EPI_class{2};
+                c3 = EPI_class{3};
+                spmup_timeseriesplot(P, c1, c2, c3, 'motion','on','nuisances','on','correlation','on');
+            end
         end
     end
 end
 
+
+
+% Clean up
+if strcmpi(options.keep_data,'off')
+    
+    for frun = 1:size(subjects{s}.func, 1)
+        if bold_include(frun) 
+            if strcmp(options.despike,'on')
+                delete(subjects{s}.func{frun}); % original
+            end
+            if exist('SliceTiming', 'var')
+                if strcmp(options.despike,'on')
+                    [filepath,filename,ext]=fileparts(subjects{s}.func{frun});
+                    delete(fullfile(filepath, ['despiked_' filename ext])); % despiked
+                end
+            end
+        end
+    end
+    
+    for frun = size(realigned_files,1)
+        delete(realigned_files{frun});
+        if strcmp(options.derivatives,'off')
+            delete(Normalized_files{frun});
+        end
+    end
+end
 
 end
 
