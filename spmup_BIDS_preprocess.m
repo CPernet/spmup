@@ -283,7 +283,7 @@ end % end processing per run
 % Field Map - compute VDM
 % ----------------------
 
-if strcmp(options.ignore_fieldmaps, 'off')
+if strcmp(options.ignore_fieldmaps, 'off') && isfield(subjects{s}, 'fieldmap')
     
     for ifmap = 1:numel(subjects{s}.fieldmap)
         
@@ -322,12 +322,12 @@ if strcmp(options.ignore_fieldmaps, 'off')
             switch subjects{s}.fieldmap(ifmap).type
                 case 'phasediff'
                     % two magnitudes (use only 1) and 1 phase difference image
-                    [~,name]=fileparts(subjects{s}.fieldmap(ifmap).phasediff);
-                    vdm{frun} = [filepath filesep 'fieldmaps' filesep 'vdm5_sc' name ext];
+                    [filepath,name,ext]=fileparts(subjects{s}.fieldmap(ifmap).phasediff);
+                    vdm{ifmap,1} = [filepath filesep 'vdm5_sc' name ext];
                 case 'phase12'
                     % two magnitude images and 2 phase images
-                    [~,name]=fileparts(subjects{s}.fieldmap(ifmap).phase1);
-                    vdm{frun} = [filepath filesep 'fieldmaps' filesep 'vdm5_sc' name ext];
+                    [filepath,name,ext]=fileparts(subjects{s}.fieldmap(ifmap).phase1);
+                    vdm{ifmap,1} = [filepath filesep 'vdm5_sc' name ext];
                 case 'fieldmap'
                     warning('Fieldmap type of fielmaps not implemented')
                 case 'epi'
@@ -501,7 +501,11 @@ if isempty(BIDS.subjects(s).fmap)
         
     end
 else
-    fprintf('subject %g: starting realignment and unwarping \n',s)
+    
+    
+    %which fieldmap for each run of this task / acq /rec
+    which_fmap = subjects{s}.which_fmap(find(bold_include)); 
+    
     % file out of realign will be
     [~,filename,ext] = fileparts(st_files{1});
     mean_realigned_file = [filepath filesep 'meanur' filename ext];
@@ -515,7 +519,11 @@ else
             && ~exist(mean_realigned_file,'file'))
         for frun = 1:size(subjects{s}.func,1)
             matlabbatch{1}.spm.spatial.realignunwarp.data(frun).scans = {st_files{frun}};
-            matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {vdm{frun}};
+            if strcmp(options.ignore_fieldmaps, 'off') && isfield(subjects{s}, 'fieldmap')
+                matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {vdm{which_fmap(frun)}};
+            else
+                matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {''};
+            end
         end
         matlabbatch{end}.spm.spatial.realignunwarp.eoptions.quality    = 1;
         matlabbatch{end}.spm.spatial.realignunwarp.eoptions.sep        = 4;
