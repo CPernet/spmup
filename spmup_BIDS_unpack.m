@@ -222,7 +222,11 @@ for s=1:nb_sub
             
             % we keep track of where the files are stored
             subjects{s}.func{bold_run_count,1} = fullfile(target_dir, [name ext]);
-            subjects{s}.func_metadata{bold_run_count,1} = metadata{frun};
+            if iscell(metadata)
+                subjects{s}.func_metadata{bold_run_count,1} = metadata{frun};
+            else
+                subjects{s}.func_metadata{bold_run_count,1} = metadata;
+            end
             file_exists = exist(subjects{s}.func{bold_run_count,1},'file');
             
             unzip_or_copy(compressed, options, file_exists, in, target_dir)
