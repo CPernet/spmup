@@ -98,37 +98,39 @@ if strcmp(options.overwrite_data,'on') || ( strcmp(options.overwrite_data,'off')
     end
     
     % and also to fmaps
-    for ifmap = 1:size(subjects{s}.fieldmap,1)
-        
-        switch subjects{s}.fieldmap(ifmap).type
-            case 'phasediff'
-                matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                    subjects{s}.fieldmap(ifmap).phasediff;
-                matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                    subjects{s}.fieldmap(ifmap).mag1;
-                matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                    subjects{s}.fieldmap(ifmap).mag2;
-            case 'phase12'
-                matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                    subjects{s}.fieldmap(ifmap).phase1;
-                matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                    subjects{s}.fieldmap(ifmap).phase2;
-                matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                    subjects{s}.fieldmap(ifmap).mag1;
-                matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                    subjects{s}.fieldmap(ifmap).mag2;
-            case 'fieldmap'
-                % not implemented
-            case 'epi'
-                % not implemented
-            otherwise
-                % not implemented
-        end
+    if strcmp(options.ignore_fieldmaps, 'off') && isfield(subjects{s}, 'fieldmap')
+        for ifmap = 1:size(subjects{s}.fieldmap,1)
+            
+            switch subjects{s}.fieldmap(ifmap).type
+                case 'phasediff'
+                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
+                        subjects{s}.fieldmap(ifmap).phasediff;
+                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
+                        subjects{s}.fieldmap(ifmap).mag1;
+                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
+                        subjects{s}.fieldmap(ifmap).mag2;
+                case 'phase12'
+                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
+                        subjects{s}.fieldmap(ifmap).phase1;
+                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
+                        subjects{s}.fieldmap(ifmap).phase2;
+                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
+                        subjects{s}.fieldmap(ifmap).mag1;
+                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
+                        subjects{s}.fieldmap(ifmap).mag2;
+                case 'fieldmap'
+                    % not implemented
+                case 'epi'
+                    % not implemented
+                otherwise
+                    % not implemented
+            end
             matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
                 [subjects{s}.func{irun} ',' num2str(i_vol)];
             
+        end
     end
-
+    
     matlabbatch{1}.spm.util.reorient.transform.transM = RM;
     matlabbatch{1}.spm.util.reorient.prefix = '';
     
