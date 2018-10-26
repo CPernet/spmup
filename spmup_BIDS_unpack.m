@@ -407,6 +407,7 @@ options.stats = 'on';
 options.derivatives = 'off';
 % QC
 options.QC = 'on';
+options.carpet_plot ='off';
 
 end
 

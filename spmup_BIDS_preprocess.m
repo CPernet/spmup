@@ -675,7 +675,7 @@ if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') 
     
     % if field maps, normalize EPI from T1
     % -------------------------------------
-    if strcmpi(options.norm,'T1norm') % ~isempty(BIDS.subjects(s).fmap)
+    if strcmpi(options.norm,'T1norm')
         
         % segment the coregistered T1 (not resliced)
         % -------------------------------------------
@@ -883,25 +883,28 @@ if strcmp(options.QC,'on') %
             
         end
         
-        % create carpet plots
-        for frun = 1:size(subjects{s}.func,1)
-            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-                    && ~exist(fullfile(fileparts(subjects{s}.func{frun}), 'voxplot.fig'), 'file'))
-                fprintf('subject %g: fMRI Quality control: carpet plot \n',s)
-                P = subjects{s}.func{frun};
-                c1 = EPI_class{1};
-                c2 = EPI_class{2};
-                c3 = EPI_class{3};
-                spmup_timeseriesplot(P, c1, c2, c3, 'motion','on','nuisances','on','correlation','on');
-            end
-        end
-        
     else
         load([fileparts(Normalized_files{frun}) filesep 'fMRIQA.mat'],'QA');
         
         fMRIQA.tSNR(1, frun) = QA.tSNR;  %#ok<NODEF>
         fMRIQA.meanFD(1,frun) = QA.meanFD;
         clear QA
+    end
+   
+end
+
+if strcmp(options.carpet_plot,'on')
+    % create carpet plots
+    for frun = 1:size(realigned_files,1)
+        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                && ~exist(fullfile(fileparts(realigned_files{frun}), 'voxplot.fig'), 'file'))
+            fprintf('subject %g: fMRI Quality control: carpet plot \n',s)
+            P = realigned_files{frun};
+            c1 = EPI_class{1};
+            c2 = EPI_class{2};
+            c3 = EPI_class{3};
+            spmup_timeseriesplot(P, c1, c2, c3, 'motion','on','nuisances','on','correlation','on');
+        end
     end
 end
 
