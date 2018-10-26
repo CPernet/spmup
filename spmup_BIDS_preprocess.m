@@ -889,7 +889,9 @@ if strcmp(options.QC,'on') %
         fMRIQA.meanFD(1,frun) = QA.meanFD;
         clear QA
     end
-    
+else
+    anatQA = [];
+    fMRIQA = [];
 end
 
 if strcmp(options.carpet_plot,'on')
