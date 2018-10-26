@@ -13,13 +13,26 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 %
 %           - choices a structure with the following fields:
 %               .outdir = where to write the data
-%               .removeNvol = number of initial volumes to remove
 %               .keep_data = 'off' (default) or 'on' to keep all steps - off means
-%                            only the last processed data are available
+%               	only the last processed data are available
 %               .overwrite_data = 'on' turning it 'off' is useful to restart
-%                                  some processing while kepping previous steps
+%               	some processing while kepping previous steps
 %               .QC = 'on' (default) or 'off' performs quality controls for
-%                     anatomical (T1) scans and EPI time series
+%               	anatomical (T1) scans and EPI time series
+%               .removeNvol = number of initial volumes to remove
+%               .realign_unwarp =  'off' (default) to turn on if you want
+%               .carpet_plot = 'off' will create the carpet plots on the
+%                   preprocessed bold runs (see spmup_timeseriesplot.m)
+%                   to run realign and unwarp (will reslice data) instead of
+%                   realign (will not reslice data)
+%               .task = [] (default) to specificy which bold task to analyze. 
+%                   Default is to run them all together. This could be problematic
+%                   if the tasks have different acquisiton parameters or dimensions.
+%               .rec = [] (default) to specificy which bold reconstruction
+%               to analyze. Default is to run them all together.
+%               .acq = [] (default) to specificy which bold acquisition to
+%               analyze. Default is to run them all together. This could be problematic
+%                   if the tasks have different dimensions.
 %               .despike = 'on' (default) or 'off' runs median despiking
 %               .drifter = 'off' ('default') or 'on' removes cardiac and respiratory signals using the drifter toolbox
 %               .motionexp = 'off' (default) or 'on' compute 24 motion parameters
@@ -29,8 +42,8 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 %               .ignore_fieldmaps = 'on' or 'off' (default) to include distorsion correction for T1norm
 %               .skernel = [8 8 8] by default is the smoothing kernel
 %               .derivatives = 'off', 1 or 2 to use for GLM
-%                              if dervatives are used, beta hrf get boosted
-%                              and smoothing is performed after the GLM
+%               	if derivatives are used, beta hrf get boosted
+%               	and smoothing is performed after the GLM
 % 
 % OUTPUTS 
 %           - BIDS: the structure returned by spm_BIDS and possibly modified

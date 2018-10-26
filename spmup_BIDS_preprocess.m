@@ -11,15 +11,28 @@ function [anatQA, fMRIQA, subjects, options] = spmup_BIDS_preprocess(BIDS_dir, B
 %           - subjects: a structure containing the fullpath of the unpacked anat,
 %           fmap and func files for each subject (see spmup_BIDS_unpack)
 %           - s is the subject index to preprocess
-%           - options is a structure with the following fields:
+%           - choices a structure with the following fields:
 %               .outdir = where to write the data
-%               .removeNvol = number of initial volumes to remove
 %               .keep_data = 'off' (default) or 'on' to keep all steps - off means
-%                            only the last processed data are available
+%               	only the last processed data are available
 %               .overwrite_data = 'on' turning it 'off' is useful to restart
-%                                  some processing while kepping previous steps
+%               	some processing while kepping previous steps
 %               .QC = 'on' (default) or 'off' performs quality controls for
-%                     anatomical (T1) scans and EPI time series
+%               	anatomical (T1) scans and EPI time series
+%               .removeNvol = number of initial volumes to remove
+%               .realign_unwarp =  'off' (default) to turn on if you want
+%               .carpet_plot = 'off' will create the carpet plots on the
+%                   preprocessed bold runs (see spmup_timeseriesplot.m)
+%                   to run realign and unwarp (will reslice data) instead of
+%                   realign (will not reslice data)
+%               .task = [] (default) to specificy which bold task to analyze.
+%                   Default is to run them all together. This could be problematic
+%                   if the tasks have different acquisiton parameters or dimensions.
+%               .rec = [] (default) to specificy which bold reconstruction
+%               to analyze. Default is to run them all together.
+%               .acq = [] (default) to specificy which bold acquisition to
+%               analyze. Default is to run them all together. This could be problematic
+%                   if the tasks have different dimensions.
 %               .despike = 'on' (default) or 'off' runs median despiking
 %               .drifter = 'off' ('default') or 'on' removes cardiac and respiratory signals using the drifter toolbox
 %               .motionexp = 'off' (default) or 'on' compute 24 motion parameters
@@ -29,8 +42,8 @@ function [anatQA, fMRIQA, subjects, options] = spmup_BIDS_preprocess(BIDS_dir, B
 %               .ignore_fieldmaps = 'on' or 'off' (default) to include distorsion correction for T1norm
 %               .skernel = [8 8 8] by default is the smoothing kernel
 %               .derivatives = 'off', 1 or 2 to use for GLM
-%                              if dervatives are used, beta hrf get boosted
-%                              and smoothing is performed after the GLM
+%               	if derivatives are used, beta hrf get boosted
+%               	and smoothing is performed after the GLM
 %
 % usage:
 % choice = struct('removeNvol', 0, 'keep_data', 'off',  'overwrite_data', 'on', ...
@@ -334,7 +347,7 @@ if strcmp(options.ignore_fieldmaps, 'off') && isfield(subjects{s}, 'fieldmap')
                 
                 if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
                         && ~exist(vdm{ifmap},'file'))
-
+                    
                     % coregister fmap to bold reference
                     matlabbatch{1}.spm.spatial.coreg.estimate.ref = {avg};
                     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.cost_fun = 'nmi';
@@ -349,7 +362,7 @@ if strcmp(options.ignore_fieldmaps, 'off') && isfield(subjects{s}, 'fieldmap')
                             {subjects{s}.fieldmap(ifmap).mag1};
                         matlabbatch{end}.spm.spatial.coreg.estimate.other = ...
                             {subjects{s}.fieldmap(ifmap).phasediff};
-
+                        
                     elseif strcmp(subjects{s}.fieldmap(ifmap).type, 'phase12')
                         % two magnitide images and 2 phase images
                         matlabbatch{end}.spm.spatial.coreg.estimate.source = ...
@@ -362,7 +375,7 @@ if strcmp(options.ignore_fieldmaps, 'off') && isfield(subjects{s}, 'fieldmap')
                     
                     fprintf('\ncoregistering fmap %g subject %g to its reference run ',ifmap,s)
                     spm_jobman('run',matlabbatch); clear matlabbatch;
-
+                    
                     
                     % VDM creation: input images
                     if strcmp(subjects{s}.fieldmap(ifmap).type, 'phasediff')
@@ -498,7 +511,7 @@ else
     
     
     %which fieldmap for each run of this task / acq /rec
-    which_fmap = subjects{s}.which_fmap(find(bold_include)); 
+    which_fmap = subjects{s}.which_fmap(find(bold_include));
     
     % file out of realign will be
     [filepath,filename,ext] = fileparts(st_files{1});
