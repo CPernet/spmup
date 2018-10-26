@@ -140,6 +140,7 @@ end
 % Despiking and slice timing for each run
 % ----------------------------------------
 bold_include = [];
+included_idx = 0;
 for frun = 1:size(subjects{s}.func, 1) % each run
     
     filesin = subjects{s}.func{frun};
@@ -169,6 +170,7 @@ for frun = 1:size(subjects{s}.func, 1) % each run
     bold_include(frun) = all([task acq rec]);
     if bold_include(frun)
         
+        included_idx = included_idx + 1;
         
         
         % !!!! TO DO: this will need to be passed on to the
@@ -250,16 +252,16 @@ for frun = 1:size(subjects{s}.func, 1) % each run
             refslice    = sliceorder(round(length(SliceTiming)/2));
             timing      = [0 RepetitionTime];
             
-            st_files{frun} = [filepath filesep 'st_' filename ext]; %#ok<*AGROW>
+            st_files{included_idx,1} = [filepath filesep 'st_' filename ext]; %#ok<*AGROW>
             
             if strcmp(options.overwrite_data, 'on') || (strcmp(options.overwrite_data, 'off') ...
-                    && ~exist(st_files{frun}, 'file'))
+                    && ~exist(st_files{included_idx,1}, 'file'))
                 fprintf('\n\nstarting slice timing correction run %g subject %g \n',frun,s)
                 spm_slice_timing(filesin, sliceorder, refslice, timing, 'st_');
             end
             
         else
-            st_files{frun} = fullfile(filepath, [filename ext]);
+            st_files{included_idx,1} = fullfile(filepath, [filename ext]);
         end
         
         % cleanup
