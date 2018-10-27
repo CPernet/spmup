@@ -56,7 +56,6 @@ function [anatQA, fMRIQA, subjects, options] = spmup_BIDS_preprocess(BIDS_dir, B
 % end
 
 % TO DO:
-% - track which task for each bold run ?
 % - implement fieldmap and epi types for fieldmap modality ?
 % - add an spm_check_coregistration to vizualize how the spmup_autoreorient
 %   worked on the anat data?
@@ -891,7 +890,8 @@ if strcmp(options.QC,'on') %
     end
 else
     anatQA = [];
-    fMRIQA = [];
+    fMRIQA.tSNR = [];
+    fMRIQA.meanFD = [];
 end
 
 if strcmp(options.carpet_plot,'on')
@@ -921,11 +921,9 @@ if strcmpi(options.keep_data,'off')
             if strcmp(options.despike,'on')
                 delete(subjects{s}.func{frun}); % original
             end
-            if exist('SliceTiming', 'var')
-                if strcmp(options.despike,'on')
-                    [filepath,filename,ext]=fileparts(subjects{s}.func{frun});
-                    delete(fullfile(filepath, ['despiked_' filename ext])); % despiked
-                end
+            if strcmp(options.despike,'on') && exist('SliceTiming', 'var')
+                [filepath,filename,ext]=fileparts(subjects{s}.func{frun});
+                delete(fullfile(filepath, ['despiked_' filename ext])); % despiked
             end
         end
     end

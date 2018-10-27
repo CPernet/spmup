@@ -69,7 +69,7 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 % TO DO:
 % - implement fieldmap and epi types for fieldmap modality ?
 % - function assumes no more than one T1w image for each subject for each
-%   session (can't deal with mutiple rec / acq)
+%   session (can't deal with mutiple rec / acq for T1w)
 
  
 % TESTED:
