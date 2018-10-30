@@ -1,22 +1,38 @@
-function [anatQA,fMRIQA]=spmup_BIDS(BIDS_dir,choices)
+function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 
 % routine to read and unpack BIDS fMRI and preprocess data, build the first
 % level analysis - with various options available
+% can also be used to list files to be preprocessed to pass to spmup_BIDS_preprocess
 %
-% FORMAT spmup_BIDS
-%        spmup_BIDS(BIDS_dir)
-%        spmup_BIDS(BIDS_dir,choices)
+% FORMAT spmup_BIDS_unpack
+%        spmup_BIDS_unpack(BIDS_dir)
+%        spmup_BIDS_unpack(BIDS_dir,choices)
 %
-% INPUTS BIDS_dir is the BIDS directory
-%        choices a structure with the following fields:
+% INPUTS 
+%           - BIDS_dir is the BIDS directory
+%
+%           - choices a structure with the following fields:
 %               .outdir = where to write the data
-%               .removeNvol = number of initial volumes to remove
 %               .keep_data = 'off' (default) or 'on' to keep all steps - off means
-%                            only the last processed data are available
+%               	only the last processed data are available
 %               .overwrite_data = 'on' turning it 'off' is useful to restart
-%                                  some processing while kepping previous steps
+%               	some processing while kepping previous steps
 %               .QC = 'on' (default) or 'off' performs quality controls for
-%                     anatomical (T1) scans and EPI time series
+%               	anatomical (T1) scans and EPI time series
+%               .removeNvol = number of initial volumes to remove
+%               .realign_unwarp =  'off' (default) to turn on if you want
+%               .carpet_plot = 'off' will create the carpet plots on the
+%                   preprocessed bold runs (see spmup_timeseriesplot.m)
+%                   to run realign and unwarp (will reslice data) instead of
+%                   realign (will not reslice data)
+%               .task = [] (default) to specificy which bold task to analyze. 
+%                   Default is to run them all together. This could be problematic
+%                   if the tasks have different acquisiton parameters or dimensions.
+%               .rec = [] (default) to specificy which bold reconstruction
+%               to analyze. Default is to run them all together.
+%               .acq = [] (default) to specificy which bold acquisition to
+%               analyze. Default is to run them all together. This could be problematic
+%                   if the tasks have different dimensions.
 %               .despike = 'on' (default) or 'off' runs median despiking
 %               .drifter = 'off' ('default') or 'on' removes cardiac and respiratory signals using the drifter toolbox
 %               .motionexp = 'off' (default) or 'on' compute 24 motion parameters
@@ -26,26 +42,35 @@ function [anatQA,fMRIQA]=spmup_BIDS(BIDS_dir,choices)
 %               .ignore_fieldmaps = 'on' or 'off' (default) to include distorsion correction for T1norm
 %               .skernel = [8 8 8] by default is the smoothing kernel
 %               .derivatives = 'off', 1 or 2 to use for GLM
-%                              if dervatives are used, beta hrf get boosted
-%                              and smoothing is performed after the GLM
+%               	if derivatives are used, beta hrf get boosted
+%               	and smoothing is performed after the GLM
+% 
+% OUTPUTS 
+%           - BIDS: the structure returned by spm_BIDS and possibly modified
+%           by spmup_BIDS_unpack
+%
+%           - subjects: a structure containing the fullpath of the unpacked anat,
+%           fmap and func files for each subject
+%
+%           - options: a structure equal to the choices strucure + the
+%           default of all the non specified fields
 %
 % usage:
 % choice = struct('removeNvol', 0, 'keep_data', 'off',  'overwrite_data', 'on', ...
 %     'despike', 'off', 'drifter', 'off', 'motionexp', 'off', 'scrubbing', 'off', ...
 %     'compcor', 'off', 'norm', 'EPInorm', 'skernel', [8 8 8], 'derivatives', 'off', ...
 %     'ignore_fieldmaps', 'on',  'outdir', ['..' filesep 'derivatives' filesep 'spmup_BIDS_processed'], 'QC', 'off'); % standard SPM pipeline
-% [anatQA,fMRIQA]=spmup_BIDS(pwd,choice)
+% [BIDS,subjects,options]=spmup_BIDS_unpack(pwd,choice)
+%
 % Cyril Pernet - University of Edinburgh
 % -----------------------------------------
 % Copyright (c) SPM Utility Plus toolbox
 
 % TO DO:
-% - track which task for each bold run ? (Remi Gau)
-% - implement fieldmap and epi types for fieldmap modality ? (Remi Gau)
+% - implement fieldmap and epi types for fieldmap modality ?
 % - function assumes no more than one T1w image for each subject for each
-%   session (can't deal with mutiple rec / acq) (Remi Gau)
-% - add an spm_check_coregistration to vizualize how the spmup_autoreorient
-%   worked on the anat data? (Remi Gau)
+%   session (can't deal with mutiple rec / acq for T1w)
+
  
 % TESTED:
 % unpacking data tried on:
@@ -90,8 +115,6 @@ if isfield(options,'ignore_fieldmaps')
     end
 end
 
-anatQA = [];
-fMRIQA = [];
 
 %% unpack data
 % -------------------------------------------------------------------------
@@ -105,12 +128,13 @@ if ~exist(options.outdir,'dir')
 end
 
 subjs_ls = spm_BIDS(BIDS,'subjects');
+nb_sub = numel(subjs_ls);
 
 
 %% unpack anat and center [0 0 0]
 % this assumes that there is no more than one T1W image for each session
 % -------------------------------
-for s=1:size(subjs_ls,2) % for each subject
+for s=1:nb_sub % for each subject
     
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
     
@@ -145,15 +169,13 @@ for s=1:size(subjs_ls,2) % for each subject
             [ext,name,compressed] = iscompressed(ext,name);
             
             % keep track of where the file is
-            subjects{s}.anat = fullfile(target_dir, [name ext]);
+            subjects{s}.anat = fullfile(target_dir, [name ext]); %#ok<*AGROW>
             file_exists = exist(subjects{s}.anat,'file'); % necessary to avoid overwriting
             
             % unzip or copies the file to its target directory depending on
             % extention / options / file existing
             unzip_or_copy(compressed, options, file_exists, in, target_dir)
             
-            % reorient the file to template
-            spmup_auto_reorient(subjects{s}.anat); disp(' anat reoriented');
         end
     end
     
@@ -171,14 +193,16 @@ end
 
 % unpack functional and field maps (still need to work out sessions here)
 % -----------------------------------------------------------------------
-for s=1:size(subjs_ls,2)
-    % parfor s=1:size(subjs_ls,2)
+for s=1:nb_sub
+    % parfor s=1:nb_sub
     
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
     
-    % initialize bold file list so that new runs can be appended with end+1
-    % even if they are from different sessions
-    subjects{s}.func = cell(1);
+    % bold file counter to list theem across different sessions
+    bold_run_count = 1;
+    
+    % fmap file counter to list theem across different sessions
+    fmap_run_count = 1;
     
     for session = 1:size(sess_ls,2) % for each session
         
@@ -194,6 +218,9 @@ for s=1:size(subjs_ls,2)
         run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
             'ses', sess_ls{session}, 'type', 'bold');
         
+        metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
+            'ses', sess_ls{session}, 'type', 'bold');
+        
         %% functional
         for frun = 1:size(run_ls,1) % for each run
             
@@ -207,11 +234,17 @@ for s=1:size(subjs_ls,2)
             [ext,name,compressed] = iscompressed(ext,name);
             
             % we keep track of where the files are stored
-            subjects{s}.func{end+1} = fullfile(target_dir, [name ext]);
-            file_exists = exist(subjects{s}.func{end},'file');
+            subjects{s}.func{bold_run_count,1} = fullfile(target_dir, [name ext]);
+            if iscell(metadata)
+                subjects{s}.func_metadata{bold_run_count,1} = metadata{frun};
+            else
+                subjects{s}.func_metadata{bold_run_count,1} = metadata;
+            end
+            file_exists = exist(subjects{s}.func{bold_run_count,1},'file');
             
             unzip_or_copy(compressed, options, file_exists, in, target_dir)
             
+            bold_run_count = bold_run_count + 1;
         end
         
         
@@ -238,6 +271,10 @@ for s=1:size(subjs_ls,2)
                     'ses', sess_ls{session}, 'modality', 'fmap', ...
                     'type', fmap_type_ls{ifmap_type_ls});
                 
+                metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
+                    'ses', sess_ls{session}, 'modality', 'fmap', ...
+                    'type', fmap_type_ls{ifmap_type_ls});
+                
                 % for all the fieldmaps of that type
                 for ifmap = 1:size(fmap_ls,1)
                     
@@ -246,32 +283,41 @@ for s=1:size(subjs_ls,2)
                     
                     [ext,name,compressed] = iscompressed(ext,name);
                     
+                    subjects{s}.fieldmap(fmap_run_count,1).metadata = ...
+                        metadata{ifmap};
+                        
+                    
                     % different behavior depending on fielpmap type
                     switch fmap_type_ls{ifmap_type_ls}
                         
                         case 'phasediff'
-                            subjects{s}.fieldmap(ifmap,:).phasediff = ...
+                            subjects{s}.fieldmap(fmap_run_count,1).phasediff = ...
                                 fullfile(target_dir, [name ext]);
-                            file_exists = exist(subjects{s}.fieldmap(ifmap,:).phasediff,'file');
+                            subjects{s}.fieldmap(fmap_run_count,1).type = 'phasediff';
+                            file_exists = exist(subjects{s}.fieldmap(fmap_run_count,:).phasediff,'file');
                             
                         case 'phase12'
+                            subjects{s}.fieldmap(fmap_run_count,1).type = 'phase12';
                             if contains(name,'phase1')
-                                subjects{s}.fieldmap(ifmap,:).phase1 = ...
+                                subjects{s}.fieldmap(fmap_run_count,1).phase1 = ...
                                     fullfile(target_dir, [name ext]);
-                                file_exists = exist(subjects{s}.fieldmap(ifmap,:).phase1,'file');
+                                file_exists = exist(subjects{s}.fieldmap(fmap_run_count,:).phase1,'file');
                             elseif contains(name,'phase2')
-                                subjects{s}.fieldmap(ifmap,:).phase2 = ...
+                                subjects{s}.fieldmap(fmap_run_count,1).phase2 = ...
                                     fullfile(target_dir, [name ext]);
-                                file_exists = exist(subjects{s}.fieldmap(ifmap,:).phase2,'file');
+                                file_exists = exist(subjects{s}.fieldmap(fmap_run_count,:).phase2,'file');
                             end
                             
                         case 'fieldmap'
+                            subjects{s}.fieldmap(fmap_run_count,1).type = 'fieldmap';
                             warning('Fieldmap type of fielmaps not implemented')
                             
                         case 'epi'
+                            subjects{s}.fieldmap(fmap_run_count,1).type = 'epi';
                             warning('EPI type of fielmaps not implemented')
                             
                         otherwise
+                            subjects{s}.fieldmap(fmap_run_count,1).type = 'unknown';
                             warning('%s is an unsupported type of fieldmap', fmap_type_ls(ifmap_type_ls))
                     end
                     
@@ -301,13 +347,13 @@ for s=1:size(subjs_ls,2)
                                 [ext,name,compressed] = iscompressed(ext,name);
                                 
                                 if imag==1
-                                    subjects{s}.fieldmap(ifmap,:).mag1 = ...
+                                    subjects{s}.fieldmap(fmap_run_count,1).mag1 = ...
                                         fullfile(target_dir, [name ext]);
-                                    file_exists = exist(subjects{s}.fieldmap(ifmap,:).mag1,'file');
+                                    file_exists = exist(subjects{s}.fieldmap(fmap_run_count,1).mag1,'file');
                                 elseif imag==2
-                                    subjects{s}.fieldmap(ifmap,:).mag2 = ...
+                                    subjects{s}.fieldmap(fmap_run_count,1).mag2 = ...
                                         fullfile(target_dir, [name ext]);
-                                    file_exists = exist(subjects{s}.fieldmap(ifmap,:).mag2,'file');
+                                    file_exists = exist(subjects{s}.fieldmap(fmap_run_count,1).mag2,'file');
                                 end
                                 
                                 unzip_or_copy(compressed, options, file_exists, in, target_dir)
@@ -318,6 +364,8 @@ for s=1:size(subjs_ls,2)
                         
                     end
 
+                    fmap_run_count = fmap_run_count + 1;
+                    
                 end
                 
             end
@@ -328,26 +376,11 @@ for s=1:size(subjs_ls,2)
     
 end
 
-return
-
 disp('spmup has finished unpacking data')
 
-%% run preprocessing using options
-% -------------------------------------------------------------------------
-if isfield(options,'removeNvol') %% need to check BIDS spec (???)
-    start_at = options.removeNvol;
-else
-    start_at = 1;
+try delete(gcp('nocreate')); 
+catch
 end
-
-% do the computation if needed
-for s=1%:size(subjs_ls,2)
-    %     parfor s=1%:size(subjs_ls,2)
-    spmup_BIDSjob(BIDS_dir,BIDS,subjects,s,options,start_at)
-end
-
-disp('spmup BIDS done - all subjects processed')
-try delete(gcp('nocreate')); end
 
 end
 
@@ -364,11 +397,18 @@ options.removeNvol = 0;
 options.outdir = [BIDS_dir filesep '..' filesep 'derivatives' filesep  ...
     'spmup_BIDS_processed'];
 
-% depiking
+% to specify which task or acquisition or recon to analyze 
+% (if none specified all will be done)
+options.task= [];
+options.rec = [];
+options.acq = [];
+
+% Despiking
 options.despike= 'off';
 options.despiking_window = [];
-% realign
+% Realign
 options.ignore_fieldmaps = 'on';
+options.realign_unwarp = 'off';
 % Drifter
 options.drifter= 'off';
 % Noise regressors
@@ -384,6 +424,7 @@ options.stats = 'on';
 options.derivatives = 'off';
 % QC
 options.QC = 'on';
+options.carpet_plot ='off';
 
 end
 

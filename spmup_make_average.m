@@ -1,6 +1,6 @@
 function spmup_make_average
 
-% sinple routine to create an average
+% simple routine to create an average
 % Cyril Pernet 10-07-2013
 
 Defaults = spm_get_defaults;
