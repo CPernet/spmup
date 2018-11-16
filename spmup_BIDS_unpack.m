@@ -8,7 +8,7 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 %        spmup_BIDS_unpack(BIDS_dir)
 %        spmup_BIDS_unpack(BIDS_dir,choices)
 %
-% INPUTS 
+% INPUTS
 %           - BIDS_dir is the BIDS directory
 %
 %           - choices a structure with the following fields:
@@ -25,7 +25,7 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 %                   preprocessed bold runs (see spmup_timeseriesplot.m)
 %                   to run realign and unwarp (will reslice data) instead of
 %                   realign (will not reslice data)
-%               .task = [] (default) to specificy which bold task to analyze. 
+%               .task = [] (default) to specificy which bold task to analyze.
 %                   Default is to run them all together. This could be problematic
 %                   if the tasks have different acquisiton parameters or dimensions.
 %               .rec = [] (default) to specificy which bold reconstruction
@@ -44,8 +44,8 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 %               .derivatives = 'off', 1 or 2 to use for GLM
 %               	if derivatives are used, beta hrf get boosted
 %               	and smoothing is performed after the GLM
-% 
-% OUTPUTS 
+%
+% OUTPUTS
 %           - BIDS: the structure returned by spm_BIDS and possibly modified
 %           by spmup_BIDS_unpack
 %
@@ -71,7 +71,7 @@ function [BIDS,subjects,options]=spmup_BIDS_unpack(BIDS_dir,choices)
 % - function assumes no more than one T1w image for each subject for each
 %   session (can't deal with mutiple rec / acq for T1w)
 
- 
+
 % TESTED:
 % unpacking data tried on:
 %  - ds009 (Remi Gau)
@@ -135,50 +135,50 @@ nb_sub = numel(subjs_ls);
 % this assumes that there is no more than one T1W image for each session
 % -------------------------------
 for s=1:nb_sub % for each subject
-    
+
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
-    
+
     for session = 1:size(sess_ls,2) % for each session
-        
+
         if size(sess_ls,2)==1
             sess_folder = '';
         else
             sess_folder = ['ses-' sess_ls{session}];
         end
-        
+
         fprintf('subject %g - session %i: checking anat \n', s, session)
-        
+
         %  target directory where the anat image will be copied/unzipped
         target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
                     sess_folder, 'anat');
-        
+
         % lists all the T1w images for that subject and session
         in = char(spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
             'ses', sess_ls{session}, 'type', 'T1w'));
-        
+
         if isempty(in) % in case there is no anat file for this session
             warning('No valid T1w file found for subject %s - session %s', ...
                 subjs_ls{s}, sess_ls{session})
-        else 
+        else
             [~,name,ext,~] = spm_fileparts(in);
-            
+
             % check if we are dealing with a .nii or .nii.gzz file
             % returns ext='.nii' in any case
             % and filename with no extension
             % compressed is 1 or 0
             [ext,name,compressed] = iscompressed(ext,name);
-            
+
             % keep track of where the file is
             subjects{s}.anat = fullfile(target_dir, [name ext]); %#ok<*AGROW>
             file_exists = exist(subjects{s}.anat,'file'); % necessary to avoid overwriting
-            
+
             % unzip or copies the file to its target directory depending on
             % extention / options / file existing
             unzip_or_copy(compressed, options, file_exists, in, target_dir)
-            
+
         end
     end
-    
+
 end
 
 % if more than 2 functional run, try to unpack data using multiple cores
@@ -195,44 +195,44 @@ end
 % -----------------------------------------------------------------------
 for s=1:nb_sub
     % parfor s=1:nb_sub
-    
+
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
-    
+
     % bold file counter to list theem across different sessions
     bold_run_count = 1;
-    
+
     % fmap file counter to list theem across different sessions
     fmap_run_count = 1;
-    
+
     for session = 1:size(sess_ls,2) % for each session
-        
+
         fprintf('subject %g - session %i: checking functional data \n',s, session)
-        
+
         if size(sess_ls,2)==1
             sess_folder = '';
         else
             sess_folder = ['ses-' sess_ls{session}];
         end
-        
+
         % list all bold files for that subject and session
         run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
             'ses', sess_ls{session}, 'type', 'bold');
-        
+
         metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
             'ses', sess_ls{session}, 'type', 'bold');
-        
+
         %% functional
         for frun = 1:size(run_ls,1) % for each run
-            
+
             target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
                     sess_folder, 'func', ['run' num2str(frun)]);
-            
+
             in = run_ls{frun,1};
-            
+
             [~,name,ext] = spm_fileparts(in);
-            
+
             [ext,name,compressed] = iscompressed(ext,name);
-            
+
             % we keep track of where the files are stored
             subjects{s}.func{bold_run_count,1} = fullfile(target_dir, [name ext]);
             if iscell(metadata)
@@ -241,61 +241,61 @@ for s=1:nb_sub
                 subjects{s}.func_metadata{bold_run_count,1} = metadata;
             end
             file_exists = exist(subjects{s}.func{bold_run_count,1},'file');
-            
+
             unzip_or_copy(compressed, options, file_exists, in, target_dir)
-            
+
             bold_run_count = bold_run_count + 1;
         end
-        
-        
+
+
         %% field maps
         if ismember('fmap', spm_BIDS(BIDS,'modalities', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}))
-            
+
             fprintf('subject %g - session %i: checking field maps \n',s, session)
-            
+
             target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
                 sess_folder, 'fieldmaps');
-            
+
             % check which types of fieldmaps we are dealing with
             fmap_type_ls = spm_BIDS(BIDS, 'types', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'modality', 'fmap');
-            
+
             % goes through each type in case we have several fieldmap types in that
             % data set
             for ifmap_type_ls = 1:size(fmap_type_ls,1)
-                
+
                 % lists all the fieldmap files of that type as there might
                 % be several runs / acq / rec ...
                 fmap_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
                     'ses', sess_ls{session}, 'modality', 'fmap', ...
                     'type', fmap_type_ls{ifmap_type_ls});
-                
+
                 metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
                     'ses', sess_ls{session}, 'modality', 'fmap', ...
                     'type', fmap_type_ls{ifmap_type_ls});
-                
+
                 % for all the fieldmaps of that type
                 for ifmap = 1:size(fmap_ls,1)
-                    
+
                     in = fmap_ls{ifmap,1};
                     [path,name,ext] = spm_fileparts(in);
-                    
+
                     [ext,name,compressed] = iscompressed(ext,name);
-                    
+
                     subjects{s}.fieldmap(fmap_run_count,1).metadata = ...
                         metadata{ifmap};
-                        
-                    
+
+
                     % different behavior depending on fielpmap type
                     switch fmap_type_ls{ifmap_type_ls}
-                        
+
                         case 'phasediff'
                             subjects{s}.fieldmap(fmap_run_count,1).phasediff = ...
                                 fullfile(target_dir, [name ext]);
                             subjects{s}.fieldmap(fmap_run_count,1).type = 'phasediff';
                             file_exists = exist(subjects{s}.fieldmap(fmap_run_count,:).phasediff,'file');
-                            
+
                         case 'phase12'
                             subjects{s}.fieldmap(fmap_run_count,1).type = 'phase12';
                             if contains(name,'phase1')
@@ -307,45 +307,45 @@ for s=1:nb_sub
                                     fullfile(target_dir, [name ext]);
                                 file_exists = exist(subjects{s}.fieldmap(fmap_run_count,:).phase2,'file');
                             end
-                            
+
                         case 'fieldmap'
                             subjects{s}.fieldmap(fmap_run_count,1).type = 'fieldmap';
                             warning('Fieldmap type of fielmaps not implemented')
-                            
+
                         case 'epi'
                             subjects{s}.fieldmap(fmap_run_count,1).type = 'epi';
                             warning('EPI type of fielmaps not implemented')
-                            
+
                         otherwise
                             subjects{s}.fieldmap(fmap_run_count,1).type = 'unknown';
                             warning('%s is an unsupported type of fieldmap', fmap_type_ls(ifmap_type_ls))
                     end
-                    
+
                     unzip_or_copy(compressed, options, file_exists, in, target_dir)
-                    
-                    
+
+
                     % taking care of magnitude images
                     if strcmp(fmap_type_ls(ifmap_type_ls), 'phasediff') ...
                             || strcmp(fmap_type_ls(ifmap_type_ls), 'phase12')
-                        
+
                         diff_name = name;
-                        
+
                         % there might be 2 magnitude images
                         for imag = 1:2
-                            
+
                             loof_for = strrep(diff_name, fmap_type_ls{ifmap_type_ls}, ...
                                 sprintf('magnitude%i', imag) );
-                            
+
                             [~,name,ext] = spm_fileparts(spm_select('List',path,...
                                 [loof_for '.*$'] ) );
-                            
+
                             in = fullfile(path, [name ext]);
-                            
+
                             % mostly in case there is only one
                             if ~isempty(name)
-                                
+
                                 [ext,name,compressed] = iscompressed(ext,name);
-                                
+
                                 if imag==1
                                     subjects{s}.fieldmap(fmap_run_count,1).mag1 = ...
                                         fullfile(target_dir, [name ext]);
@@ -355,30 +355,30 @@ for s=1:nb_sub
                                         fullfile(target_dir, [name ext]);
                                     file_exists = exist(subjects{s}.fieldmap(fmap_run_count,1).mag2,'file');
                                 end
-                                
+
                                 unzip_or_copy(compressed, options, file_exists, in, target_dir)
-                                
+
                             end
-                            
+
                         end
-                        
+
                     end
 
                     fmap_run_count = fmap_run_count + 1;
-                    
+
                 end
-                
+
             end
-            
+
         end
-        
+
     end
-    
+
 end
 
 disp('spmup has finished unpacking data')
 
-try delete(gcp('nocreate')); 
+try delete(gcp('nocreate'));
 catch
 end
 
@@ -397,7 +397,7 @@ options.removeNvol = 0;
 options.outdir = [BIDS_dir filesep '..' filesep 'derivatives' filesep  ...
     'spmup_BIDS_processed'];
 
-% to specify which task or acquisition or recon to analyze 
+% to specify which task or acquisition or recon to analyze
 % (if none specified all will be done)
 options.task= [];
 options.rec = [];
@@ -443,20 +443,29 @@ end
 function unzip_or_copy(compressed, options, file_exists, in, target_dir)
 
 if isempty(in) % if no valid file was found
-    
-elseif compressed % if compressed
-    if strcmp(options.overwrite_data,'on') || ( strcmp(options.overwrite_data,'off') ...
-            && ~file_exists )
-        fprintf(' Unpacking data: %s\n',in)
-        gunzip(in, target_dir);
-    end
-    
-elseif ~compressed % if not compressed
-    if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-            && ~file_exists )
-        fprintf(' Copying data: %s\n',in)
-        copyfile(in, target_dir);
-    end
+
+else
+
+  if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+          && ~file_exists )
+      
+      fprintf(' Copying data: %s\n',in)
+      if ~exist(target_dir,'dir')
+          mkdir(target_dir);
+      end
+      copyfile(in, target_dir);
+
+      if compressed % if compressed
+
+        [~,name,ext] = spm_fileparts(in);
+        file_to_unpack = fullfile(target_dir, [name ext]);
+        fprintf(' Unpacking data: %s\n', file_to_unpack)
+        gunzip(file_to_unpack, target_dir);
+
+      end
+
+  end
+
 end
-     
+
 end
