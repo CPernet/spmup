@@ -22,8 +22,7 @@ end
 
 %-Get filename
 %--------------------------------------------------------------------------
-F   = xSPM.title;
-F   = [F '_contour.img'];
+F   = [xSPM.Vspm.fname '_contour.nii'];
 spm('Pointer','Watch')
 
 %-Set up header information
