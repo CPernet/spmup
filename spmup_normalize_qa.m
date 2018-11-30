@@ -111,12 +111,14 @@ if strcmp(flags.T1, 'on')
     slices = find(search>10-3); slices = [slices(4):6:slices(end)];
     
     figure('Name','Average T1 vs T2*'); colormap('gray')
-    for s=1:8
-        A = flipud(squeeze(Ref(:,:,slices(s)))'); subplot(3,8,s); imagesc(A);
+    n = 3;
+    m = numel(slices);
+    for s=1:numel(slices)
+        A = flipud(squeeze(Ref(:,:,slices(s)))'); subplot(n,m,s); imagesc(A);
         if s ==4; title('Normalized T1 weighted image','Fontsize',14); end
-        B = flipud(squeeze(Average(:,:,slices(s)))'); subplot(3,8,s+8); imagesc(B);
+        B = flipud(squeeze(Average(:,:,slices(s)))'); subplot(n,m,s+m); imagesc(B);
         if s ==4; title('Normalized averaged T2* weighted image','Fontsize',14); end
-        C = abs((A>10-3) - (B>10-3)); subplot(3,8,s+16); imagesc(C);
+        C = abs((A>10-3) - (B>10-3)); subplot(n,m,s+m*2); imagesc(C);
         if s ==4; title('Difference in positive (mask) values','Fontsize',14); end
     end
     saveas(gcf,'outlines.fig','fig'); close(gcf)

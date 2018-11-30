@@ -88,8 +88,13 @@ if iscell(P)
 else
     V = spm_vol(P);
 end
-[folder,name,ext] = fileparts(V(1).fname);
-cd(folder); average = dir('mean*.nii');
+[folder,name,~] = fileparts(V(1).fname);
+if strcmp(V(1).descrip, 'Warped') %in case we are dealing with a normalized image
+    average = spm_select('FPList',folder,['^wmean' name(2:end)]);
+else
+    average = spm_select('FPList',folder,['^mean' name]);
+end
+cd(folder);
 
 % if distance we need the mean image
 if strcmp(flags.volume_distance,'on')
@@ -97,7 +102,7 @@ if strcmp(flags.volume_distance,'on')
         disp('mean image not found - computing one .. ')
         average = mean(spm_read_vols(V),4);
     else
-        average =  spm_read_vols(spm_vol([folder filesep average.name]));
+        average =  spm_read_vols(spm_vol(average));
     end
 end
 
@@ -140,19 +145,8 @@ if strcmp(flags.motion_parameters,'on')
             1.28*(temp_motion(i-1,6) - temp_motion(i,6))^2);
     end
     
-    % interquartile range
-    y=sort(delta);
-    j=floor(length(delta)/4 + 5/12);
-    g=(length(delta)/4)-j+(5/12);
-    ql=(1-g).*y(j)+g.*y(j+1); % lower quartile
-    k=length(delta)-j+1;
-    qu=(1-g).*y(k)+g.*y(k-1); % higher quartile
-    value=qu-ql; % inter-quartile range
-    
     % robust outliers
-    M = median(delta);
-    k=(17.63*n-23.64)/(7.74*n-3.71); % Carling's k
-    m_outliers=delta<(M-k*value) | delta>(M+k*value);
+    m_outliers = spmup_comp_robust_outliers(delta);
     
     if sum(m_outliers) > 0
         moutlier_matrix = zeros(size(motion_param,1),sum(m_outliers));
@@ -201,19 +195,8 @@ if strcmp(flags.globals,'on')
     end
     glo = detrend(glo); % since in spm the data are detrended
     
-    % interquartile range
-    y=sort(glo);
-    j=floor(length(glo)/4 + 5/12);
-    g=(length(glo)/4)-j+(5/12);
-    ql=(1-g).*y(j)+g.*y(j+1); % lower quartile
-    k=length(glo)-j+1;
-    qu=(1-g).*y(k)+g.*y(k-1); % higher quartile
-    value=qu-ql; % inter-quartile range
-    
     % robust outliers
-    M = median(glo);
-    k=(17.63*n-23.64)/(7.74*n-3.71); % Carling's k
-    g_outliers=glo<(M-k*value) | glo>(M+k*value);
+    g_outliers = spmup_comp_robust_outliers(glo);
     
     if sum(g_outliers) > 0
         goutlier_matrix = zeros(size(motion_param,1),sum(g_outliers));
@@ -240,7 +223,7 @@ end
 
 if strcmp(flags.volume_distance, 'on')
     
-    n = size(P,1);
+    n = numel(V);
     distance_to_mean = zeros(n,1);
     distance_between = zeros(n-1,1);
     % mean_data = spm_read_vols(spm_vol(average));
@@ -258,19 +241,8 @@ if strcmp(flags.volume_distance, 'on')
         end
     end
     
-     % interquartile range
-    y=sort(distance_between);
-    j=floor(length(distance_between)/4 + 5/12);
-    g=(length(distance_between)/4)-j+(5/12);
-    ql=(1-g).*y(j)+g.*y(j+1); % lower quartile
-    k=length(distance_between)-j+1;
-    qu=(1-g).*y(k)+g.*y(k-1); % higher quartile
-    value=qu-ql; % inter-quartile range
-    
     % robust outliers
-    M = median(distance_between);
-    k=(17.63*n-1-23.64)/(7.74*n-1-3.71); % Carling's k (use n-1 because 1st image doesn't count)
-    dist_outliers=distance_between<(M-k*value) | distance_between>(M+k*value);
+    dist_outliers = spmup_comp_robust_outliers(distance_between);
     
     figure('Name','Mean square distances between volumes','Visible','On');
     set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized', 'outerposition',[0 0 1 1]); 

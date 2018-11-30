@@ -1,14 +1,17 @@
-function schemaball(Data,Mask,varargin)
-% FORMAT schemaball(Data,Names,'Threshold',x,'Reorder','Yes',ExtraPlots,'Yes'))
+function spmup_schemaball(Data,Mask,varargin)
+
+% Routione to plot connectivity matrices
+%
+% FORMAT spmup_schemaball(Data,Mask,Names,'Threshold',x,'Reorder','Yes',ExtraPlots,'Yes'))
 %
 % IMPUT Data is a 2D n*n symmetric correlation matrix
-% Mask is a 2D n*n symetric binary correlation matrix
-% OPTIONS ARE
-% Names cell array with n names (default 1 to n)
-% Edges 'Bezier' (default) or 'Line' for curved or straight lines between nodes
-% Connect 'Thickness' or 'Colour' edges changfe thickness or color based on the Data values
-% Reorder reorder data to minimize edge crossing (bandwidth)
-% ExtraPlots in addition to the circular plot, other plots to visualize the data are provided
+%       Mask is a 2D n*n symetric binary correlation matrix
+%       OPTIONS ARE
+%       Names cell array with n names (default 1 to n)
+%       Edges 'Bezier' (default) or 'Line' for curved or straight lines between nodes
+%       Connect 'Thickness' or 'Colour' edges change thickness or color based on the Data values
+%       Reorder reorder data to minimize edge crossing (bandwidth)
+%       ExtraPlots in addition to the circular plot, imagesc of the full and sparsified matrices
 %
 % Example
 % Names{1} = 'Left ROI1'
