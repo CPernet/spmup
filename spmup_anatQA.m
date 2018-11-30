@@ -171,7 +171,12 @@ end
 data = spm_read_vols(AnatV);
 data(isnan(data)) = [];
 Bmax = sqrt(sum(data(:).^2));
-anatQA.EFC = nansum((data(:)./Bmax).*abs(log((data(:)./Bmax))));
+try
+    % should work nost of the time, possibly throwing warnings (cf Joost Kuijer)
+    anatQA.EFC = nansum((data(:)./Bmax).*log((data(:)./Bmax)));
+catch
+    anatQA.EFC = nansum((data(:)./Bmax).*abs(log((data(:)./Bmax))));
+end
 
 % asym
 middle_img = abs((AnatV.dim(1).*AnatV.mat(1))./2);
