@@ -139,7 +139,7 @@ elseif nargin == 3
     if isfield(varargin{3},'skip')
         flags.skip = varargin{3}.skip;
         if ~isempty(flags.skip) && ~isnumeric(flags.skip)
-            error('the skip parameter must be a real number')
+            error('the skip parameter must be a real integer')
         end
     else
         flags.skip = 0;
