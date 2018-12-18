@@ -7,21 +7,30 @@ function censoring_regressors = spmup_censoring(data)
 % --------------------------------
 % Copyright (C) spmup 2017
 
+
+k = 2.2414; % = sqrt(chi2inv(0.975,1))
 [n,p] = size(data);
-for column = 1:p
-    % interquartile range
-    y=sort(data(:,column));
-    j=floor(n/4 + 5/12);
-    g=(n/4)-j+(5/12);
-    ql=(1-g).*y(j)+g.*y(j+1); % lower quartile
-    k=n-j+1;
-    qu=(1-g).*y(k)+g.*y(k-1); % higher quartile
-    value=qu-ql; % inter-quartile range
+distance = NaN(n,p);
+for p=1:size(data,2)
+    tmp = data(:,p);
+    points = find(~isnan(tmp));
+    tmp(isnan(tmp)) = [];
     
-    % robust outliers
-    M = nanmedian(data(:,column));
-    k=(17.63*n-23.64)/(7.74*n-3.71); % Carling's k
-    outliers(:,column)=data(:,column)<(M-k*value) | data(:,column)>(M+k*value);
+    % compute all distances
+    n = length(tmp);
+    for i=1:n
+        j = points(i);
+        indices = [1:n]; indices(i) = [];
+        distance(j,p) = median(abs(tmp(i) - tmp(indices)));
+    end
+    
+    % get the S estimator
+    % consistency factor c = 1.1926;
+    Sn = 1.1926*median(distance(points,p));
+    
+    % get the outliers in a normal distribution
+    outliers(:,p) = (distance(:,p) ./ Sn) > k; % no scaling needed as S estimates already std(data)
+    outliers(:,p) = outliers(:,p)+isnan(data(:,p));
 end
 
 % create the motion censoring regressors simply diagonalizing each outlier
