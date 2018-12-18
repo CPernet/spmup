@@ -7,7 +7,6 @@ function varargout=spmup_rcompcor(varargin)
 %
 % FORMAT: [anoise,tnoise,QC] = spmup_rcompcor(fmridata,whitematter,csf,graymatter,brainmask);
 %         [anoise,tnoise,QC] = spmup_rcompcor(fmridata,whitematter,csf,graymatter); % implicit brain mask
-%         [anoise,tnoise]    = spmup_rcompcor(fmridata,whitematter,csf,brainmask); % no QC
 %         [anoise,QC]        = spmup_rcompcor(fmridata,whitematter,csf,graymatter); % no temporal noise regressors
 %         [tnoise,QC]        = spmup_rcompcor(fmridata,brainmask); % no anatomical noise regressors
 %
@@ -56,14 +55,15 @@ for inputs = 1:nargin
         else
             Vfmri = spm_vol(varargin{1});
         end
+        
+        if sum(size(Vfmri)) == 2
+            error('fMRI data must be time series')
+        end
     end
     
-    if sum(size(Vfmri)) == 2
-        error('fMRI data must be time series')
-    end
     
     % case we do it all
-    if nargout == 3 && nargin == 5
+    if nargout == 3 && nargin >= 4
         if inputs == 1; anoise = []; tnoise = []; QC = []; end
         if inputs == 2; [Vwhitematter,whitematter]=local_import(varargin{2}); end
         if inputs == 3; [Vcsf        ,csf        ]=local_import(varargin{3}); end
@@ -71,13 +71,6 @@ for inputs = 1:nargin
         if inputs == 5; [Vbrainmask  ,brainmask  ]=local_import(varargin{5}); end
     end
     
-    % case we have no QC
-    if nargout == 3 && nargin == 4
-        if inputs == 1; anoise = []; tnoise = []; end
-        if inputs == 2; [Vwhitematter,whitematter]=local_import(varargin{2}); end
-        if inputs == 3; [Vcsf        ,csf        ]=local_import(varargin{3}); end
-        if inputs == 4; [Vbrainmask  ,brainmask  ]=local_import(varargin{4}); end
-    end
     
     % case we have anatomical noise regressor only
     if nargout <= 2 && nargin == 4
@@ -102,9 +95,6 @@ for inputs = 1:nargin
     end
 end
 
-if nargout == 3
-    QC = [];
-end
 
 % quickly check dimensions and if the masks are binary.
 % If masks are not binary, threshold at 5% of the max assuming these images
@@ -187,6 +177,7 @@ if exist('anoise','var')
     timeseries = [timeseries spm_get_data(Vfmri,[x y z]')];
     
     % get regressors
+    % timeseries = spm_detrend(timeseries,2);
     anoise = decompose(timeseries,0);
     
     % if QC then output the thresholded mask images
@@ -285,7 +276,7 @@ if exist('tnoise','var')
     % figure; for z=1:Vbrainmask.dim(3); imagesc(SNRimg(:,:,z)); pause(0.2); end
     
     % sort voxels, keep top 2% in each slice
-    for z=1:Vbrainmask.dim(3)
+    for z=1:size(brainmask,3)
         vox = SNRimg(:,:,z);
         SNRimg(:,:,z) = (vox >= prctile(vox(:),98));
     end
@@ -300,7 +291,9 @@ if exist('tnoise','var')
     
     % if QC then output an tSNR image and an image of selected voxels
     if exist('QC','var')
-        [fpath,~,fext]=fileparts(Vbrainmask.fname);
+        if exist('Vbrainmask','var')
+            [fpath,~,fext]=fileparts(Vbrainmask.fname);
+        end
         Vbrainmask.fname = [fpath filesep 'tSRN' fext];
         Vbrainmask.descrip = 'robust temporal SNR image';
         QC.SNR.V = Vbrainmask;
@@ -312,7 +305,7 @@ if exist('tnoise','var')
         varargout{2} = tnoise;
         varargout{3} = QC;
     elseif nargout <= 2
-        varargout{1} = tnoise;
+        varargout{2} = tnoise;
         if exist('QC','var')
             varargout{2} = QC;
         end
