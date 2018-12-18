@@ -10,24 +10,10 @@ function [despiked,filtered] = spmup_despike(varargin)
 %        spmup_despike(P,[],flags)
 %
 % INPUT if none the user is prompted
-%       P the names of the 3D or 4D fMRI images (time-series) 
+%
+%       P the names of the fMRI images (time-series) or the 4D matrix of data 
 %       M the name of the mask or the 3D binary matrix 
 %       flags defines options to be used
-%             - flags.auto_mask,'off' or 'on' if M is not provided,
-%             auto_mask is 'on' but if set to 'off' the user is prompted 
-%             to select a mask
-%             - flags.method is 'median' or any of the option of the
-%             'smooth' matlab function - in all cases the span is function 
-%             of the autocorrelation unless window is specified
-%             - flags.window defines the number of consecutive images to
-%             use to despike the data ; for instance flags.method = 'median'
-%             and flags.window = 3 means that each data point is 1st
-%             substituted by a moving 3 points median and the resulting
-%             fit is used to determine outliers (see below)
-%
-%       P the names of the fMRI images (time-series) or the 4D matrix of
-%       data M the name of the mask or the 3D binary matrix flags defines
-%       options to be used
 %             - flags.auto_mask,'off' or 'on' if M is not provided, auto_mask is
 %                               'on' but if set to 'off' the user is prompted to 
 %                               select a mask
@@ -139,7 +125,7 @@ elseif nargin == 3
     if isfield(varargin{3},'skip')
         flags.skip = varargin{3}.skip;
         if ~isempty(flags.skip) && ~isnumeric(flags.skip)
-            error('the skip parameter must be a real number')
+            error('the skip parameter must be a real integer')
         end
     else
         flags.skip = 0;
@@ -395,7 +381,7 @@ end
 %% quick QA and reformating
 if strcmp(flags.method,'median')
     Despiked_QA = sum((YY == Y),4);
-    despiked = YY; clear YY
+    despiked = YY; %clear YY
 else
     Despiked_QA = NaN(size(Y,1),size(Y,2),size(Y,3));
     for i=1:length(index)
@@ -407,8 +393,11 @@ else
         despiked(x,y,z,:) = YY{i}; 
         filtered(x,y,z,:) = ZZ{i};
     end
-    clear YY ZZ
+    clear ZZ
+%     clear YY
 end
+
+Despiked_QA = despiked; %set aside for QA report (see below)
 
 % figure('Name','QA'); colormap('hot') 
 % for z=1:size(Despiked_QA,3)
@@ -448,7 +437,7 @@ if isempty(flags.window)
 else
     spmup_despike_log.window = flags.window;
 end
-Despiked_QA = sqrt(mean((despiked-Y).^2,4)); % how much different
+Despiked_QA = sqrt(mean((Despiked_QA-Y).^2,4)); % how much different
 spmup_despike_log.RMS = Despiked_QA;
 if ischar(P)
     [pathstr,name,ext]= fileparts(V(1).fname);
