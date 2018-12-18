@@ -16,6 +16,8 @@ function nuisances = spmup_nuisance(fmridata,whitematter,csf)
 % -----------------------------------------
 % Copyright (c) SPM Utility Plus toolbox
 
+threshold = 0.7;
+
 if nargin == 0
     [fmridata,sts]= spm_select(Inf,'image','Select fMRI data');
     if sts == 0; disp('selection aborded'); return; end
@@ -53,9 +55,9 @@ if any(Vcsf.dim ~= Vfmri(1).dim)
 end
 csf = spm_read_vols(Vcsf);
 
-% check if the masks are binary with a threshold at 0.7
-whitematter = whitematter > 0.7;
-csf = csf > 0.7;
+% check if the masks are binary with a threshold 
+whitematter = whitematter > threshold ;
+csf = csf > threshold ;
 
 % noise regressor comes from the white matter and csf images
 index = find(whitematter);
