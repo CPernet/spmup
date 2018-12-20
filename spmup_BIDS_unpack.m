@@ -137,6 +137,8 @@ nb_sub = numel(subjs_ls);
 for s=1:nb_sub % for each subject
 
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
+    
+    mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}]))
 
     for session = 1:size(sess_ls,2) % for each session
 
@@ -145,6 +147,9 @@ for s=1:nb_sub % for each subject
         else
             sess_folder = ['ses-' sess_ls{session}];
         end
+        
+        mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                    sess_folder, 'anat'))
 
         fprintf('subject %g - session %i: checking anat \n', s, session)
 
@@ -197,6 +202,10 @@ for s=1:nb_sub
     % parfor s=1:nb_sub
 
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
+    
+    if isempty(sess_ls)
+        sess_ls = {''};
+    end
 
     % bold file counter to list theem across different sessions
     bold_run_count = 1;
@@ -214,6 +223,9 @@ for s=1:nb_sub
             sess_folder = ['ses-' sess_ls{session}];
         end
 
+        [~,~,~] = mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+            sess_folder, 'func'));
+
         % list all bold files for that subject and session
         run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
             'ses', sess_ls{session}, 'type', 'bold');
@@ -225,8 +237,12 @@ for s=1:nb_sub
         for frun = 1:size(run_ls,1) % for each run
 
             target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                    sess_folder, 'func', ['run' num2str(frun)]);
-
+                sess_folder, 'func', ['run' num2str(frun)]);
+            
+            if ~exist(target_dir,'dir')
+                mkdir(target_dir);
+            end
+            
             in = run_ls{frun,1};
 
             [~,name,ext] = spm_fileparts(in);
