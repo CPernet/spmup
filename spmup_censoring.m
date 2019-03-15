@@ -1,7 +1,13 @@
 function censoring_regressors = spmup_censoring(data)
 
 % routine that computes robust outliers for each column of the data in
-% and return a matrix on cessoring regressors (0s and a 1 per column)
+% and return a matrix of censsoring regressors (0s and a 1 per column)
+%
+% FORMAT censoring_regressors = spmup_censoring(data)
+%
+% INPUT data is a n*m matrix 
+% OUTPUT censoring_regressors a matrix with ones in each column for
+%        outliers found in coumns of data
 %
 % Cyril Pernet
 % --------------------------------
