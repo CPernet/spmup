@@ -1,4 +1,4 @@
-function varargout=spmup_rcompcor(varargin)
+function varargout = spmup_rcompcor(varargin)
 
 % This function compute the 'compcor' regressors of Behzadi et al. 2007
 % <http://www.ncbi.nlm.nih.gov/pmc/articles/PMC2214855/>
@@ -324,7 +324,7 @@ function compout = decompose(timeseries,fig)
 
 % subfunction to threshold compoments using the broken stick method described
 % in Jackson (1993) <http://www.jstor.org/stable/1939574?seq=1#page_scan_tab_contents>
-% Instead of analytical soltion, we do 1000 Monte-Carlo from normally
+% Instead of analytical solution, we do 1000 Monte-Carlo from normally
 % distributed data from a matrix that have the same rank, giving a
 % distribution of expected principal values - and thus allowing thresholding.
 

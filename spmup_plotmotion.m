@@ -37,10 +37,11 @@ if isempty(motion_file)
 end
 
 %% compute
-motion_param = load(motion_file.name);
-temp_motion = motion_param; [n,p]=size(motion_param);
-temp_motion(:,4:6)= temp_motion(:,4:6)*180/pi; % use deg rather than radian
-derivatives = diff(temp_motion);
+motion_param       = load(motion_file.name);
+[n,~]              = size(motion_param);
+temp_motion        = motion_param; 
+temp_motion(:,4:6) = temp_motion(:,4:6)*180/pi; % use deg rather than radian
+derivatives        = diff(temp_motion);
 
 delta = zeros(n,1);  % Mean square displacement in two scans
 for i = 2:n
