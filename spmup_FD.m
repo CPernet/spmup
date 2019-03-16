@@ -36,11 +36,11 @@ if nargin == 0
     else
         realignment_file = [filepath filesep filename];
     end
-elseif nargin == 1
-    radius = varargin{1};
 elseif nargin == 2
-    fig = 'on';
+    radius = varargin{1};
 elseif nargin == 3
+    fig = 'on';
+elseif nargin == 4
     fig = varargin{3};
     if ~strcmpi(fig,'on') || ~strcmpi(fig,'off') || ~strcmpi(fig,'save')
         warndlg('could not recognize the figure flag, using ''save'''); 
