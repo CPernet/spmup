@@ -41,10 +41,7 @@ else
     Vfmri = spm_vol(fmridata);
 end
 
-if sum(size(Vfmri)) == 2
-    error('fMRI data must be time series')
-end
-    
+   
 Vwhitematter = spm_vol(whitematter);
 if any(Vwhitematter.dim ~= Vfmri(1).dim)
     error('Dimension issue between data and white matter')
