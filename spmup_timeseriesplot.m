@@ -1,4 +1,4 @@
-function M = spmup_timeseriesplot(fmridata,c1,c2,c3,varargin)
+function M = spmup_timeseriesplot(fmridata,cn1,cn2,cn3,varargin)
 
 % routine to produce plots a la Jonathan Power
 %
@@ -6,8 +6,7 @@ function M = spmup_timeseriesplot(fmridata,c1,c2,c3,varargin)
 %        M = spmup_timeseriesplot(P,c1, c2, c3, 'motion','on','nuisances','on','correlation','on')
 %
 % INPUT fmridata is a cell for the time series (see spm_select)
-%                if a cell array with 2 elements, both are plotted as well
-%                as the squred difference
+%                if a cell array with 2 elements, both are plotted 
 %       c1, c2, c3 are the tissue classes derived from the segmentation
 %       
 %       several options are also available
@@ -28,7 +27,7 @@ function M = spmup_timeseriesplot(fmridata,c1,c2,c3,varargin)
 %       All three cases can be computed automatically in this function or
 %       using specific calls, if provided the matrices are plotted as such
 %       and could therefore come from other computations - if a cell array
-%       of two time series is provide, it assumes the same motion and nuisance 
+%       of two time series is provided, it assumes the same motion and nuisance 
 %       apply, taking data from the 1st set eg data before and after denoising
 %
 % OUTPUT a figure (voxplot) showing all grey and white matter voxels
@@ -46,60 +45,56 @@ function M = spmup_timeseriesplot(fmridata,c1,c2,c3,varargin)
 
 %% check fMRI data in
 if nargin == 0
-    [fmridata,sts]= spm_select(Inf,'image','Select fMRI data');
+    [fmridata,sts]= spm_select(1,'image','Select fMRI data');
     if sts == 0; disp('selection aborded'); return; end
     if size(fmridata,1) == 1 && strcmp(fmridata(length(fmridata)-1:end),',1')
         fmridata = fmridata(1:length(fmridata)-2); % in case picked 4D put left ,1
     end
-    [c1,sts]= spm_select(1,'image','Select grey matter tissue image');
+    [cn1,sts]= spm_select(1,'image','Select grey matter tissue image');
     if sts == 0; disp('selection aborded'); return; end
-    [c2,sts]= spm_select(1,'image','Select white matter tissue image');
+    [cn2,sts]= spm_select(1,'image','Select white matter tissue image');
     if sts == 0; disp('selection aborded'); return; end
-    [c3,sts]= spm_select(1,'image','Select csf tissue image');
+    [cn3,sts]= spm_select(1,'image','Select csf tissue image');
     if sts == 0; disp('selection aborded'); return; end
 end
 
 % check fmridata is 4D
 if iscell(fmridata)
-    for v=1:size(fmridata{1},1)
-        Vfmri(v) =spm_vol(fmridata{v,1});
+    if strcmp(fmridata{1}(end-1:end),',1')
+        fmridata{1} = fmridata{1}(1:end-2);
     end
     
-    if size(fmridata,2) == 2
-        for v=1:size(fmridata{2},1)
-            Vfmri(v) =spm_vol(fmridata{v,2});
-        end
+    if strcmp(fmridata{2}(end-1:end),',1')
+        fmridata{2} = fmridata{2}(1:end-2);
     end
-else % not a cell array = only 1 time series
-    Vfmri = spm_vol(fmridata);
-end
 
-if sum(size(Vfmri)) == 2
-    error('fMRI data must be time series')
-end
-
-if exist('Vfmri2','var')
-    if sum(size(Vfmri2)) == 2
-        error('fMRI data must be time series')
+    % get the data
+    Vfmri =spm_vol(fmridata{1});
+    Vfmri2 =spm_vol(fmridata{2});
+    
+else % not a cell array
+    if strcmp(fmridata(1,end-1:end),',1')
+        fmridata = fmridata(1:end-2);
     end
+    Vfmri = spm_vol(fmridata(1,:));
 end
 
 %% deal with the masks
 disp('reading and thresholding masks ... ')
-if iscell(c1); c1=cell2mat(c1); end
-greymatter = spm_vol(c1); 
+if iscell(cn1); cn1=cell2mat(cn1); end
+greymatter = spm_vol(cn1); 
 if any(greymatter.dim ~= Vfmri(1).dim)
     disp('Dimension issue between data and grey matter - reslicing ... ')
 end
 
-if iscell(c2); c2=cell2mat(c2); end
-whitematter = spm_vol(c2); 
+if iscell(cn2); cn2=cell2mat(cn2); end
+whitematter = spm_vol(cn2); 
 if any(whitematter.dim ~= Vfmri(1).dim)
     error('Dimension issue between data and white matter')
 end
 
-if iscell(c3); c3=cell2mat(c3); end
-csf = spm_vol(c3); 
+if iscell(cn3); cn3=cell2mat(cn3); end
+csf = spm_vol(cn3); 
 if any(csf.dim ~= Vfmri(1).dim)
     error('Dimension issue between data and CSF')
 end
@@ -170,7 +165,11 @@ end
 % Nuisance
 if strcmpi(nuisances,'on') || ~exist('nuisances','var')
     disp('getting WM and CSF traces')
-    nuisances = spmup_nuisance(fmridata,whitematter,csf); 
+    if iscell(fmridata)
+        nuisances = spmup_nuisance(fmridata{1},whitematter,csf);
+    else
+        nuisances = spmup_nuisance(fmridata,whitematter,csf);
+    end
     nuisances = struct2array(nuisances)';
     figplot = figplot+1;
     
@@ -184,7 +183,11 @@ end
 % Correlation
 if strcmpi(correlation,'on') || ~exist('correlation','var')
     disp('getting volume correlations')
-    [r_course(1,:), r_course(2,:)] = spmup_volumecorr(fmridata);
+    if iscell(fmridata)
+        [r_course(1,:), r_course(2,:)] = spmup_volumecorr(fmridata{1});
+    else
+        [r_course(1,:), r_course(2,:)] = spmup_volumecorr(fmridata);
+    end
     figplot = figplot+1;
     
 elseif isnumeric(correlation) 
@@ -246,59 +249,81 @@ X = [linspace(0,1,length(Vfmri))' ones(length(Vfmri),1)];
 cleanM = M - (X*(X\M'))'; 
 
 %% figure
+if iscell(fmridata) && size(fmridata,2) == 2
+    cleanM2 = spmup_timeseriesplot(fmridata{2},cn1,cn2,cn3,'motion','off','nuisance','off',...
+        'correlation','off','makefig','off'); 
+end
 
-figure('Name','voxplot')
-set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-plotindex = 1;
-% top of the figure are nuisance time courses: head motion as framewise
-% displacement and the white mattrer and csf time courses (detrended)
-if exist('motion','var')
-    subplot(figplot+4,1,plotindex); plotindex = plotindex+1;
-    plot(motion(1,:),'LineWidth',3); hold on;
-    if size(motion,1) == 2
-        tmp = motion(1,:).*motion(2,:);
-        tmp(tmp==0) = NaN;
-        plot(tmp,'or','LineWidth',2);
+if strcmpi(makefig,'on')
+    figure('Name','voxplot')
+    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    plotindex = 1;
+    % top of the figure are nuisance time courses: head motion as framewise
+    % displacement and the white mattrer and csf time courses (detrended)
+    if exist('motion','var')
+        subplot(figplot+4,1,plotindex); plotindex = plotindex+1;
+        plot(motion(1,:),'LineWidth',3); hold on;
+        if size(motion,1) == 2
+            tmp = motion(1,:).*motion(2,:);
+            tmp(tmp==0) = NaN;
+            plot(tmp,'or','LineWidth',2);
+        end
+        axis([1 length(motion) min(motion(1,:)) max(motion(1,:))])
+        ylabel('motion'); title('Framewise Displacement'); grid on;
     end
-    axis([1 length(motion) min(motion(1,:)) max(motion(1,:))])
-    ylabel('motion'); title('Framewise Displacement'); grid on; 
-end
-
-if exist('nuisances','var')
-    subplot(figplot+4,1,plotindex); plotindex = plotindex+1;
-    plot(nuisances','LineWidth',3); hold on;
-    axis([1 length(motion) min(nuisances(:)) max(nuisances(:))])
-    ylabel('mean'); title('WM and CSF signals'); grid on; 
-end
-
-% displacement and the white mattrer and csf time courses (detrended)
-if exist('r_course','var')
-    subplot(figplot+4,1,plotindex); plotindex = plotindex+1;
-    plot(r_course(1,:),'LineWidth',3); hold on;
-    if size(r_course,1) == 2
-        tmp = r_course(1,:).*r_course(2,:);
-        tmp(tmp==0) = NaN;
-        plot(tmp,'or','LineWidth',2);
+    
+    if exist('nuisances','var')
+        subplot(figplot+4,1,plotindex); plotindex = plotindex+1;
+        plot(nuisances','LineWidth',3); hold on;
+        axis([1 length(motion) min(nuisances(:)) max(nuisances(:))])
+        ylabel('mean'); title('WM and CSF signals'); grid on;
     end
-    axis([1 length(r_course) min(r_course(1,:)) max(r_course(1,:))])
-    ylabel('r'); title('Volume Correlations'); grid on; 
+    
+    % displacement and the white mattrer and csf time courses (detrended)
+    if exist('r_course','var')
+        subplot(figplot+4,1,plotindex); plotindex = plotindex+1;
+        plot(r_course(1,:),'LineWidth',3); hold on;
+        if size(r_course,1) == 2
+            tmp = r_course(1,:).*r_course(2,:);
+            tmp(tmp==0) = NaN;
+            plot(tmp,'or','LineWidth',2);
+        end
+        axis([1 length(r_course) min(r_course(1,:)) max(r_course(1,:))])
+        ylabel('r'); title('Volume Correlations'); grid on;
+    end
+    
+    % plot is organized as follow: cortex (subdivided as Yeo et al networks), cerebellum, nuclei
+    % // thick line // white matter, ventricules - shows top 20% most variables voxels
+    
+    if ~exist('cleanM2','var')
+        subplot(figplot+4,1,[plotindex:figplot+4]);
+        imagesc(cleanM);
+        colormap('gray');
+        hold on
+        plot([1:size(M,2)],line_index.*ones(1,size(M,2)),'g','LineWidth',2)
+        xlabel('Time (scans)'); ylabel('  CSF          White Matter           GM Networks');
+        M = cleanM;
+    else
+        subplot(figplot+4,1,[plotindex:figplot+2]);
+        imagesc(cleanM); colormap('gray');
+        hold on; plot([1:size(M,2)],line_index.*ones(1,size(M,2)),'g','LineWidth',2)
+        ylabel('CSF WM GM');
+        
+        subplot(figplot+4,1,[plotindex+2:figplot+4]);
+        imagesc(cleanM2); colormap('gray');
+        hold on; plot([1:size(M,2)],line_index.*ones(1,size(M,2)),'g','LineWidth',2)
+        xlabel('Time (scans)');ylabel('CSF WM GM');
+        clear M; M{1}=cleanM; M{2}=cleanM2;
+    end
+    
+    if iscell(fmridata)
+        fmridata = Vfmri(1).fname;
+    end
+    saveas(gcf, fullfile(fileparts(fmridata), 'voxplot.fig'),'fig');
+    try
+        print (gcf,'-dpsc2', '-bestfit', fullfile(fileparts(fmridata), 'voxplot.ps'));
+    catch
+        print (gcf,'-dpsc2', fullfile(fileparts(fmridata), 'voxplot.ps'));
+    end
+    close(gcf)
 end
-
-% plot is organized as follow: cortex (subdivided as Yeo et al networks), cerebellum, nuclei 
-% // thick line // white matter, ventricules - shows top 20% most variables voxels
-
-subplot(figplot+4,1,[plotindex:figplot+4]);
-imagesc(cleanM); 
-colormap('gray'); 
-hold on
-plot([1:size(M,2)],line_index.*ones(1,size(M,2)),'g','LineWidth',2)
-xlabel('Time (scans)'); ylabel('  CSF          White Matter           GM Networks');
-
-saveas(gcf, fullfile(fileparts(fmridata), 'voxplot.fig'),'fig'); 
-try
-    print (gcf,'-dpsc2', '-bestfit', fullfile(fileparts(fmridata), 'voxplot.ps'));
-catch
-    print (gcf,'-dpsc2', fullfile(fileparts(fmridata), 'voxplot.ps'));
-end
-close(gcf)
-
