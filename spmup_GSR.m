@@ -222,6 +222,7 @@ for v=1:size(VfMRI,1)
     clean_data = spm_write_vol(V(v),int32(squeeze(residuals(:,:,:,v))));
 end
 rmdir([fpath filesep 'regression'],'s')
-spmup_timeseriesplot([{rsfMRI},{clean_data.fname}],cell2mat(realigned_data{4}.tiss(1).c), ...
+clean_data = VfMRI.fname;
+spmup_timeseriesplot([{rsfMRI},{clean_data}],cell2mat(realigned_data{4}.tiss(1).c), ...
     cell2mat(realigned_data{4}.tiss(2).c),cell2mat(realigned_data{4}.tiss(3).c));
 

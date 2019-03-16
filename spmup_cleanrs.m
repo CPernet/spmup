@@ -219,6 +219,8 @@ residuals = spm_jobman('run',matlabbatch); clear matlabbatch;
 VfMRI = spm_file_merge(residuals{2}.res,[fpath filesep 'clean_' fname '.nii']);
 rmdir([fpath filesep 'regression'],'s')
 clean_data = VfMRI.fname;
+spmup_timeseriesplot([{rsfMRI},{clean_data}],cell2mat(realigned_data{4}.tiss(1).c), ...
+    cell2mat(realigned_data{4}.tiss(2).c),cell2mat(realigned_data{4}.tiss(3).c));
 
 
 
