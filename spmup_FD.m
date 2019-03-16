@@ -43,7 +43,6 @@ elseif nargin == 3
 elseif nargin == 4
     fig = varargin{3};
     if ~strcmpi(fig,'on') || ~strcmpi(fig,'off') || ~strcmpi(fig,'save')
-        warndlg('could not recognize the figure flag, using ''save'''); 
         fig = 'save';
     end
 end
