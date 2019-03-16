@@ -232,8 +232,7 @@ for r = 1:length(roi_values)
     tmp    = spm_get_data(Vfmri,[x y z]')';
     tmp(find(sum(isnan(tmp),2)),:) = []; % removes rows of NaN;
     tmp(sum(tmp,2) == 0,:) = []; % remove 0
-    mad_vox = mad(tmp,1,2);
-    M = [M ; tmp(mad_vox >  prctile(mad_vox,75),:)];
+    M = [M ; tmp];
 end
 line_index = size(M,1);
 NGM = size(M,1);
@@ -242,7 +241,7 @@ NGM = size(M,1);
 [x,y,z]=ind2sub(size(c3),[find(c2);find(c3)]);
 tmp = spm_get_data(Vfmri,[x y z]')';
 mad_vox = mad(tmp,1,2);
-M = [M ; tmp(mad_vox >  prctile(mad_vox,size(tmp,1)/NGM),:)];
+M = [M ; tmp(mad_vox >  prctile(mad_vox,round(NGM*100/size(tmp,1)/2)),:)];
 
 % remove mean and linear trend
 X = [linspace(0,1,length(Vfmri))' ones(length(Vfmri),1)]; 
