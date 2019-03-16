@@ -36,13 +36,11 @@ else
     Vfmri = spm_vol(fmridata);
 end
 
-if sum(size(Vfmri)) == 2
-    error('fMRI data must be time series')
-end
 
 %% compute the Pearson correlation  
 data     = spm_read_vols(Vfmri);
 data     = reshape(data,[prod(Vfmri(1).dim),size(data,4)]);
+data(sum(isnan(data),2) == size(data,2),:) = []; % remove empty voxels
 r_course = corr(data); diag = 1:length(r_course)-1;
 r_course = r_course(sub2ind(size(r_course),diag,(diag+1)));
 
