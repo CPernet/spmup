@@ -5,7 +5,9 @@ function M = spmup_timeseriesplot(fmridata,c1,c2,c3,varargin)
 % FORMAT spmup_timeseriesplot(P,c1, c2, c3, options)
 %        M = spmup_timeseriesplot(P,c1, c2, c3, 'motion','on','nuisances','on','correlation','on')
 %
-% INPUT fmridata is a cell array for the time series (see spm_select)
+% INPUT fmridata is a cell for the time series (see spm_select)
+%                if a cell array with 2 elements, both are plotted as well
+%                as the squred difference
 %       c1, c2, c3 are the tissue classes derived from the segmentation
 %       
 %       several options are also available
@@ -25,11 +27,14 @@ function M = spmup_timeseriesplot(fmridata,c1,c2,c3,varargin)
 %       second columns or row is then assumed to mark outliers
 %       All three cases can be computed automatically in this function or
 %       using specific calls, if provided the matrices are plotted as such
-%       and could therefore come from other computations
+%       and could therefore come from other computations - if a cell array
+%       of two time series is provide, it assumes the same motion and nuisance 
+%       apply, taking data from the 1st set eg data before and after denoising
 %
 % OUTPUT a figure (voxplot) showing all grey and white matter voxels
 %        in time, associated to the traces in options
 %        M is the matrix of voxel by time
+%        the figure and M are (for GM) organized according to Yeo's network
 %
 % Reference: Power, J.D. (2016). A simple but useful way to assess fMRI
 % scan qualities. NeuroImage
@@ -56,10 +61,16 @@ end
 
 % check fmridata is 4D
 if iscell(fmridata)
-    for v=1:size(fmridata,1)
-        Vfmri(v) =spm_vol(fmridata{v});
+    for v=1:size(fmridata{1},1)
+        Vfmri(v) =spm_vol(fmridata{v,1});
     end
-else
+    
+    if size(fmridata,2) == 2
+        for v=1:size(fmridata{2},1)
+            Vfmri(v) =spm_vol(fmridata{v,2});
+        end
+    end
+else % not a cell array = only 1 time series
     Vfmri = spm_vol(fmridata);
 end
 
@@ -67,7 +78,14 @@ if sum(size(Vfmri)) == 2
     error('fMRI data must be time series')
 end
 
+if exist('Vfmri2','var')
+    if sum(size(Vfmri2)) == 2
+        error('fMRI data must be time series')
+    end
+end
+
 %% deal with the masks
+disp('reading and thresholding masks ... ')
 if iscell(c1); c1=cell2mat(c1); end
 greymatter = spm_vol(c1); 
 if any(greymatter.dim ~= Vfmri(1).dim)
@@ -91,7 +109,7 @@ c2 = spm_read_vols(spm_vol(whitematter));
 c3 = spm_read_vols(spm_vol(csf));
 
 % make each class is mutually exclusive by making voxel content is higher
-% than the sum of the other + base threshold at 20%
+% than the sum of the other + base threshold at 30%
 c1  = c1 .* (c1>(c2+c3));  
 c2  = c2 .* (c2>(c1+c3));  
 c3  = c3 .* (c3>(c1+c2));  
@@ -99,26 +117,36 @@ c1  = c1 .* (c1>0.7);
 c2  = c2 .* (c2>0.7);
 c3  = c3 .* (c3>0.7);
 
-
-motion = 'on';
-nuisances = 'on';
+%% options
+motion      = 'on';
+nuisances   = 'on';
 correlation = 'on';
+makefig     = 'on';
 
-% options
 for i=1:length(varargin)
    if strcmpi(varargin{i},'motion') 
-       motion = varargin{i+1};
+       motion      = varargin{i+1};
    elseif strcmpi(varargin{i},'nuisances') 
-       nuisances = varargin{i+1};
+       nuisances   = varargin{i+1};
    elseif strcmpi(varargin{i},'correlation') 
        correlation = varargin{i+1};
+   elseif strcmpi(varargin{i},'makefig') 
+       makefig = varargin{i+1};
    end 
+end
+
+% if no figure, no point computing extra stuff
+if makefig == 0
+    motion      = 'off';
+    nuisances   = 'off';
+    correlation = 'off';
 end
 
 figplot = 0;
 % Motion
 if strcmpi(motion,'on') || ~exist('motion','var')
-       rfile = dir([fileparts(Vfmri(1).fname) filesep '*.txt']);
+    disp('getting frame wise displacement')
+    rfile = dir([fileparts(Vfmri(1).fname) filesep '*.txt']);
     if isempty(rfile)
         [rfile,sts]= spm_select(1,'txt','Select realignmnet parameters');
         if sts == 0; disp('selection aborded'); return; end
@@ -141,6 +169,7 @@ end
 
 % Nuisance
 if strcmpi(nuisances,'on') || ~exist('nuisances','var')
+    disp('getting WM and CSF traces')
     nuisances = spmup_nuisance(fmridata,whitematter,csf); 
     nuisances = struct2array(nuisances)';
     figplot = figplot+1;
@@ -154,6 +183,7 @@ end
 
 % Correlation
 if strcmpi(correlation,'on') || ~exist('correlation','var')
+    disp('getting volume correlations')
     [r_course(1,:), r_course(2,:)] = spmup_volumecorr(fmridata);
     figplot = figplot+1;
     
@@ -164,39 +194,56 @@ elseif isnumeric(correlation)
     figplot = figplot+1;
 end
 
-% get matrix to plot from fMRI data
-M = [];
-roi = [fileparts(which('spmup_timeseriesplot.m')) filesep 'external' filesep 'Yeo2011_7Networks_MNI152_FreeSurferConformed1mm_LiberalMask.nii'];
+%% get matrix to plot from fMRI data
+disp('Checking Yeo''s networks to organize GM voxels')
+roi = [fileparts(which('spmup_timeseriesplot.m')) filesep 'external' ...
+    filesep 'Yeo2011_7Networks_MNI152_FreeSurferConformed1mm_LiberalMask.nii'];
 Vroi = spm_vol(roi);
 if any(Vroi.dim ~= Vfmri(1).dim) % maybe we need to resize the ROI image
-    clear matlabbatch
-    matlabbatch{1}.spm.util.bbox.image = {Vfmri(1).fname};
-    matlabbatch{1}.spm.util.bbox.bbdef.fov = 'fv';
-    bb = spm_jobman('run',matlabbatch);
-    Vroi = spm_vol(cell2mat(spmup_resize(roi,bb{1}.bb,abs(diag(Vfmri(1).mat(1:3,1:3)))')));
+    % 1st check if there is a resampled one that match
+    roi2 = [fileparts(which('spmup_timeseriesplot.m')) filesep 'external' ...
+        filesep 'rYeo2011_7Networks_MNI152_FreeSurferConformed1mm_LiberalMask.nii'];
+    Vroi2 = spm_vol(roi2);
+    if Vroi2.dim ~= Vfmri(1).dim
+        Vroi = Vroi2;
+    else
+        % 2nd if not resample
+        clear matlabbatch
+        matlabbatch{1}.spm.util.bbox.image = {Vfmri(1).fname};
+        matlabbatch{1}.spm.util.bbox.bbdef.fov = 'fv';
+        bb = spm_jobman('run',matlabbatch);
+        Vroi = spm_vol(cell2mat(spmup_resize(roi,bb{1}.bb,abs(diag(Vfmri(1).mat(1:3,1:3)))')));
+    end
+    clear Vroi2;
 end
 
 % for each network, take gray matter voxels
-ROIdata = spm_read_vols(Vroi);
+M          = []; 
+ROIdata    = spm_read_vols(Vroi);
+ROIdata    = round(ROIdata);
 roi_values = unique(ROIdata);
 roi_values(roi_values==0) = [];
+disp('finally reading the data ...')
 for r = 1:length(roi_values)
-    [x,y,z]=ind2sub(size(ROIdata),intersect(find(ROIdata==r),find(c1)));
-    tmp = spm_get_data(Vfmri,[x y z]')';
+    [x,y,z]= ind2sub(size(ROIdata),intersect(find(ROIdata==r),find(c1)));
+    tmp    = spm_get_data(Vfmri,[x y z]')';
     tmp(find(sum(isnan(tmp),2)),:) = []; % removes rows of NaN;
-    M = [M ; tmp];
+    tmp(sum(tmp,2) == 0,:) = []; % remove 0
+    mad_vox = mad(tmp,1,2);
+    M = [M ; tmp(mad_vox >  prctile(mad_vox,75),:)];
 end
 line_index = size(M,1);
+NGM = size(M,1);
 
 % get data for white matter and CSF
 [x,y,z]=ind2sub(size(c3),[find(c2);find(c3)]);
-M = [M ; spm_get_data(Vfmri,[x y z]')'];
+tmp = spm_get_data(Vfmri,[x y z]')';
+mad_vox = mad(tmp,1,2);
+M = [M ; tmp(mad_vox >  prctile(mad_vox,size(tmp,1)/NGM),:)];
 
 % remove mean and linear trend
 X = [linspace(0,1,length(Vfmri))' ones(length(Vfmri),1)]; 
 cleanM = M - (X*(X\M'))'; 
-
-
 
 %% figure
 
@@ -209,9 +256,11 @@ if exist('motion','var')
     subplot(figplot+4,1,plotindex); plotindex = plotindex+1;
     plot(motion(1,:),'LineWidth',3); hold on;
     if size(motion,1) == 2
-        plot(motion(1,:).*motion(2,:),'or','LineWidth',2);
+        tmp = motion(1,:).*motion(2,:);
+        tmp(tmp==0) = NaN;
+        plot(tmp,'or','LineWidth',2);
     end
-    axis([1 length(motion) 1/10*range(motion(1,:)) max(motion(1,:))])
+    axis([1 length(motion) min(motion(1,:)) max(motion(1,:))])
     ylabel('motion'); title('Framewise Displacement'); grid on; 
 end
 
@@ -227,21 +276,23 @@ if exist('r_course','var')
     subplot(figplot+4,1,plotindex); plotindex = plotindex+1;
     plot(r_course(1,:),'LineWidth',3); hold on;
     if size(r_course,1) == 2
-        plot(r_course(1,:).*r_course(2,:),'or','LineWidth',2);
+        tmp = r_course(1,:).*r_course(2,:);
+        tmp(tmp==0) = NaN;
+        plot(tmp,'or','LineWidth',2);
     end
     axis([1 length(r_course) min(r_course(1,:)) max(r_course(1,:))])
     ylabel('r'); title('Volume Correlations'); grid on; 
 end
 
 % plot is organized as follow: cortex (subdivided as Yeo et al networks), cerebellum, nuclei 
-% // thick line // white matter, ventricules
+% // thick line // white matter, ventricules - shows top 20% most variables voxels
+
 subplot(figplot+4,1,[plotindex:figplot+4]);
 imagesc(cleanM); 
 colormap('gray'); 
 hold on
 plot([1:size(M,2)],line_index.*ones(1,size(M,2)),'g','LineWidth',2)
 xlabel('Time (scans)'); ylabel('  CSF          White Matter           GM Networks');
-
 
 saveas(gcf, fullfile(fileparts(fmridata), 'voxplot.fig'),'fig'); 
 try
