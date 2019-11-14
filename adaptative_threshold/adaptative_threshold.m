@@ -170,7 +170,7 @@ end
     
 saving_choice = spm_input('Saving the image threasholded with topological FDR?','!+1','b',{'yes','no'});
 if strcmp(saving_choice,'yes')
-    topo_fdr_thresholding([SPM_path 'SPM.mat'], contrast_nb, threshold(end), 'none', 1, 1, 0.05, P, 'stat', 0);
+    topo_fdr_thresholding(fullfile(SPM_path,'SPM.mat'), contrast_nb, threshold(end), 'none', 1, 1, 0.05, P, 'stat', 0);
 end
 
 
