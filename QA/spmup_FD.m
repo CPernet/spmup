@@ -4,18 +4,19 @@ function [FD,RMS,FD_outliers,RMS_outliers] = spmup_FD(varargin)
 % Power et al. (2012) doi:10.1016/j.neuroimage.2011.10.018  
 % Power et al. (2014) doi:10.1016/j.neuroimage.2013.08.048
 %
-% FORMAT: [FD,RMS,motion] = spmup_FD
-%         [FD,RMS,motion] = spmup_FD(realignment_file)
-%         [FD,RMS,motion] = spmup_FD(realignment_file,'Radius',value,'figure','on/save/off')
+% FORMAT: [FD,RMS,FD_outliers,RMS_outliers] = spmup_FD
+%         [FD,RMS,FD_outliers,RMS_outliers] = spmup_FD(realignment_file)
+%         [FD,RMS,FD_outliers,RMS_outliers] = spmup_FD(realignment_file,'Radius',value,'figure','on/save/off')
 %
-% INPUT: realigment is the realigment parameters file
-%        radius is the expected head radius (default 50 mm)
-%        figure on: plots parameters, save: save a plot of parameter in
-%        directory of motion parameters; off: nothing
+% INPUTS: realigment is the realigment parameters file (rp*.txt)
+%         radius is the expected head radius (default 50 mm)
+%         figure on: plots parameters, save: save a plot of parameter in
+%                    directory of motion parameters; off: nothing
 %
 % OUTPUT: FD framewise displacement
 %         RMS the root mean square displacement 
-%         
+%         FD_outliers the S-outliers from FD
+%         RMS_outliers  the S-outliers from RMS
 %
 % Cyril Pernet - University of Edinburgh
 % -----------------------------------------
