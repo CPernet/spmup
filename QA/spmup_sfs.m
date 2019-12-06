@@ -19,6 +19,10 @@ function sfs = spmup_sfs(fmridata,TR,csf,roi)
 %         mu_roi and std_roi are the mean signal and mean std of voxels defined by the ROI image
 %         mu_global: the mean signal in time over all in brain voxels
 %         std_csf: the mean std in time of CSF voxels (defined as mask > 70%)
+%
+% Cyril Pernet - University of Edinburgh
+% -----------------------------------------
+% Copyright (c) SPM Utility Plus toolbox
 
 current = pwd;
 
