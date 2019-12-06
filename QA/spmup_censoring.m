@@ -47,31 +47,8 @@ end
 %% get outliers
 
 if ~isempty(data)
-    k = sqrt(chi2inv(0.975,1));
-    [n,p] = size(data);
-    distance = NaN(n,p);
-    for p=1:size(data,2)
-        tmp = data(:,p);
-        points = find(~isnan(tmp));
-        tmp(isnan(tmp)) = [];
-        
-        % compute all distances
-        n = length(tmp);
-        for i=1:n
-            j = points(i);
-            indices = [1:n]; indices(i) = [];
-            distance(j,p) = median(abs(tmp(i) - tmp(indices)));
-        end
-        
-        % get the S estimator
-        % consistency factor c = 1.1926;
-        Sn = 1.1926*median(distance(points,p));
-        
-        % get the outliers in a normal distribution
-        outliers(:,p) = (distance(:,p) ./ Sn) > k; % no scaling needed as S estimates already std(data)
-        outliers(:,p) = outliers(:,p)+isnan(data(:,p));
-    end
-    
+    outliers = spmup_comp_robust_outliers(data,'Carling');
+
     % create the motion censoring regressors simply diagonalizing each outlier
     % columns and then removing empty columns
     censoring_regressors = [];
