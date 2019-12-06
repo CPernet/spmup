@@ -35,9 +35,13 @@ This function recapitulates tSNR as described in [Thomas Liu (2016)](https://www
 - a tSMR_time_series.nii image is also saved on the drive, showing tSNR in each voxel for GM, WM and CSF as computed above
 - a post-scrip figure with plots of noise, tSNR and ratio with SNR0, noise per increasing ROI size (should be a line)
 
+_spmup_spectral_:
+
+This function computes the power spectrum slice by slice and looks for outliers across volumes. This is not intended to find time series outliers (see below) but to check for artefacts in the data (usually a coil a reconstruction issue giving rise to large spectral changes).
+
 _spmup_sfs_:
 
-This function computes the Signal Fluctuation Sensitivity metric [DeDora et 2016](http://journal.frontiersin.org/article/10.3389/fnins.2016.00180/full) which is arguably or more sensitive metric than tSNR to mesure BOLD variations in resting state fMRI. By default sfs os returned in the 7 resting state networks from [Yeo et al 2011](https://www.physiology.org/doi/full/10.1152/jn.00338.2011).
+This function computes the Signal Fluctuation Sensitivity metric [DeDora et 2016](http://journal.frontiersin.org/article/10.3389/fnins.2016.00180/full) which is arguably or more sensitive metric than tSNR to mesure BOLD variations in resting state fMRI. By default sfs is returned in the 7 resting state networks from [Yeo et al 2011](https://www.physiology.org/doi/full/10.1152/jn.00338.2011).
 
 ### 1st level QA
 
