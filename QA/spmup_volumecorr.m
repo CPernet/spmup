@@ -122,7 +122,8 @@ r_outliers = spmup_comp_robust_outliers(r_course);
 if strcmpi(fig,'on') || strcmpi(fig,'save')
     subplot(2,1,2); 
     plot(r_course,'LineWidth',2); grid on; title('Volume to volume correlation ');
-    hold on; tmp = r_course.*r_outliers; tmp(tmp==0) = NaN; plot(tmp,'ro','LineWidth',3)
+    hold on; axis([1 size(r_course,2) min(r_course)-0.01*range(r_course) 1])
+    tmp = r_course.*r_outliers; tmp(tmp==0) = NaN; plot(tmp,'ro','LineWidth',3)
     if strcmpi(fig,'save')
         [filepath,filename] = fileparts(V(1).fname);
         try
