@@ -85,10 +85,12 @@ fprintf('processing data %s \n',time_series);
 
 if strcmpi(Basics,'on')
     [jobs.mean_image,jobs.std_image] = spmup_basics(time_series,'mean','std');
+    V = spm_vol(jobs.mean_image);
+    Coordinate = V.dim /2; % take the middle of the image
+else
+    V = spm_vol(time_series);
+    Coordinate = V(1).dim /2; 
 end
-
-V = spm_vol(jobs.mean_image);
-Coordinate = V.dim /2; % take the middle of the image 
 
 % motion QA
 realign_files = spmup_realign_qa(time_series,...

@@ -181,6 +181,8 @@ end
 
 %% make movies
 if strcmpi(Movie, 'on')
+    % out = spmup_movie(Y,Coordinate);
+	
     x = squeeze(Y(Coordinate(1),:,:,:));
     y = squeeze(Y(:,Coordinate(2),:,:));
     z = squeeze(Y(:,:,Coordinate(3),:));
