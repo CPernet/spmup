@@ -6,11 +6,11 @@ function [r_outliers,r_course] = spmup_volumecorr(varargin)
 %
 % FORMAT [r_course, outliers] = spmup_volumecorr
 %        [r_course, outliers] = spmup_volumecorr(P)
-%        [r_course, outliers] = spmup_volumecorr(P,M)
-%        [r_course, outliers] = spmup_volumecorr(P,M,'figure','on/save/off')
+%        [r_course, outliers] = spmup_volumecorr(P,'mask',M,'figure','on/save/off')
 %
 % INPUT P the fMRI data 
-%       M the Mask (optional) to apply
+%       optionally input the 'mask' M 
+%                  and speficiy what to do with the figure (save as default)
 %
 % OUTPUT r_course a vector of correlations between volumes
 %        outliers 0/1 indicates which volumes are outliers
@@ -74,36 +74,43 @@ else
     end
 end
     
-if nargin == 2
-    M = varargin{2};
-    if ischar(M)
-        V = spm_vol(M);
-        Mask = zeros([V(1).dim(1:3),N]);
-        for i=1:numel(V)
-            for p=1:V(1).dim(3)
-                Mask(:,:,p,i) = spm_slice_vol(V(i),spm_matrix([0 0 p]),V(i).dim(1:2),0);
+M   = [];
+fig = 'save';
+if nargin > 1
+    for in = 2:nargin
+        if strcmpi(varargin{in},'figure')
+            try
+                fig = varargin{in+1};
+            catch
+                fig = 'on';
+            end
+            
+        elseif strcmpi(varargin{in},'mask')
+            M = varargin{in+1};
+            if ischar(M)
+                V = spm_vol(M);
+                Mask = zeros([V(1).dim(1:3),N]);
+                for i=1:numel(V)
+                    for p=1:V(1).dim(3)
+                        Mask(:,:,p,i) = spm_slice_vol(V(i),spm_matrix([0 0 p]),V(i).dim(1:2),0);
+                    end
+                end
+            else
+                if numel(size(M)) == 3 % this is already data in
+                    Mask = m;
+                else
+                    error('mask data are not char nor 3D data matrix, please check inputs')
+                end
             end
         end
-    else
-        if numel(size(M)) == 3 % this is already data in
-            Mask = m; 
-        else
-            error('mask data are not char nor 3D data matrix, please check inputs')
-        end
     end
-else
+end
+
+if isempty(M)
     disp('generating a mask')
     Mask = spmup_auto_mask(V);
 end
 
-fig = 'save';
-if nargin == 3
-    fig = 'on';
-elseif nargin == 4
-    if strcmpi(varargin{3},'figure')
-        fig = varargin{4};
-    end
-end
 
 %% compute the Pearson correlation  
 data     = Y.*Mask; clear Y Mask; 
@@ -135,3 +142,4 @@ if strcmpi(fig,'on') || strcmpi(fig,'save')
     end
 end
 fprintf('outlier volumes: %g\n',find(r_outliers));
+fprintf('report: %s\n',fullfile(filepath,[filename '_volume_correlation.pdf']))
