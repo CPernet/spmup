@@ -89,12 +89,7 @@ if nargin > 1
             M = varargin{in+1};
             if ischar(M)
                 V = spm_vol(M);
-                Mask = zeros([V(1).dim(1:3),N]);
-                for i=1:numel(V)
-                    for p=1:V(1).dim(3)
-                        Mask(:,:,p,i) = spm_slice_vol(V(i),spm_matrix([0 0 p]),V(i).dim(1:2),0);
-                    end
-                end
+                Mask = spm_read_vols(V);
             else
                 if numel(size(M)) == 3 % this is already data in
                     Mask = m;
@@ -111,6 +106,11 @@ if isempty(M)
     Mask = spmup_auto_mask(V);
 end
 
+% check dim
+if any([size(Y,1) size(Y,2) size(Y,3)] ~= size(Mask))
+    error('fmri data and mask have different dimentions %gx%gx%g vs %gx%gx%g',...
+        size(Y,1),size(Y,2),size(Y,3),size(Mask,1),size(Mask,2),size(Mask,3))
+end
 
 %% compute the Pearson correlation  
 data     = Y.*Mask; clear Y Mask; 
