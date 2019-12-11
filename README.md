@@ -4,11 +4,9 @@ SPM utlities plus are tools designed to get the best of mass univariate analyses
 
 ## QA
 
-The QA folder contains a series of tools to check the quality of your images. Some metrics can be used at the group level as covariates, which can be important when comparing different group of subjects, if their quality metrics are different.
+The QA folder contains a series of tools to check the quality of your images. Some metrics can be used at the group level as covariates, which can be important when comparing different group of subjects, if their quality metrics are different. The intented usage is to run fMRI data preprocessing and then call spmup_anatQA.m on the coregistered T1 image (i.e. the one used to derive normalization parameters), spmup_temporalSNR.m and spmup_fisrt_level_qa.m on the smoothed normalized realigned the slice timed fMRI data (i.e. the data used for your GLM). Post GLM estimation, spmup_glmQA is called. At the group level, call spmup_second_level_qa.m.
 
-The basic usage is to call spmup_anatQA.m spmup_temporalSNR.m spmup_fisrt_level_qa.m spmup_second_level_qa.m.
-
-### SNR and beyond
+### subject level QA: SNR and beyond
 
 _spmup_anatQA:_
 
@@ -43,7 +41,7 @@ _spmup_sfs_:
 
 This function computes the Signal Fluctuation Sensitivity metric [DeDora et 2016](http://journal.frontiersin.org/article/10.3389/fnins.2016.00180/full) which is arguably or more sensitive metric than tSNR to mesure BOLD variations in resting state fMRI. By default sfs is returned in the 7 resting state networks from [Yeo et al 2011](https://www.physiology.org/doi/full/10.1152/jn.00338.2011).
 
-### 1st level QA
+### fMRI 1st level QA
 
 _spmup_fisrt_level_qa_
 
@@ -55,7 +53,7 @@ _spmup_censoring:_
 
 This function takes motion parameters along with any valued vectors to create a design.txt file to be used as regressors. Along with motion parameters (and Voltrera expansion if specified), a series of binary vectors are added for outlying data. Values vectors would typically come from spmup_FD and spm_globals. Note that outliers will differ from the 'Time series outliers' functions detailled below, because spmup_censoring outliers are defined with high specificity but low sensitivity using a box-plot rule (interquartile range) with Carling's k adjustment i.e. less outliers are found but they are for sure outliers, while the default of those functions uses S-outliers with is a method with lower specificity but higher sensitivity (=more false positives, but good for QA the data).
 
-### 2nd level QA
+### fMRI 2nd level QA
 
 _spmup_second_level_qa_
 
@@ -80,3 +78,87 @@ This function compute the slice-wise correlations. This is performed both betwee
 _spmup_FD:_
 
 This function computes the framewise displacement from motion parameters defined as the L1 and L2 norms from derivatives, and returns outliers.
+
+## hrf (re)estimation
+
+Using the GLM with a temporal derivative, we can compute a systematic time shift per condition. If indeed at each trial, the reponse peaks earlier or later, then the hrf regressor does not fit the maximum of the data (the model hrf+derivative does), and one can correct for this. An important aspect to consider beside the amplitude and time shift is the smoothness of images, as this impact statistics as well. Boosting relies on the ratio of parameters leading to rougher images. The recommendation is thus to smooth a little your data before running the GLM (e.g. 2mm) to increase SNR and then to re-estimate the response magnitude and smooth again (e.g. 6mm). At the group level, the smoothness achieved should match what you would have wanted if no re-estimation was performed.
+
+ _spmup_hrf_boost:_
+
+ This function re-estimate the response amplitude given the computed time shift, the time delay image is also returned. WARNING: the re-estimation is actually computed also if the 2nd derivative is present, and this is not recommended, unless a single condition is estimated, which means that by default the GLM should only include the hrf and 1st derivatives.
+
+ _spmup_smooth_boostedfiles:_
+
+ This function simply applies spm_smooth but re-masking before writing down the data. This is necessary as spmup_hrf_boost i) make images rougher and ii) introduces edges effect. The mask is simply taken from the computed GLM model.
+
+## plots
+
+_spmup_plotmotion:_
+
+Plots separately translation, rotation and total displacement.
+
+_spmup_plot_tsdiff:_
+
+Plots the smalest and largest difference between time series in the time or frequency domain.
+
+_MakeContours:_
+
+from the current imaged data in spm_graphics, it makes an image of the contours of each blobs - this is useful to then show the raw statistical map and the signiticant areas highlighted by the contours.
+
+_gp_parametric_plot:_
+
+from a group level analysis on a parametric regressor, the average reponse (mean beta/con) is plotted along with the average model, if the model is of the same size between subjects.  All is returned in the workspace (with boostrapped confidence intervals).
+
+_gp_event_plot:_
+
+from a group level analysis, the the average reponse (mean beta/con) is plotted along with the average model, ie the reconstructed average hemodynamic reponse (also accounting for derivatives). All is returned in the workspace (with boostrapped confidence intervals).
+
+## utilities
+
+_spmup_auto_reorient:_
+
+set the [0,0,0] coordinate automatically from one image to all images in a cell array - i.e. input the T1 and all fMRI data, the [0,0,0] coordinate is set for the T1 and this is applied to all fMRI data.
+
+_spmup_auto_mask:_
+
+Compute a mask from a time-series of memory mapped images, giving a similar (but more inclusive) mask than SPM.
+
+_spmup_autocorrelation:_
+
+This function computes (efficiently) the autocorrelation of all in mask  voxels of time series data.
+
+_spmup_basics:_
+
+Returns the most basic metrics: mean and std images from a time series.
+
+_spmup_comp_dist2surf:_
+
+compute the average distance from [0 0 0] to the surface of the brain (assuming at least segmented c1 c2 present, or better a surface gifti file).
+
+_spmup_despike:_
+
+'Despike' fMRI time series, by default using a median filter with a derived from the autocorrelation. Alternatively, user can input any of the matlab smooth function arguments.
+
+_spmup_despike_reviewlog:_
+
+QA for spmup_despike - indicating which voxels and how much despiking has been done.
+
+_spmup_ernst:_
+
+This returns the theoretical optimal flip angle for a given TR, i.e. cos(flip_angle) = exp(-TR/T1 time).
+
+_spm_psc:_
+
+Computes the percentage signal change scaled for the design matrix.
+
+_spmup_resize:_
+
+Routine to resize an image to match the desired bounding box and voxel size.
+
+_spmup_roiextraction:_
+
+Routine to extract the 1st eigen value for an arbitrary number of ROI and from an arbitrary number of images (like spm_voi).
+
+_spmup_skip:_
+
+Reads a 4D fmri data set and return a 4D set minus N initial volumes.
