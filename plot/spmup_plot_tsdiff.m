@@ -1,7 +1,7 @@
 function h = spmup_plot_tsdiff(varargin)
 
 % routine that takes timeseries images as input , along with coordinates
-% and plot the least the most different time courses in the time or
+% and plot the least and most different time courses in the time or
 % freqency domain
 % 
 % FORMAT h = spmup_plot_tsdiff(timeseries1,timeseries2,coordinates,options)
@@ -31,7 +31,7 @@ end
 
 % get the data
 timeseries1 = spm_get_data(spm_vol(varargin{1}),coord); % get raw time series
-timeseries2 = spm_get_data(spm_vol(varargin{2}),coord); % get rst time series
+timeseries2 = spm_get_data(spm_vol(varargin{2}),coord); 
 A = union(find(sum(timeseries1,1)==0),find(sum(timeseries2,1)==0));
 timeseries1(:,A) = []; timeseries2(:,A) = []; % clean up 0s
 
