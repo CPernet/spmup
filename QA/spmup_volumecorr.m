@@ -6,11 +6,11 @@ function [r_outliers,r_course] = spmup_volumecorr(varargin)
 %
 % FORMAT [r_course, outliers] = spmup_volumecorr
 %        [r_course, outliers] = spmup_volumecorr(P)
-%        [r_course, outliers] = spmup_volumecorr(P,'mask',M,'figure','on/save/off')
+%        [r_course, outliers] = spmup_volumecorr(P,'mask',M,'figure',value)
 %
 % INPUT P the fMRI data 
 %       optionally input the 'mask' M 
-%                  and speficiy what to do with the figure (save as default)
+%                            'figure' as 'on' 'off' or 'save' (default)
 %
 % OUTPUT r_course a vector of correlations between volumes
 %        outliers 0/1 indicates which volumes are outliers
@@ -88,8 +88,8 @@ if nargin > 1
         elseif strcmpi(varargin{in},'mask')
             M = varargin{in+1};
             if ischar(M)
-                V = spm_vol(M);
-                Mask = spm_read_vols(V);
+                VM = spm_vol(M);
+                Mask = spm_read_vols(VM);
             else
                 if numel(size(M)) == 3 % this is already data in
                     Mask = m;
