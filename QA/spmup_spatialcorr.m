@@ -24,11 +24,6 @@ if exist('nansum','file') ~= 2
 end
 
 %% check inputs
-
-disp('running spmup_spatialcorr ...')
-disp('-------------------------')
-
-%% get data and mask
 % memory mapped data
 if nargin == 0
     [P,sts] = spm_select(Inf,'image' ,'Select your fMRI time series',{},pwd,'.*',Inf);
@@ -67,13 +62,14 @@ else
         end
     else
         if numel(size(P)) == 4 % this is already data in
-            Y = P; 
+            Y = P; V.fname = pwd;
         else
             error('input data are not char nor 4D data matrix, please check inputs')
         end
     end
 end
    
+% option
 fig = 'save';
 if nargin > 1 && strcmpi(varargin{2},'figure')
     fig = 'on';
@@ -81,6 +77,12 @@ if nargin > 1 && strcmpi(varargin{2},'figure')
         fig = varargin{3};
     end
 end
+
+% filename
+[filepath,filename] = fileparts(V(1).fname); 
+fprintf('running spmup_spatialcorr on %s\n',filename)
+disp   ('---------------------------')
+filename(strfind(filename,'_')) = ' ';
 
 %% correlations between slices within each volume
 % -----------------------------------------------
@@ -93,9 +95,13 @@ end
 
 if strcmpi(fig,'on') || strcmpi(fig,'save')
     figure('Name','Spatial QA')
-    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    if strcmpi(fig,'on')
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    else
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    end
     subplot(2,2,1); imagesc(r); ylabel('slices'); xlabel('volume nb')
-    title('Correlations between slices within each volume')
+    title(sprintf('Correlations between slices \n within each volume'))
 end
 
 r = nanmean(r,1); % average over slices
@@ -107,9 +113,10 @@ else
 end
 
 if strcmpi(fig,'on') || strcmpi(fig,'save')
-    subplot(2,2,3); plot(r,'LineWidth',2); ylabel('correlation value'); xlabel('volume nb')
+    subplot(2,2,2); plot(r,'LineWidth',2); ylabel('correlation value'); xlabel('volume nb')
     hold on; tmp = volume_outliers.*r; tmp(tmp==0)=NaN; plot(tmp,'ro','LineWidth',3);
-    grid on; axis tight; hold on; title('Average correlations per volume'); clear tmp
+    grid on; axis tight; hold on; title(sprintf('Average correlations per volume \n %s',filename)); 
+    clear tmp
 end
 
 %% correlations between volumes within each slice
@@ -122,8 +129,8 @@ for j=(size(Y,4)-1):-1:1
 end
 
 if strcmpi(fig,'on') || strcmpi(fig,'save')
-    subplot(2,2,2); imagesc(r)
-    title('Correlations between volumes within each slice')
+    subplot(2,2,3); imagesc(r)
+    title(sprintf('Correlations between volumes \n within each slice'))
     ylabel('slices'); xlabel('volume nb')
 end
 
@@ -136,17 +143,17 @@ else
 end
 
 if strcmpi(fig,'on') || strcmpi(fig,'save')
-    subplot(2,2,4); plot(r,'LIneWidth',2); ylabel('correlation value'); xlabel('slice nb')
+    subplot(2,2,4); plot(r,'LineWidth',2); ylabel('correlation value'); xlabel('slice nb')
     hold on; tmp = slice_outliers.*r; tmp(tmp==0)=NaN; plot(tmp,'ro','LineWidth',3);
-    grid on; axis tight; hold on; title('Average correlations per slice'); clear tmp
+    grid on; axis tight; hold on; title(sprintf('Average correlations per slice \n %s',filename)); 
+    clear tmp
 end
 
 if strcmpi(fig,'save')
-    [filepath,filename] = fileparts(V(1).fname);
-    try
-        print (gcf,'-dpdf', '-bestfit', fullfile(filepath,[filename '_spatial_correlation.pdf']));
-    catch
-        print (gcf,'-dpdf', fullfile(filepath,[filename '_spatial_correlation.pdf']));
+    if exist(fullfile(filepath,'spm.ps'),'file')
+        print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
+    else
+        print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QA.ps'));
     end
     close(gcf)
 end
