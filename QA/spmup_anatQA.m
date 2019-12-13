@@ -121,14 +121,14 @@ subplot(2,2,1);
 tmp                = spm_read_vols(AnatV); % read anat
 tmp                = tmp ./max(tmp(:))*100; % nornalize to 100
 tmp(brain_mask==0) = 200; % set non brain to 200
-imagesc(squeeze(tmp(:,:,round(AnatV.dim(3)/2))));
-title('brain mask - axial');
+imagesc(fliplr(squeeze(tmp(:,:,round(AnatV.dim(3)/2))))');
+title('brain mask - sagital');
 subplot(2,2,2); 
 imagesc(flipud(squeeze(tmp(:,round(AnatV.dim(2)/2),:))'));
-title('brain mask - coronal');
+title('brain mask - axial');
 subplot(2,2,4); 
 imagesc(flipud(squeeze(tmp(round(AnatV.dim(1)/2),:,:))'));
-title('brain mask - sagital');
+title('brain mask - coronal');
 clear tmp
 
 subplot(2,2,3);
