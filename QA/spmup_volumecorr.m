@@ -1,4 +1,4 @@
-function [r_outliers,r_course] = spmup_volumecorr(varargin)
+function [r_course,r_outliers] = spmup_volumecorr(varargin)
 
 % compute the Pearson correlation between volumes of the time series 
 % and return possible outliers among correlated volumes (this assumes of
@@ -24,11 +24,6 @@ if exist('nansum','file') ~= 2
 end
 
 %% check inputs
-
-disp('running spmup_volumecorr ...')
-disp('-------------------------')
-
-%% get data and mask
 % memory mapped data
 if nargin == 0
     [P,sts] = spm_select(Inf,'image' ,'Select your fMRI time series',{},pwd,'.*',Inf);
@@ -67,13 +62,14 @@ else
         end
     else
         if numel(size(P)) == 4 % this is already data in
-            Y = P; 
+            Y = P; V.fname = pwd;
         else
             error('input data are not char nor 4D data matrix, please check inputs')
         end
     end
 end
-    
+
+% options
 M   = [];
 fig = 'save';
 if nargin > 1
@@ -112,6 +108,13 @@ if any([size(Y,1) size(Y,2) size(Y,3)] ~= size(Mask))
         size(Y,1),size(Y,2),size(Y,3),size(Mask,1),size(Mask,2),size(Mask,3))
 end
 
+% filename
+[filepath,filename] = fileparts(V(1).fname); 
+fprintf('running spmup_volumecorr on %s\n',filename)
+disp   ('---------------------------')
+filename(strfind(filename,'_')) = ' ';
+
+    
 %% compute the Pearson correlation  
 data     = Y.*Mask; clear Y Mask; 
 data     = reshape(data,[prod(V(1).dim),size(data,4)]);
@@ -119,7 +122,11 @@ data(sum(isnan(data),2) == size(data,2),:) = []; % remove empty voxels
 r_course = corr(data); diag = 1:length(r_course)-1;
 if strcmpi(fig,'on') || strcmpi(fig,'save')
     figure('Name','Volume correlation')
-    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    if strcmpi(fig,'on')
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    else
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    end
     subplot(2,1,1); imagesc(r_course); title('Volume correlation matrix')
 end  
 r_course = [r_course(sub2ind(size(r_course),diag,(diag+1))) r_course(1,size(r_course,2))];
@@ -128,18 +135,16 @@ r_course = [r_course(sub2ind(size(r_course),diag,(diag+1))) r_course(1,size(r_co
 r_outliers = spmup_comp_robust_outliers(r_course);
 if strcmpi(fig,'on') || strcmpi(fig,'save')
     subplot(2,1,2); 
-    plot(r_course,'LineWidth',2); grid on; title('Volume to volume correlation ');
+    plot(r_course,'LineWidth',2); grid on; title(sprintf('Volume to volume correlation \n%s', filename));
     hold on; axis([1 size(r_course,2) min(r_course)-0.01*range(r_course) 1])
     tmp = r_course.*r_outliers; tmp(tmp==0) = NaN; plot(tmp,'ro','LineWidth',3)
     if strcmpi(fig,'save')
-        [filepath,filename] = fileparts(V(1).fname);
-        try
-            print (gcf,'-dpdf', '-bestfit', fullfile(filepath,[filename '_volume_correlation.pdf']));
-        catch
-            print (gcf,'-dpdf', fullfile(filepath,[filename '_volume_correlation.pdf']));
+        if exist(fullfile(filepath,'spm.ps'),'file')
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
+        else
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QA.ps'));
         end
         close(gcf)
     end
 end
 fprintf('outlier volumes: %g\n',find(r_outliers));
-fprintf('report: %s\n',fullfile(filepath,[filename '_volume_correlation.pdf']))
