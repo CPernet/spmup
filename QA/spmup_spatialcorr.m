@@ -2,7 +2,6 @@ function [volume_outliers, slice_outliers] = spmup_spatialcorr(varargin)
 
 % look at the time series per slice, and compute correlations
 % this allows testing that images are alike and spots drop out easily
-% also create the mean image, sd, and binary mask 
 %
 % FORMAT: [volume_outliers, slice_outliers] = spmup_spatialcorr
 % FORMAT: [volume_outliers, slice_outliers] = spmup_spatialcorr(P,'figure',value)
@@ -84,13 +83,16 @@ fprintf('running spmup_spatialcorr on %s\n',filename)
 disp   ('---------------------------')
 filename(strfind(filename,'_')) = ' ';
 
-%% correlations between slices within each volume
-% -----------------------------------------------
 
-for j=size(Y,4):-1:1
-    for i=(size(Y,3)-1):-1:1
-        r(i,j) = corr2(Y(:,:,i,j),Y(:,:,i+1,j));
-    end
+%% correlations between slices for each volume
+% -----------------------------------------------
+n = size(Y,3);
+for i = size(Y,4):-1:1
+    S      = squeeze(Y(:,:,:,i));                % take one volume  
+    vols   = reshape(S,[size(Y,1)*size(Y,2),n]); % reshape each slice as vectors
+    all_r  = corr(vols);                         % all correlations between slices
+    idx    = 2:n+1:numel(all_r);                 % take only one above diag (12,23,34,..) 
+    r(i,:) = all_r(idx);
 end
 
 if strcmpi(fig,'on') || strcmpi(fig,'save')
@@ -100,11 +102,11 @@ if strcmpi(fig,'on') || strcmpi(fig,'save')
     else
         set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
     end
-    subplot(2,2,1); imagesc(r); ylabel('slices'); xlabel('volume nb')
+    subplot(2,2,1); imagesc(r'); ylabel('slices'); xlabel('volume nb')
     title(sprintf('Correlations between slices \n within each volume'))
 end
 
-r = nanmean(r,1); % average over slices
+r = nanmean(r,2); % average over slices
 volume_outliers = spmup_comp_robust_outliers(r);
 if sum(volume_outliers ~= 0)
     fprintf('volume %g is potiential outlier\n',find(volume_outliers));
@@ -115,23 +117,27 @@ end
 if strcmpi(fig,'on') || strcmpi(fig,'save')
     subplot(2,2,2); plot(r,'LineWidth',2); ylabel('correlation value'); xlabel('volume nb')
     hold on; tmp = volume_outliers.*r; tmp(tmp==0)=NaN; plot(tmp,'ro','LineWidth',3);
-    grid on; axis tight; hold on; title(sprintf('Average correlations per volume \n %s',filename)); 
+    grid on; axis tight; hold on; title(sprintf('Correlations averaged across slices \n %s',filename)); 
     clear tmp
 end
+clear S vols all_r idx r
 
-%% correlations between volumes within each slice
+%% correlations between volumes slice by slice
 % -----------------------------------------------
 
-for j=(size(Y,4)-1):-1:1
-    for i=size(Y,3):-1:1
-        r(i,j) = corr2(Y(:,:,i,j),Y(:,:,i,j+1));
-    end
+n = size(Y,4);
+for i = size(Y,3):-1:1
+    S      = squeeze(Y(:,:,i,:));                % take one slice all volumes
+    vols   = reshape(S,[size(Y,1)*size(Y,2),n]); % reshape slices as vectors
+    all_r  = corr(vols);                         % all correlations between volumes
+    idx    = 2:n+1:numel(all_r);                 % take only one above diag (12,23,34,..) 
+    r(i,:) = all_r(idx);
 end
 
 if strcmpi(fig,'on') || strcmpi(fig,'save')
-    subplot(2,2,3); imagesc(r)
-    title(sprintf('Correlations between volumes \n within each slice'))
-    ylabel('slices'); xlabel('volume nb')
+    subplot(2,2,3); imagesc(r')
+    title(sprintf('Correlations between volumes \n for each slice'))
+    xlabel('slices'); ylabel('volume nb')
 end
 
 r = nanmean(r,2); % average over volumes
@@ -145,7 +151,7 @@ end
 if strcmpi(fig,'on') || strcmpi(fig,'save')
     subplot(2,2,4); plot(r,'LineWidth',2); ylabel('correlation value'); xlabel('slice nb')
     hold on; tmp = slice_outliers.*r; tmp(tmp==0)=NaN; plot(tmp,'ro','LineWidth',3);
-    grid on; axis tight; hold on; title(sprintf('Average correlations per slice \n %s',filename)); 
+    grid on; axis tight; hold on; title(sprintf('Correlations averaged across volumes \n %s',filename)); 
     clear tmp
 end
 
