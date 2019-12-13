@@ -84,7 +84,7 @@ Radius                = 50;
 Voltera               = 'off';
 Globals               = 'on'; 
 Movie                 = 'on';
-Coordinate            = [];
+Coordinates           = [];
 
 if nargin >1
    for v=1:(nargin-1)
@@ -101,15 +101,15 @@ if nargin >1
       elseif strcmpi(varargin{v},'Movie')
            Movie = varargin{v+1};
       elseif strcmpi(varargin{v},'Coordinate')
-           Coordinate = varargin{v+1};
+           Coordinates = varargin{v+1};
       end
    end
 end
 
 % if movie we need AC
 if strcmp(Movie,'on')
-    if isempty(Coordinate)
-        Coordinate = V(1).dim/2; % default
+    if isempty(Coordinates)
+        Coordinates = V(1).dim/2; % default
 %         Coordinate = input('Coordinate to centre the movie on is missing [x y z]:','s');
 %         if ~contains(Coordinate,'[') && ~contains(Coordinate,']')
 %             Coordinate = ['[' Coordinate ']'];
@@ -143,7 +143,7 @@ if strcmpi(Globals,'on')
     g_outliers = spmup_comp_robust_outliers(glo);
         
     % figure
-    figure('Name','Globals outlier detectio','Visible','On');
+    figure('Name','Globals outlier detection','Visible','On');
     set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized', 'outerposition',[0 0 1 1]); 
     plot(glo,'LineWidth',3); title('Global intensity');
     hold on; tmp = g_outliers.*glo; tmp(tmp==0)=NaN; plot(tmp,'or','LineWidth',3);
@@ -181,48 +181,8 @@ end
 
 %% make movies
 if strcmpi(Movie, 'on')
-    % out = spmup_movie(Y,Coordinate);
-	
-    x = squeeze(Y(Coordinate(1),:,:,:));
-    y = squeeze(Y(:,Coordinate(2),:,:));
-    z = squeeze(Y(:,:,Coordinate(3),:));
-    n = size(Y,4); clear Y
-    
-    for plane = 1:3
-        figure; colormap('gray')
-        
-        % make video object
-        if plane == 1
-            vidObj = VideoWriter(fullfile(filepath,[filename '_sagital.avi']));
-            new_files{findex} = fullfile(filepath,[filename '_sagital.avi']);
-            findex = findex +1; 
-        elseif plane == 2
-            vidObj = VideoWriter(fullfile(filepath,[filename '_coronal.avi']));
-            new_files{findex} = fullfile(filepath,[filename '_coronal.avi']);
-            findex = findex +1;
-        elseif plane == 3
-            vidObj = VideoWriter(fullfile(filepath,[filename '_axial.avi']));
-            new_files{findex} = fullfile(filepath,[filename '_axial.avi']);
-            findex = findex +1;
-        end
-        open(vidObj);
-        set(gca,'NextPlot','replacechildren')
-        
-        % make pictures and get frames
-        for i=1:n
-            if plane == 1
-                imagesc(x(:,:,i)');axis tight
-            elseif plane == 2
-                imagesc(y(:,:,i)');axis tight
-            elseif plane == 3
-                imagesc(z(:,:,i)');axis tight
-            end
-            title(['volume ' num2str(i)]);
-            currFrame = getframe;
-            writeVideo(vidObj,currFrame);
-        end
-        close(vidObj);close
-    end
+    new_files{findex} = spmup_movie(Y,'coordinates',Coordinates,...
+        'filename',fullfile(filepath,filename),'showfig','off');
 end
 cd(current)
 disp('realign QA done');
