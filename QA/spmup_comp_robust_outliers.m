@@ -17,7 +17,7 @@ function outliers = spmup_comp_robust_outliers(time_series,type)
 % the median of the data: outliers are outside the bound of median+/- k*IQR, 
 % k = k=(17.63*n-23.64)/(7.74*n-3.71). This is a more specific measure,
 % as such it is 'better' than S-outliers to regress-out, removing bad data
-% points (assuming we don;t want to 'remove' too many).
+% points (assuming we don't want to 'remove' too many).
 %
 % see:
 %
