@@ -141,7 +141,10 @@ if strcmpi(fig,'on') || strcmpi(fig,'save')
 end
 
 r = nanmean(r,2); % average over volumes
-slice_outliers = spmup_comp_robust_outliers(r);
+tmp = r(~isnan(r)); % if 0 in all slices, r is nan
+tmp = spmup_comp_robust_outliers(tmp);
+slice_outliers = zeros(length(r),1);
+slice_outliers(~isnan(r)) = tmp;
 if sum(slice_outliers ~= 0)
     fprintf('slice %g is potiential outlier\n',find(slice_outliers));
 else
@@ -159,7 +162,7 @@ if strcmpi(fig,'save')
     if exist(fullfile(filepath,'spm.ps'),'file')
         print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
     else
-        print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QA.ps'));
+        print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
     end
     close(gcf)
 end
