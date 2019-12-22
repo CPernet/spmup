@@ -10,7 +10,7 @@ The QA folder contains a series of tools to check the quality of your images. So
 
 _spmup_anatQA:_
 
-Inspired by the [Preprocessed Connectome Project Quality Assurance Protocol](http://preprocessed-connectomes-project.org/quality-assessment-protocol/), this function takes an anaotmical image along with gray (c1) and white (c2) matter images to returns
+Inspired by the [Preprocessed Connectome Project Quality Assurance Protocol](http://preprocessed-connectomes-project.org/quality-assessment-protocol/), this function takes an anatomical image along with gray (c1) and white (c2) matter images to returns
 - SNR (Signal-to-Noise Ratio, the mean intensity within gray and white matter divided by the standard deviation of the values outside the brain),
 - CNR (Contrast to Noise Ratio, the mean of the white matter intensity values minus the mean of the gray matter intensity values divided by the standard deviation of the values outside the brain),
 - FBER (Foreground to Background Energy Ratio, the variance of voxels in grey and white matter divided by the variance of voxels outside the brain),
