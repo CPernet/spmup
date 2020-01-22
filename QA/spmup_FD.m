@@ -66,7 +66,11 @@ RMS_outliers = spmup_comp_robust_outliers(RMS);
 %% figure
 if strcmpi(fig,'on') || strcmpi(fig,'save')
     figure('Name','Motion and displacement')
-    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    if strcmpi(fig,'on')
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    else
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    end
     subplot(2,2,1); plot(motion(:,[1 2 3]),'LineWidth',3); axis tight; box on; grid on; title('translation')
     xlabel('Volumes'); ylabel('displacement in mm')
     subplot(2,2,2); plot(motion(:,[4 5 6]),'LineWidth',3); axis tight; box on; grid on; title('rotation')
@@ -78,11 +82,11 @@ if strcmpi(fig,'on') || strcmpi(fig,'save')
     hold on; tmp = RMS_outliers.*RMS; tmp(tmp==0)=NaN; plot(tmp,'ro','LineWidth',3);
     xlabel('Volumes'); ylabel('average displacement in mm')
     
-    if strcmpi(fig,'save')        
-        try
-            print (gcf,'-dpdf', '-bestfit', fullfile(filepath,[filename(4:end) '_displacement.pdf']));
-        catch
-            print (gcf,'-dpdf', fullfile(filepath,[filename(4:end) '_displacement.pdf']));
+    if strcmpi(fig,'save')
+        if exist(fullfile(filepath,'spm.ps'),'file')
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
+        else
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
         end
         close(gcf)
         cd(current)
