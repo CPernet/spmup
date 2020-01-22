@@ -52,7 +52,7 @@ if ~isempty(data)
     % create the motion censoring regressors simply diagonalizing each outlier
     % columns and then removing empty columns
     censoring_regressors = [];
-    for column = p:-1:1
+    for column = size(outliers,2):-1:1
         censoring_regressors = [censoring_regressors diag(outliers(:,column))];
     end
     censoring_regressors(:,sum(censoring_regressors,1)==0) = []; % remove empty columns
@@ -71,7 +71,7 @@ end
 save(fullfile(filepath,[filename(4:end) '_design.txt']),'design','-ascii')
 
 % % quick check
-% if sum(censoring_regressors(:))/size(censoring_regressors,1)*100 > 10
-%     warndlg('Censoring was performed but more than 10% of data were marked which can be problematic fitting data');
-% end
+if sum(censoring_regressors(:))/size(censoring_regressors,1)*100 > 10
+    warndlg('Censoring was performed but more than 10% of data were marked which can be problematic fitting data');
+end
 
