@@ -97,15 +97,17 @@ end
 
 %% make movies
 if isempty(coordinates)
-    coordinates(1) = round(size(Y,1) / 2);
-    coordinates(2) = round(size(Y,2) / 2);
-    coordinates(3) = round(size(Y,3) / 2);
+    coordinates(1) = size(Y,1) / 2;
+    coordinates(2) = size(Y,2) / 2;
+    coordinates(3) = size(Y,3) / 2;
 end
+coordinates = round(coordinates);
 x = squeeze(Y(coordinates(1),:,:,:));
 y = squeeze(Y(:,coordinates(2),:,:));
 z = squeeze(Y(:,:,coordinates(3),:));
 clear Y
-    
+
+disp('making the time series movie ...')
 vidObj = VideoWriter(filename);
 open(vidObj);
 figure('Name',filename,'Visible',showfig);
