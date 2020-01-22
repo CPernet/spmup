@@ -1,19 +1,19 @@
-function tSNR = spmup_temporalSNR(time_series,masks,figout)
+function tSNR = spmup_temporalSNR(time_series,masks,fig)
 
 % Computes the temporal SNR of the time_series input in the different
 % compartments provided by the masks images = mean signal / std over time
-% The routine recapitulates tSNR as described in Thomas Liu  (2016) 
-% Noise contributions to the fMRI signal: An overview NeuroImage, 343, 
+% The routine recapitulates tSNR as described in Thomas Liu  (2016)
+% Noise contributions to the fMRI signal: An overview NeuroImage, 343,
 % 141-151 <http://dx.doi.org/10.1016/j.neuroimage.2016.09.008>
-% 
-% FORMAT tSNR = spmup_temporalSNR(time_series,masks,plot)
+%
+% FORMAT tSNR = spmup_temporalSNR(time_series,masks,plot_option)
 %
 % INPUT time_series: a cell array of file names (see spm_select)
-%       masks: a cell array of (non binary) tissue class images (GM, WM, 
-%       CSF in that order) in the same space as the time series (i.e. 
+%       masks: a cell array of (non binary) tissue class images (GM, WM,
+%       CSF in that order) in the same space as the time series (i.e.
 %       typically from the anatomical coregistered to the mean EPI) +
 %       optional a brain mask (if not provided, one is computed)
-%       plot 0/1 if you want to have a plot of tSNR per ROI size
+%       plot option: off/on/save (default) if you want to have figures
 %
 % OUTPUT tSNR is a structure with the following fields:
 %            .GM: mean GM signal / std over time (estimate BOLD from GM>(WM+CSF))
@@ -29,8 +29,8 @@ function tSNR = spmup_temporalSNR(time_series,masks,figout)
 %            .roi: tSNR for increased ROI (from in mask by increasing slices) ~linear function of srqrt(nb voxels)
 %            .signal_mean: sqrt(std(GM)^2+std(WM+CSF)^2) / sqrt((SNR0^2/tSNR- 1)/SNR0^2)
 %            Since tSNR = SNR0^2 / (1+L^2*SNR0^2), we have L^2 = (SNR0^2 /tSNR - 1) / SNR0^2
-%            and sqrt(std(GM)^2+std(WM+CSF)^2) = L*Smean 
-%        tSMR_time_series.nii image is also saved on the drive, showing tSNR in each voxel for GM, WM and CSF as computed above 
+%            and sqrt(std(GM)^2+std(WM+CSF)^2) = L*Smean
+%        tSNR_time_series.nii image is also saved on the drive, showing tSNR in each voxel for GM, WM and CSF as computed above
 %
 % References: (1) Thomas Liu  (2016) Noise contributions to the fMRI signal: An overview NeuroImage, 143, 141-151.
 %             (2) CÃesar Caballero-Gaudes and Richard C. Reynolds (2016). Methods For Cleaning The BOLD fMRI Signal. NeuroImage, 154,128-149
@@ -50,6 +50,7 @@ if nargin == 0
     if sts == 0
         return
     end
+    fig = 'on';
 end
 
 if size(time_series,1) == 1 && strcmp(time_series(length(time_series)-1:end),',1')
@@ -77,8 +78,8 @@ end
 
 if iscell(VM); VM = cell2mat(VM); end
 
-if length(VM) ~= 3
-    error(['3 masks files expected, ' num2str(size(VM,1)) ' detected - check input file'])
+if length(VM) < 3
+    error(['at least 3 masks files expected, ' num2str(size(VM,1)) ' detected - check input file'])
 end
 
 if any(VM(1).dim~= VM(2).dim) || any(VM(3).dim~= VM(2).dim)
@@ -89,7 +90,12 @@ if any(V(1).dim~= VM(1).dim)
     error('dimention mismatch between the time series and masks')
 end
 
+if ~exist('fig','var')
+    fig = 'off';
+end
+
 %% Compute relative masks
+disp('tSNR - reading data ..')
 GM         = spm_read_vols(VM(1));
 WM         = spm_read_vols(VM(2));
 CSF        = spm_read_vols(VM(3));
@@ -98,27 +104,28 @@ if length(VM) == 4
 else
     brain_mask = (smooth3(GM,'box',15)+smooth3(WM,'box',15)+smooth3(CSF,'box',15))>0;
 end
-GM         = GM.*(GM>0.5); 
-WM         = WM.*(WM>0.5); 
+GM         = GM.*(GM>0.5);
+WM         = WM.*(WM>0.5);
 CSF        = CSF.*(CSF>0.5); % baseline prob 50%
 GM         = GM.*(GM>(WM+CSF)); % figure; rst_hist(GM(:))
 WM         = WM.*(WM>(GM+CSF)); % figure; rst_hist(WM(:))
 CSF        = CSF.*(CSF>(WM+GM)); % figure; rst_hist(CSF(:))
 
 %% in masks tSNR
-clear x y z 
+disp('tSNR - computing metrics ..')
+clear x y z
 [x,y,z]  = ind2sub(size(GM),find(GM));
 data     = spm_get_data(V,[x y z]');
 stdGM    = nanmean(nanstd(data,1));
 tSNR.GM  = nanmean(nanmean(data,1)) /stdGM;
 
-clear x y z 
+clear x y z
 [x,y,z]  = ind2sub(size(WM),find(WM));
 data     = spm_get_data(V,[x y z]');
 stdWM    = nanmean(nanstd(data,1));
 tSNR.WM  = nanmean(nanmean(data,1)) /stdWM;
 
-clear x y z 
+clear x y z
 [x,y,z]  = ind2sub(size(CSF),find(CSF));
 data     = spm_get_data(V,[x y z]');
 stdCSF   = nanmean(nanstd(data,1));
@@ -132,9 +139,9 @@ stdBackground       = nanmean(nanstd(data,1));
 tSNR.Background_raw = data;
 tSNR.Background     = nanmean(nanmean(data,1)) /stdBackground; % figure; rst_hist(data(:))
 
-% Computes the density estimate of data using a Random Average Shifted 
-% Histogram algorithm is coded based on Bourel et al. Computational 
-% Statistics and Data Analysis 79 (2014) 
+% Computes the density estimate of data using a Random Average Shifted
+% Histogram algorithm is coded based on Bourel et al. Computational
+% Statistics and Data Analysis 79 (2014)
 if exist('cubehelix','file') == 0
     addpath([fileparts(which('spmup_temporalSNR.m')) filesep 'external']);
 end
@@ -147,25 +154,29 @@ elseif contains(ext,'img')
 end
 
 if sum(isnan(data(:))) ~= numel(data)
-    if ~exist('figout','var') || figout ~=0
+    if ~strcmpi(fig,'off')
         % tSNR per voxel from background
         data = (nanmean(data,1)/stdBackground)';
         
         % see where is it and spatial distribition
         figure('Name','Background SNR')
-        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+        if strcmpi(fig,'on')
+            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+        else
+            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+        end
         figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
         SNRimage = zeros(V(1).dim); index = 1;
         SNRimage(find(brain_mask~=1)) = data;
         mymin = nanmedian(data)-3*iqr(data);
         if mymin<0 || isnan(mymin)
-            mymin = 0; 
+            mymin = 0;
         end
         for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
             subplot(4,9,figindex(index));
             imagesc((squeeze(SNRimage(:,:,z))'));
             index = index+1; colormap(cubehelix(32,[1.15,0.1,4,1], [0,1], [0,0.85]))
-            caxis([mymin, nanmedian(data)+3*iqr(data)]); 
+            caxis([mymin, nanmedian(data)+3*iqr(data)]);
             set(gca,'XtickLabel',[],'YtickLabel',[])
             xlabel(['slice ' num2str(z)]);
         end
@@ -215,16 +226,19 @@ if sum(isnan(data(:))) ~= numel(data)
         bar(bc,K,1,'FaceColor',[0.5 0.5 1]);
         title('RAS Histogram - background noise');
         grid on; box on; ylabel('tSNR'); drawnow
-        try
-            print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,[filename '_tSNR.ps']));
-        catch
-            print (gcf,'-dpsc2', [pwd filesep 'tSNR.ps']);
+        if strcmpi(fig,'save')
+            if exist(fullfile(filepath,'spm.ps'),'file')
+                print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
+            else
+                print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+            end
+            close('Background SNR')
         end
-        close('Background SNR')
     end
 end
 
 %% average (tSNR)
+disp('tSNR - making voxel wise tSNR image ..')
 [x,y,z]  = ind2sub(size(WM),find(WM+CSF));
 data     = spm_get_data(V,[x y z]');
 stdWMCSF = nanmean(nanstd(data,1)); % presumably non BOLD
@@ -233,10 +247,10 @@ stdWMCSF = nanmean(nanstd(data,1)); % presumably non BOLD
 data         = spm_get_data(V,[x y z]'); % the whole image or so
 tSNR.average = nanmean(nanmean(data,1)) / sqrt(stdGM^2+stdWMCSF^2+stdBackground^2);
 data         = (nanmean(data,1)/sqrt(stdGM^2+stdWMCSF^2))';
-SNRimage     = zeros(V(1).dim); 
+SNRimage     = zeros(V(1).dim);
 SNRimage(find(GM+WM+CSF+(brain_mask ~= 1))) = data;
 
-W                    = V(1); 
+W                    = V(1);
 W.fname              = [filepath filesep filename '_tSNR' ext];
 W.private.dat.fname  = [filepath filesep filename '_tSNR' ext];
 W.descrip            = 'tSNR image - see spmup_temporalSNR';
@@ -249,103 +263,99 @@ spm_write_vol(W,SNRimage);
 data       = spm_get_data(V,[x y z]');
 tSNR.image = nanmean(nanmean(data,1)) / stdBackground;
 data       = (nanmean(data,1)/stdBackground)';
-SNROimage  = zeros(V(1).dim); 
+SNROimage  = zeros(V(1).dim);
 SNROimage(find(GM+WM+CSF)) = data;
 
-if ~exist('figout','var') || figout ~= 0
+if ~strcmpi(fig,'off')
     figure('Name','SNR0'); index = 1;
-    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-    figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31]; 
+    if strcmpi(fig,'on')
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    else
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    end
+    figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
     for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
-        subplot(4,9,figindex(index)); 
+        subplot(4,9,figindex(index));
         imagesc(flipud(squeeze(SNRimage(:,:,z)')));
-        caxis([min(SNRimage(:)), max(SNRimage(:))]); set(gca,'XtickLabel',[],'YtickLabel',[]); 
-        xlabel(['slice ' num2str(z)]); if index ==2; title('tSNR image'); end        
-        subplot(4,9,figindex(index)+5); R= abs(sqrt((squeeze(SNROimage(:,:,z)'./SNRimage(:,:,z)').^2)-1)); 
+        caxis([min(SNRimage(:)), max(SNRimage(:))]); set(gca,'XtickLabel',[],'YtickLabel',[]);
+        xlabel(['slice ' num2str(z)]); if index ==2; title('tSNR image'); end
+        subplot(4,9,figindex(index)+5); R= abs(sqrt((squeeze(SNROimage(:,:,z)'./SNRimage(:,:,z)').^2)-1));
         imagesc(flipud(R)); if index ==2; title('SNR0/tSNR image'); end
-        try caxis([min(R(:)), max(R(:))]); end 
-        set(gca,'XtickLabel',[],'YtickLabel',[]); xlabel(['slice ' num2str(z)]); 
+        try caxis([min(R(:)), max(R(:))]); end
+        set(gca,'XtickLabel',[],'YtickLabel',[]); xlabel(['slice ' num2str(z)]);
         index = index+1; colormap(cubehelix(32,[3,1.9,1.5,1], [0,1], [0.2,0.8]))
     end
     drawnow
-    if exist(fullfile(filepath,[filename '_tSNR.ps']),'file')
-        try
-            print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,[filename '_tSNR.ps']), '-append');
-        catch
-            print (gcf,'-dpsc2', fullfile(filepath,[filename '_tSNR.ps']), '-append');
+    if strcmpi(fig,'save')
+        if exist(fullfile(filepath,'spm.ps'),'file')
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
+        else
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
         end
-    else
-        try
-            print (gcf,'-dpdf', '-bestfit', fullfile(filepath,[filename '_tSNR.pdf']));
-        catch
-            print (gcf,'-dpdf', fullfile(filepath,[filename '_tSNR.pdf']));
-        end
+        close('SNR0')
     end
-    close('SNR0')
 end
-  
+
 tSNR.SNR02tSNR_corr = corr(SNRimage(:),SNROimage(:));
 clear SNRimage SNROimage
 
 %% ratio
 tSNR.SNR02tSNR_ratio = abs(sqrt(((tSNR.average/tSNR.image)^2)-1));
-    
+
 %% signal
 L2 = (tSNR.image^2 /tSNR.average - 1) / tSNR.image^2;
 tSNR.signal_mean = sqrt(stdGM^2+stdWMCSF^2) / sqrt(L2);
 
 %% per ROI (absolute masking)
+disp('tSNR - checking linearlity ..')
 GM  = spm_read_vols(VM(1));
 WM  = spm_read_vols(VM(2));
 CSF = spm_read_vols(VM(3));
 
 index = 1;
 for p=0.95:-0.05:0.1
-  
+    
     [x,y,z] = ind2sub(size(GM),find(GM>=p));
     data    = spm_get_data(V,[x y z]');
-    stdGM   = nanmean(nanstd(data,1)); 
-
-   [x,y,z]  = ind2sub(size(WM),find(WM>p+CSF>p));
-   data     = spm_get_data(V,[x y z]');
-   stdWMCSF = nanmean(nanstd(data,1)); 
-
-   ROI = (GM>p+WM>p+CSF>p);
-   % figure; for z=1:size(ROI,3); imagesc(squeeze(ROI(:,:,z))); pause; end
-   [x,y,z]               = ind2sub(size(brain_mask),find(ROI+(brain_mask~=1)));
-   data                  = spm_get_data(V,[x y z]'); % the whole image or so
-   tSNR.roi.value(index) = nanmean(nanmean(data,1)) / sqrt(stdGM^2+stdWMCSF^2+stdBackground^2);
-   tSNR.roi.size(index)  = nansum(ROI(:));
-   index = index + 1;
+    stdGM   = nanmean(nanstd(data,1));
+    
+    [x,y,z]  = ind2sub(size(WM),find(WM>p+CSF>p));
+    data     = spm_get_data(V,[x y z]');
+    stdWMCSF = nanmean(nanstd(data,1));
+    
+    ROI = (GM>p+WM>p+CSF>p);
+    % figure; for z=1:size(ROI,3); imagesc(squeeze(ROI(:,:,z))); pause; end
+    [x,y,z]               = ind2sub(size(brain_mask),find(ROI+(brain_mask~=1)));
+    data                  = spm_get_data(V,[x y z]'); % the whole image or so
+    tSNR.roi.value(index) = nanmean(nanmean(data,1)) / sqrt(stdGM^2+stdWMCSF^2+stdBackground^2);
+    tSNR.roi.size(index)  = nansum(ROI(:));
+    index = index + 1;
 end
 % fit a line to this
 B = pinv([sqrt(tSNR.roi.size)' ones(18,1)])*tSNR.roi.value';
 model = [sqrt(tSNR.roi.size)' ones(18,1)]*B;
 tSNR.roi.slope = B(1);
 
-if ~exist('figout','var') || figout ~=0
+if ~strcmpi(fig,'off')
     figure('Name','SNR per size'); index = 1;
-    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    if strcmpi(fig,'on')
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    else
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    end
     plot(sqrt(tSNR.roi.size),[sqrt(tSNR.roi.size)' ones(18,1)]*B,'LineWidth',3);
     hold on; plot(sqrt(tSNR.roi.size),tSNR.roi.value,'ro','LineWidth',2);
     axis tight; box on; grid minor; ylabel('temporal SNR','FontSize',12)
     xlabel('sqrt of the number of in brain voxels used','FontSize',12)
     mytitle = sprintf('tSNR=%g*sqrt(nb of voxels)+%g \n RMSE=%g',B(1),B(2),sqrt(mean(model - tSNR.roi.value')));
     title(mytitle,'FontSize',12); drawnow
-    if exist(fullfile(filepath,[filename '_tSNR.ps']),'file')
-        try
-            print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,[filename '_tSNR.ps']), '-append');
-        catch
-            print (gcf,'-dpsc2', fullfile(filepath,[filename '_tSNR.ps']), '-append');
+    if strcmpi(fig,'save')
+        if exist(fullfile(filepath,'spm.ps'),'file')
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
+        else
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
         end
-    else
-        try
-            print (gcf,'-dpdf', '-bestfit', fullfile(filepath,[filename '_tSNR.pdf']));
-        catch
-            print (gcf,'-dpdf', fullfile(filepath,[filename '_tSNR.pdf']));
-        end
+        close('SNR per size')
     end
-    close('SNR per size')
 end
 
- 

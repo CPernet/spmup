@@ -71,7 +71,7 @@ end
 save(fullfile(filepath,[filename(4:end) '_design.txt']),'design','-ascii')
 
 % % quick check
-if sum(censoring_regressors(:))/size(censoring_regressors,1)*100 > 10
-    warndlg('Censoring was performed but more than 10% of data were marked which can be problematic fitting data');
-end
+% if sum(censoring_regressors(:))/size(censoring_regressors,1)*100 > 10
+%     warndlg('Censoring was performed but more than 10% of data were marked which can be problematic fitting data');
+% end
 
