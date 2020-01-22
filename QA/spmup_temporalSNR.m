@@ -11,7 +11,8 @@ function tSNR = spmup_temporalSNR(time_series,masks,figout)
 % INPUT time_series: a cell array of file names (see spm_select)
 %       masks: a cell array of (non binary) tissue class images (GM, WM, 
 %       CSF in that order) in the same space as the time series (i.e. 
-%       typically from the anatomical coregistered to the mean EPI)
+%       typically from the anatomical coregistered to the mean EPI) +
+%       optional a brain mask (if not provided, one is computed)
 %       plot 0/1 if you want to have a plot of tSNR per ROI size
 %
 % OUTPUT tSNR is a structure with the following fields:
@@ -51,23 +52,22 @@ if nargin == 0
     end
 end
 
-V = spm_vol(time_series);
 if size(time_series,1) == 1 && strcmp(time_series(length(time_series)-1:end),',1')
     time_series = time_series(1:length(time_series)-2); % in case picked 4D put left ,1
 end
 
 if iscell(time_series)
     for v=1:size(time_series,1)
-        Vfmri(v) =spm_vol(time_series{v});
+        V(v) =spm_vol(time_series{v});
     end
 else
-    Vfmri = spm_vol(time_series);
+    V = spm_vol(time_series);
 end
 
 if iscell(V); V = cell2mat(V); end
 if size(V,1) < 10; error('there is less than 10 images in your time series ??'); end
 
-for m=1:3
+for m=1:length(masks)
     if iscell(masks) ==0
         VM(m) = spm_vol(masks(m,:));
     else
@@ -93,7 +93,11 @@ end
 GM         = spm_read_vols(VM(1));
 WM         = spm_read_vols(VM(2));
 CSF        = spm_read_vols(VM(3));
-brain_mask = (smooth3(GM,'box',15)+smooth3(WM,'box',15)+smooth3(CSF,'box',15))>0;
+if length(VM) == 4
+    brain_mask = spm_read_vols(VM(4));
+else
+    brain_mask = (smooth3(GM,'box',15)+smooth3(WM,'box',15)+smooth3(CSF,'box',15))>0;
+end
 GM         = GM.*(GM>0.5); 
 WM         = WM.*(WM>0.5); 
 CSF        = CSF.*(CSF>0.5); % baseline prob 50%
@@ -154,12 +158,15 @@ if sum(isnan(data(:))) ~= numel(data)
         SNRimage = zeros(V(1).dim); index = 1;
         SNRimage(find(brain_mask~=1)) = data;
         mymin = nanmedian(data)-3*iqr(data);
-        if mymin<0; mymin = 0; end
+        if mymin<0 || isnan(mymin)
+            mymin = 0; 
+        end
         for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
             subplot(4,9,figindex(index));
             imagesc((squeeze(SNRimage(:,:,z))'));
             index = index+1; colormap(cubehelix(32,[1.15,0.1,4,1], [0,1], [0,0.85]))
-            caxis([mymin, median(data)+3*iqr(data)]); set(gca,'XtickLabel',[],'YtickLabel',[])
+            caxis([mymin, nanmedian(data)+3*iqr(data)]); 
+            set(gca,'XtickLabel',[],'YtickLabel',[])
             xlabel(['slice ' num2str(z)]);
         end
         clear SNRimage
