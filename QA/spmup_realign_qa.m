@@ -24,6 +24,7 @@ function new_files = spmup_realign_qa(P,varargin)
 %              --> generates three movies along the x, y, z planes defined based on the coordinate
 %              --> if empty, takes the middle of the volume
 %       'Average': where to get the mean image
+%       'Figure': : 'on', 'save' (default - save on drive but not visible) or 'off'
 %
 % Cyril Pernet 
 % --------------------------------------------------------------------------
@@ -85,6 +86,7 @@ Voltera               = 'off';
 Globals               = 'on'; 
 Movie                 = 'on';
 Coordinates           = [];
+fig                   = 'save';
 
 if nargin >1
    for v=1:(nargin-1)
@@ -102,6 +104,8 @@ if nargin >1
            Movie = varargin{v+1};
       elseif strcmpi(varargin{v},'Coordinate')
            Coordinates = varargin{v+1};
+      elseif strcmpi(varargin{v},'Figure')
+           fig = varargin{v+1};
       end
    end
 end
@@ -123,20 +127,21 @@ findex = 1; % index for the new_files variables
 %% look at motion parameters
 [filepath,filename]=fileparts(V(1).fname);
 if strcmpi(MotionParameters,'on')
-    disp('plotting and getting displacement ... ')
-    motion_file = dir(fullfile(filepath,'rp*.txt')); 
+    disp('getting displacement ... ')
+    motion_file = dir(fullfile(filepath,['rp*' filename(round(length(filename)/2):end) '.txt'])); 
+    if size(motion_file,1) > 1
+       error('more than one rp*.txt file was found that partially matches the time series name') 
+    end
     [FD,RMS] = spmup_FD(fullfile(motion_file.folder,motion_file.name),...
-        'Radius',Radius,'figure','save');
-    new_files{findex} = [motion_file.folder filesep [motion_file.name(4:end-4) '_displacement.pdf']];
-    findex = findex +1;
+        'Radius',Radius,'Figure',fig);
 end
 
 %% look at globals
 
 if strcmpi(Globals,'on')
     disp('computing globals for outliers ... ')
-    glo = zeros(size(P,1),1);
-    for s=1:size(V,2)
+    glo = zeros(length(V),1);
+    for s=1:length(V)
         glo(s) = spm_global(V(s));
     end
     glo = spm_detrend(glo,1); % since in spm the data are detrended
@@ -144,18 +149,23 @@ if strcmpi(Globals,'on')
         
     % figure
     figure('Name','Globals outlier detection','Visible','On');
-    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized', 'outerposition',[0 0 1 1]); 
+    if strcmpi(fig,'on')
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    else
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    end
     plot(glo,'LineWidth',3); title('Global intensity');
     hold on; tmp = g_outliers.*glo; tmp(tmp==0)=NaN; plot(tmp,'or','LineWidth',3);
     grid on; axis tight;  xlabel('scans'); ylabel('mean intensity')
-    try
-        print (gcf,'-dpdf', '-bestfit', fullfile(filepath,[filename '_globals.pdf']));
-    catch
-        print (gcf,'-dpdf', fullfile(filepath,[filename '_globals.pdf']));
+    if strcmpi(fig,'save')
+        if exist(fullfile(filepath,'spm.ps'),'file')
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
+        else
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+        end
+        close(gcf)
+        cd(current)
     end
-    close(gcf)
-    new_files{findex} = [filepath filesep filename '_globals.pdf'];
-    findex = findex +1;
 end
 
 %% make the design.txt file
@@ -174,7 +184,10 @@ if isempty(data) && strcmpi(Voltera,'off')
 else
     spmup_censoring(fullfile(motion_file.folder,motion_file.name),...
         data,'Voltera',Voltera);
-    new_files{findex} = fullfile(motion_file.folder,[motion_file.name(4:end-4) '_design.txt']);
+    % remane using P
+    movefile(fullfile(motion_file.folder,[motion_file.name(4:end-4) '_design.txt']),...
+        fullfile(motion_file.folder,[filename '_design.txt']))
+    new_files{findex} = fullfile(motion_file.folder,[filename '_design.txt']);
     findex = findex +1;
 end
 

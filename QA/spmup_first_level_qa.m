@@ -23,8 +23,9 @@ function jobs = spmup_first_level_qa(varargin)
 %       'Movie': 'on' (default) or 'off'
 %       'Coordinate': a coordinate, like [46 64 37];
 %              --> generates three movies along the x, y, z planes defined based on the coordinate
-%       'Basics': on (default) or 'off'
+%       'Basics': 'on' (default) or 'off'
 %              --> creates the average and std of images
+%       'Figure': 'on', 'save' (default - save on drive but not visible) or 'off' 
 % 
 % OUTPUT jobs is a structure with the different jobs performed
 %
@@ -56,8 +57,10 @@ Voltera               = 'off';
 Globals               = 'on'; 
 Movie                 = 'on';
 Basics                = 'on';
+Figure                = 'save';
 
 if nargin >1
+   time_series = varargin{1};
    for v=1:nargin
       if strcmpi(varargin{v},'Motion Parameters')
            MotionParameters = varargin{v+1};
@@ -75,6 +78,8 @@ if nargin >1
            Coordinate = varargin{v+1};
       elseif strcmpi(varargin{v},'Basics')
            Basics = varargin{v+1};
+      elseif strcmpi(varargin{v},'Figure')
+           Figure = varargin{v+1};
       end
    end
 end
@@ -100,24 +105,17 @@ realign_files = spmup_realign_qa(time_series,...
     'Voltera', Voltera,...
     'Globals', Globals,...
     'Movie', Movie,...
-    'Coordinate', Coordinate);
+    'Coordinate', Coordinate, ...
+    'Figure',Figure);
 
 ri = 1;
-if strcmpi(MotionParameters, 'on')
-    jobs.displacement = realign_files{ri};
-    ri = ri+1;
+if strcmp(MotionParameters,'on') || strcmp('Framewise Displacement','on') || strcmp('Globals','on')
+    jobs.design = realign_files{1};
+    ri = 2;
 end
-
-if strcmpi(Globals, 'on')
-    jobs.globals = realign_files{ri};
-    ri = ri+1;
-end
-
-jobs.design = realign_files{ri};
-ri = ri+1;
 
 if strcmpi(Movie, 'on')
-    jobs.movies = {realign_files{ri} realign_files{ri+1} realign_files{ri+2}};
+    jobs.movies = {realign_files{ri}};
 end
 
 disp('1st level QA done')
