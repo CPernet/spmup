@@ -108,7 +108,7 @@ for subject = 1:size(SPMs,1)
             hrf_param = [1:3:length(columns)]; % in case we have parametric regressors
             for h=1:length(hrf_param)
                 regressors = columns(hrf_param(h) + (0:(xBF.order-1)));
-                combined_regressor = X(:,regressors)*ones(xBF.order,1); % using all functions this is the hrf model                for l=1:3 % load beta files
+                combined_regressor = X(:,regressors)*ones(xBF.order,1); % using all functions this is the hrf model                
                 for l=1:xBF.order % load beta files
                     name = [SPM.Vbeta(regressors(l)).fname ',1'];
                     beta{l} = spm_read_vols(spm_vol([pwd filesep name]));
