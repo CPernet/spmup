@@ -5,7 +5,7 @@ function out = spmup_QAreport(varargin)
 %
 % FORMAT spmup_QAreport('metric',cellarray,'figure',fig_value)
 %
-% INPUTS - 'metric' can be 'anatQA', 'tSNR', 'volumecorr', 'spatialcorr' or 'displacement'
+% INPUTS - 'metric' can be 'anatQA', 'tSNR', 'volumecorr', 'sliceout' or 'displacement'
 %        - cellarray is a cell array of the corresponding metrics, i.e.
 %        a cell array of the anatQA or tSNR structures, a cell array of
 %        volume correlation time courses, a cell array of slice_outliers, or
@@ -28,7 +28,7 @@ fig          = 'on';
 tSNR         = [];
 anatQA       = [];
 volumecorr   = [];
-spatialcorr  = [];
+sliceout     = [];
 displacement = [];
 
 for in = 1:nargin
@@ -36,8 +36,8 @@ for in = 1:nargin
         anatQA = varargin{in+1};
     elseif strcmpi(varargin{in},'volumecorr')
         volumecorr = varargin{in+1};
-    elseif strcmpi(varargin{in},'spatialcorr')
-        spatialcorr = varargin{in+1};
+    elseif strcmpi(varargin{in},'sliceout')
+        sliceout = varargin{in+1};
     elseif strcmpi(varargin{in},'displacement')
         displacement = varargin{in+1};
     elseif strcmpi(varargin{in},'tSNR')
@@ -73,7 +73,7 @@ if ~isempty(anatQA)
     
     fields_to_keep = sum(isnan(M))~=n_subjects;
     [Med,CI]       = HD(M(:,fields_to_keep)); 
-    outliers       = spmup_comp_robust_outliers(M(:,fields_to_keep));
+    outliers       = spmup_comp_robust_outliers(M(:,fields_to_keep),'Carling');
     
     if fields_to_keep(1) == 1
         out.anatQA.SNR.median   = Med(1);
@@ -114,7 +114,7 @@ if ~isempty(tSNR)
 
 end
 
-%% volumecorr
+%% volumecorr (r values)
 
 if ~isempty(volumecorr)
     [n_subjects,p_repetitions] = size(volumecorr);
@@ -123,26 +123,55 @@ if ~isempty(volumecorr)
         [n_subjects,p_repetitions] = size(volumecorr);
     end
     
-   
     M = NaN(n_subjects,p_repetitions); % get median correlation
     D = NaN(n_subjects,p_repetitions); % get dispersion MAD   
     for p=1:p_repetitions
+        Fields{p} = ['Run ' num2str(p)];
         for s = 1:n_subjects
-            M(s,1:n(s,p)) = volumecorr{s,p_repetitions}';
+            M(s,p) = HD(volumecorr{s,p}');
+            D(s,p) = mad(volumecorr{s,p}',1);
         end
-        
-        [Med,CI]       = HD(M);
-        outliers       = spmup_comp_robust_outliers(M);
-        
-         make_figure('Summary Anat stats QA',fig,M,Fields,outliers)
     end
-    
-
+    out.volumecorr.medians        = M;
+    out.volumecorr.median_abs_dev = D;
+    out.volumecorr.outliers       = spmup_comp_robust_outliers(D,'Carling');
+    make_figure('Volume correlation deviations',fig,D,Fields,out.volumecorr.outliers)
 end
 
-%%
-if ~isempty(spatialcorr)
+%% Spatial correlation (already a matrix of outliers)
+
+if ~isempty(sliceout)
+    [n_subjects,p_repetitions] = size(sliceout);
+    if n_subjects == 1
+        sliceout = sliceout';
+        [n_subjects,p_repetitions] = size(sliceout);
+    end
     
+    M = zeros(length(sliceout{1,1}),p_repetitions); % get sum of outliers
+    for p=1:p_repetitions
+        Fields{p} = ['Run ' num2str(p)];
+        for s = 1:n_subjects
+            if ~isempty(sliceout{s,p})
+                M(:,p) = M(:,p) + sliceout{s,p};
+            end
+        end
+    end
+    out.sliceout.sum = M;
+
+    figure('Name','Slice outliers')
+    if strcmpi(fig,'on')
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    else
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    end
+    template = fullfile(fileparts(which('spm.m')),['canonical' filesep 'avg152T2.nii']);
+    template = spm_read_vols(spm_vol(template)); 
+    sagital  = fliplr(squeeze(template(round(size(template,1)/2),:,:)))';
+    sagital  = imresize(sagital,[size(M,1),size(sagital,2)]);
+    ax1      = subplot(1,3,1:2); imagesc(sagital); colormap(ax1,'gray')
+    title('resampled canonical avg152T2.nii')
+    ax2      = subplot(1,3,3); imagesc(M); colormap(ax2,'parula'); colorbar
+    title('Sum of outliying slices'); xlabel('Runs')
 end
 
 %%
@@ -157,7 +186,7 @@ end
 function [HDQ,CIQ] = HD(X)
 
 % Compute the Harrell-Davis estimate of the qth decile
-% The vector x contains the data, and the desired decile is q
+% The column vector x contains the data, and the desired decile is q
 %
 % FRANK E. HARRELL and C. E. DAVIS (1982).
 % A new distribution-free quantile estimator
@@ -171,57 +200,60 @@ rng shuffle
 
 %% compute
 table = randi(p,p,nboot);
-for i=1:N
+for i=N:-1:1
     nanindex = isnan(X(:,i));
     x        = X(~nanindex,i);
     HDQ(i)   = get_HD(x,q);
     
-    % The constant c was determined so that the
-    % probability coverage of the confidence interval is
-    % approximately 95% when sampling from normal and
-    % non-normal distributions
-    n=length(x);
-    
-    if n<=10 % hd estimate of the deciles cannot be computed, using percentile boostrap
-        for kk=1:nboot
-            if sum(nanindex) ~=0
-                values = find(nanindex);
-                tmp = table(:,kk);
-                for l=1:length(values)
-                    tmp(tmp==values(l))=[];
+    if nargout == 2
+        % The constant c was determined so that the
+        % probability coverage of the confidence interval is
+        % approximately 95% when sampling from normal and
+        % non-normal distributions
+        n=length(x);
+        
+        if n<=10 % hd estimate of the deciles cannot be computed, using percentile boostrap
+            for kk=1:nboot
+                if sum(nanindex) ~=0
+                    values = find(nanindex);
+                    tmp = table(:,kk);
+                    for l=1:length(values)
+                        tmp(tmp==values(l))=[];
+                    end
+                    D = X(tmp,i);
+                else
+                    D = X(table(:,kk),i) ; % applies the sample resampling for each column
                 end
-                D = X(tmp,i);
-            else
-                D = X(table(:,kk),i) ; % applies the sample resampling for each column
+                Mb(kk) = HD(D,.5);
             end
-            Mb(kk) = HD(D,.5);
-        end
-        
-        Mb = sort(Mb);
-        Mb(isnan(Mb)) = [];
-        low = round((alphav*length(Mb))/2);
-        high = length(Mb) - low;
-        CIQ(1,i) = Mb(low+1);
-        CIQ(2,i) = Mb(high);
-        
-    else
-        if n <=21 &&  q<=.2 || n <=21 && q>=.8
-            c = -6.23./n+5.01;
-        elseif n<=40 && q<=.1 || n<=40 && q>=.9
-            c = 36.2./n+1.31;
+            
+            Mb = sort(Mb);
+            Mb(isnan(Mb)) = [];
+            low = round((alphav*length(Mb))/2);
+            high = length(Mb) - low;
+            CIQ(1,i) = Mb(low+1);
+            CIQ(2,i) = Mb(high);
+            
         else
-            c = 1.96 + .5064.* (n.^-.25);
+            if n <=21 &&  q<=.2 || n <=21 && q>=.8
+                c = -6.23./n+5.01;
+            elseif n<=40 && q<=.1 || n<=40 && q>=.9
+                c = 36.2./n+1.31;
+            else
+                c = 1.96 + .5064.* (n.^-.25);
+            end
+            
+            % do bootstrap
+            for kk=1:nboot
+                boot(kk)=get_HD(randsample(x,n,true),q);
+            end
+            bse = std(boot,0); % normalize by (n-1)
+            CIQ(1,i) = HDQ(i)-c.*bse;
+            CIQ(2,i) = HDQ(i)+c.*bse;
         end
-        
-        % do bootstrap
-        for kk=1:nboot
-            boot(kk)=get_HD(randsample(x,n,true),q);
-        end
-        bse = std(boot,0); % normalize by (n-1)
-        CIQ(1,i) = HDQ(i)-c.*bse;
-        CIQ(2,i) = HDQ(i)+c.*bse;
+        clear n c boot bse
     end
-    clear x n c boot bse
+    clear x
 end
 
 end
