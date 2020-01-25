@@ -20,10 +20,13 @@ function SF = spm_psc(SPMs,varargin)
 % OUTPUT: Scaling Factor (SF) returns the value(s) to use for PSC
 %         if no output specify, writes down images of PSC
 %
-% Reference: Pernet (2014) Misconceptions in the use of the GLM ...
+% Ref.  Pernet CR (2014) Misconceptions in the use of the General Linear
+% Model applied to functional MRI: a tutorial for junior neuro-imagers.
+% Front. Neurosci. 8:1. doi: 10.3389/fnins.2014.00001
 % <https://www.frontiersin.org/articles/10.3389/fnins.2014.00001/full>
 %
 % Cyril Pernet - University of Edinburgh
+% Thanks to Robin Ince for improving the code
 % -----------------------------------------
 % Copyright (c) SPM Utility Plus toolbox
 
@@ -33,122 +36,129 @@ if nargin == 0 % pick up as many SPM.mat files as needed
     if sts == 0
         return
     end
-    option = questdlg('scale for a typical trial or for this design?','option','trial','design','trial');
-    SF = spm_psc(SPMs,option);
-    if length(unique(SF)) > 1
-        warning('different scaling factors obtained for each design')
-    end
     
-elseif nargin == 2
+    % get SF
+    option = questdlg('scale for a typical trial or for this design?','option','trial','design','trial');
+    SF     = spmup_psc(SPMs,option);
+    if length(SF) == 1
+        SF = repmat(SF,[1,size(SPMs,1)]);
+    end
+    clear option
+    
+else
     if nargout == 1
-        option = varargin{2};
+        option = varargin{1};
     else
-        SF = varargin{2};
+        SF = varargin{1};
+        if length(SF) == 1
+            SF = repmat(SF,[1,size(SPMs,1)]);
+        end
     end
 end
 
-% --------------------------
-% loop per subject
-
+%% loop per subject
 for subject = 1:size(SPMs,1)
-    fprintf('processing subject %g \n',subject)
-    try
+    
+    % read the design matrix
+    if iscell(SPMs)
         [path,file,ext]= fileparts(SPMs{subject});
-    catch SPMs_file_issue
+    else
         [path,file,ext]= fileparts(SPMs(subject,:));
     end
-    SPM = load(fullfile(path,file));
-    SPM = SPM.SPM;
+    SPM        = load(fullfile(path,[file ext]));
+    SPM        = SPM.SPM;
+    xBF.dt     = SPM.xBF.dt;
+    xBF.name   = SPM.xBF.name;
+    xBF.length = SPM.xBF.length;
+    xBF.order  = SPM.xBF.order;
+    xBF        = spm_get_bf(xBF); % rebuild the hrf model used
     
-    %% 1 get the max of ideal trial in the super sampled design matrix
-    
-    xBF.order = SPM.xBF.order;
-    if strcmpi(option,'trial')
-        xBF.dt     = SPM.xBF.dt;
-        xBF.name   = SPM.xBF.name;
-        xBF.length = SPM.xBF.length;
-        xBF        = spm_get_bf(xBF); % rebuild the hrf model used
-        if strcmp(SPM.xBF.name,'hrf (with time derivative)')
-            event = xBF.bf*[1 1]';
-        elseif strcmp(SPM.xBF.name,'hrf (with time and dispersion derivatives)')
-            event = xBF.bf*[1 1 1]';
-        else
-            event = xBF.bf;
-        end
-        SF = max(event);
-    elseif strcmpi(option,'design')
-        s = size(SPM.Sess,2);
-        for session= s:-1:1
-            U = spm_get_ons(SPM,s);
-            X = spm_Volterra(U,xBF.bf,SPM.xBF.Volterra); % re-create the super-sampled design
-            if strcmpi(option,'design')
-                sf_sess(session) = max(X(:));
+    %% Get the Scaling Factor
+    if exist('option','var')
+        
+        if strcmpi(option,'trial')
+            if strcmp(SPM.xBF.name,'hrf (with time derivative)')
+                event = xBF.bf*[1 1]';
+            elseif strcmp(SPM.xBF.name,'hrf (with time and dispersion derivatives)')
+                event = xBF.bf*[1 1 1]';
+            else
+                event = xBF.bf;
             end
+            scaling_factor(subject) = max(event);
+            
+        elseif strcmpi(option,'design')
+            s = size(SPM.Sess,2);
+            for session= s:-1:1
+                U = spm_get_ons(SPM,s);
+                X = spm_Volterra(U,xBF.bf,SPM.xBF.Volterra); % re-create the super-sampled design
+                if strcmpi(option,'design')
+                    sf_sess(session) = max(X(:));
+                end
+            end
+            scaling_factor(subject) = max(sf_sess);
+            
+        else
+            error('unkown option for scaling factor')
         end
-        SF(subject) = max(sf_sess); % update
-    else
-        error('unkown option for scaling factor')
     end
     
-    %% 2 if derivative(s) present - compute the boosted hrf
-    if xBF.order>1 && ~isfolder('hrf_boost')
-        spmup_hrf_boost([SPM.swd filesep 'SPM.mat'])
-    end
-    fprintf('computing and writing PSC images using a value of %g as scaling factor \n',SF);
+    %% 2 compute PSC 
     
-    %% 3 compute PSC using the hrf or boosted hrf
-    mkdir(fullfile(path,'PSC'))
-    s = size(SPM.Sess,2);
-    for session= 1:s
-        U = spm_get_ons(SPM,s);
-        X = spm_Volterra(U,xBF.bf,SPM.xBF.Volterra); % re-create the super-sampled design
-        nb_conditions = size(SPM.Sess(s).U,2);
-        for c=1:nb_conditions
-            columns = SPM.Sess(session).Fc(c).i; % which columns for this condition
-            hrf_param = [1:3:length(columns)]; % in case we have parametric regressors
-            for h=1:length(hrf_param)
-                regressors = columns(hrf_param(h) + (0:(xBF.order-1)));
-                combined_regressor = X(:,regressors)*ones(xBF.order,1); % using all functions this is the hrf model                
-                for l=1:xBF.order % load beta files
-                    name = [SPM.Vbeta(regressors(l)).fname ',1'];
-                    beta{l} = spm_read_vols(spm_vol([pwd filesep name]));
+    if exist('SF','var')
+        fprintf('computing and writing PSC images using a value of %g as scaling factor \n',SF(subject));
+        
+        %% 3 compute PSC using the hrf or boosted hrf
+        mkdir(fullfile(path,'PSC'))
+        s = size(SPM.Sess,2);
+        hrf_indices = [];
+        for session= 1:s
+            U             = spm_get_ons(SPM,s);
+            X             = spm_Volterra(U,xBF.bf,SPM.xBF.Volterra); % re-create the super-sampled design
+            nb_conditions = size(SPM.Sess(s).U,2);
+            for c=1:nb_conditions
+                columns   = SPM.Sess(session).Fc(c).i; % which columns for this condition
+                hrf_param = 1:3:length(columns); % in case we have parametric regressors
+                for h=1:length(hrf_param)
+                    hrf_indices = [hrf_indices SPM.Sess(session).col(columns(hrf_param(h)))]; % keep for contrasts
+                    regressors  = columns(hrf_param(h) + (0:(xBF.order-1)));
+                    for l=1:xBF.order % load beta files
+                        name    = [SPM.Vbeta(regressors(l)).fname ',1'];
+                        beta{l} = spm_read_vols(spm_vol([SPM.swd filesep name]));
+                    end
+                    
+                    % now combine beta values - scaled by the new regressor
+                    H = 0;
+                    for l=1:xBF.order
+                        H = H + ((beta{l}.*beta{l}).*sum(X(:,regressors(l)).^2));
+                    end
+                    H = sqrt(H);
+                    % keep the sign of beta hrf
+                    beta_sign = beta{1} ./ abs(beta{1});
+                    
+                    % finally get the PSC
+                    name      = [SPM.Vbeta(max(SPM.Sess(s).col)+session).fname]; % constant
+                    [~,~,ext] = fileparts(name); % nii or img
+                    V         = spm_vol([SPM.swd filesep name]);
+                    constant  = spm_read_vols(V);
+                    PSC       = beta_sign .* (H.*SF(subject)./constant.*100);
+                    % write as a matrix and as an image using column number
+                    V.fname           = fullfile(SPM.swd,'PSC',[sprintf('PSC_%04d',SPM.Sess(session).col(columns(hrf_param(h)))) ext]);
+                    V.descrip         = 'Percentage signal change image';
+                    V.private.descrip = 'Percentage signal change image';
+                    spm_write_vol(V,PSC);
                 end
-                
-                % now combine beta values - scaled by the new regressor
-                H = 0;
-                for l=1:xBF.order
-                    H = H + ((beta{l}.*beta{l}).*sum(X(:,regressors(l)).^2));
-                end
-                H = sqrt(H);
-                % keep the sign of beta hrf
-                beta_sign = beta{1} ./ abs(beta{1});
-                
-                % finally get the PSC
-                last_column = size(SPM.xX.X,2)-s+session; % 1 cst per session
-                name = [SPM.Vbeta(last_column).fname ',1'];
-                [~,~,ext] = fileparts(SPM.Vbeta(last_column).fname); % nii or img
-                V        = spm_vol([pwd filesep name]);
-                constant = spm_read_vols(V);
-                PSC      = beta_sign .* (H.*SF./constant.*100);
-                % write as a matrix and as an image using column number
-                V.fname = fullfile(pwd,'PSC',[sprintf('PSC_%04d',regressors(1)) ext]);
-                V.descrip         = 'Percentage signal change image';
-                V.private.descrip = 'Percentage signal change image';
-                spm_write_vol(V,PSC);
             end
         end
     end
 end
 
-%% combine PSC maps using contrast weights if any
-
-
-if size(Scaling_Factor,2) == 1
-    fprintf('PSC done - Scaling Factor %g: \n',Scaling_Factor)
-else
-    fprintf('PSC done - Scaling Factors: \n')
-    for s=1:size(Scaling_Factor,2)
-        fprintf('subject %g = %g \n',s,Scaling_Factor(s));
+% cleanup SF
+if exist('scaling_factor','var')
+    if length(unique(scaling_factor)) == 1
+        SF = scaling_factor(1);
+    else
+        warning('different scaling factors obtained for each design')
+        SF = scaling_factor;
     end
 end
 
