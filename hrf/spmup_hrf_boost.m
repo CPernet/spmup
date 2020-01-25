@@ -3,8 +3,9 @@ function files_out = spmup_hrf_boost(varargin)
 % this function takes a SPM.mat and related files to create boosted beta
 % parameters and con images if the hrf doesn't fit properly the data, some
 % information can be recovered using the 1st and 2nd derivatives - most of
-% the time is boosts the hrf value but it can also reduce it if there are
-% strong shape differences -
+% the time this boosts the hrf value but it can also reduce it if there are
+% strong shape differences - it is thus recommended to use 1st derivative
+% only, unless you have a slow design.
 %
 % Ref.  Pernet CR (2014) Misconceptions in the use of the General Linear
 % Model applied to functional MRI: a tutorial for junior neuro-imagers.
@@ -42,7 +43,7 @@ defaults = spm_get_defaults;
 img_ext  = defaults.images.format;
 
 current = pwd;
-shift = 2;
+shift = 2; % default is 4 to 6 sec
 if nargin == 0
     [t,sts] = spm_select(1,'mat','Select 1st level SPM file');
     if sts == 0
@@ -89,25 +90,25 @@ disp('  Estimating acceptable delays  ')
 disp('--------------------------------')
 
 % parameters of the design
-xBF.dt = SPM.xBF.dt;
-xBF.name = SPM.xBF.name;
+xBF.dt     = SPM.xBF.dt;
+xBF.name   = SPM.xBF.name;
 xBF.length = SPM.xBF.length;
-xBF.order = SPM.xBF.order;
-xBF = spm_get_bf(xBF);
+xBF.order  = SPM.xBF.order;
+xBF        = spm_get_bf(xBF);
 
 % orthogonalise derivative(s) and normalize
-xBF.bf  =  spm_orth(xBF.bf);
-SS = xBF.bf'*xBF.bf;
+xBF.bf =  spm_orth(xBF.bf);
+SS     = xBF.bf'*xBF.bf;
 for f=1:size(xBF.bf,2)
     xBF.bf(:,f) = xBF.bf(:,f)./sqrt(SS(f,f));
 end
 
 % the range of time covered by this model is
-BFtime = [0:xBF.dt:(length(xBF.bf)-1)*xBF.dt];
-PeakTime = BFtime(find(xBF.bf(:,1) == max(xBF.bf(:,1))));
+BFtime     = 0:xBF.dt:(length(xBF.bf)-1)*xBF.dt;
+PeakTime   = BFtime(find(xBF.bf(:,1) == max(xBF.bf(:,1))));
 PeakDelays = [PeakTime-shift PeakTime+shift];
 if length(unique(PeakDelays)) == 1
-    fprintf('skipping time to peack estimation - delay = 0, this is risky \n')
+    fprintf('skipping time to peak estimation - delay = 0, this is risky \n')
 else
     fprintf('parameters will be boosted for estimated responses peaking between %g and %g sec \n',PeakDelays(1),PeakDelays(2));
 end
@@ -358,9 +359,3 @@ files_out{2} = newcon;
 cd(current)
 disp('------------------')
 disp('spm_hrf_boost done')
-
-
-
-
-
-
