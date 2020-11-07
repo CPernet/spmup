@@ -97,7 +97,6 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
         % get the data
         Vfmri = spm_vol(fmridata{1});
-        Vfmri2 = spm_vol(fmridata{2});
 
     else % not a cell array
         if strcmp(fmridata(1, end - 1:end), ',1')
@@ -285,9 +284,8 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
         tmp    = spm_get_data(Vfmri, [x y z]')';
         tmp(find(sum(isnan(tmp), 2)), :) = []; % removes rows of NaN;
         tmp(sum(tmp, 2) == 0, :) = []; % remove 0
-        M = [M; tmp];
+        M = [M; tmp]; %#ok<*AGROW>
     end
-    line_index = size(M, 1);
     NGM = size(M, 1);
 
     % get data for white matter and CSF
@@ -299,6 +297,8 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
     % remove mean and linear trend
     X = [linspace(0, 1, length(Vfmri))' ones(length(Vfmri), 1)];
     cleanM = M - (X * (X \ M'))';
+    clear M
+    M{1} = cleanM;
 
     if iscell(fmridata) && size(fmridata, 2) == 2
         cleanM2 = spmup_timeseriesplot(fmridata{2}, ...
@@ -309,10 +309,22 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
                                         'nuisance', 'off', ...
                                         'correlation', 'off', ...
                                         'makefig', 'off');
+                                      
+        M{2} = cleanM2;
     end
+    
+    
+    if iscell(fmridata)
+      fmridata = Vfmri(1).fname;
+    end
+    
+    figure_name = fullfile(fileparts(fmridata), 'voxplot');
 
     %% figure
     if strcmpi(makefig, 'on')
+      
+        thick_line_width = 3;
+        thin_line_width = 2;
       
         figure('Name', 'voxplot');
         
@@ -329,15 +341,16 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
         if exist('motion', 'var')
           
             subplot(figplot + 4, 1, plotindex);
-            
             plotindex = plotindex + 1;
-            plot(motion(1, :), 'LineWidth', 3);
+            
+            plot(motion(1, :), 'LineWidth', thick_line_width);
             hold on;
             if size(motion, 1) == 2
                 tmp = motion(1, :) .* motion(2, :);
                 tmp(tmp == 0) = NaN;
-                plot(tmp, 'or', 'LineWidth', 2);
+                plot(tmp, 'or', 'LineWidth', thin_line_width);
             end
+            
             axis([1 length(motion) min(motion(1, :)) max(motion(1, :))]);
             ylabel('motion');
             title('Framewise Displacement');
@@ -347,11 +360,11 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
         if exist('nuisances', 'var')
           
-            subplot(figplot + 4, 1, plotindex);
-            
+            subplot(figplot + 4, 1, plotindex); 
             plotindex = plotindex + 1;
-            plot(nuisances', 'LineWidth', 3);
-            hold on;
+            
+            plot(nuisances', 'LineWidth', thick_line_width);
+            
             axis([1 length(motion) min(nuisances(:)) max(nuisances(:))]);
             ylabel('mean');
             title('WM and CSF signals');
@@ -363,15 +376,16 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
         if exist('r_course', 'var')
           
             subplot(figplot + 4, 1, plotindex);
-            
             plotindex = plotindex + 1;
-            plot(r_course(1, :), 'LineWidth', 3);
+            
+            plot(r_course(1, :), 'LineWidth', thick_line_width);
             hold on;
             if size(r_course, 1) == 2
                 tmp = r_course(1, :) .* r_course(2, :);
                 tmp(tmp == 0) = NaN;
-                plot(tmp, 'or', 'LineWidth', 2);
+                plot(tmp, 'or', 'LineWidth', thin_line_width);
             end
+            
             axis([1 length(r_course) min(r_course(1, :)) max(r_course(1, :))]);
             ylabel('r');
             title('Volume Correlations');
@@ -388,50 +402,50 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
           
             subplot(figplot + 4, 1, [plotindex:figplot + 4]);
             
-            imagesc(cleanM);
-            colormap('gray');
-            hold on;
-            plot([1:size(M, 2)], line_index .* ones(1, size(M, 2)), 'g', 'LineWidth', 2);
-            xlabel('Time (scans)');
+            plot_carpet(M{1}, thin_line_width);
+            
             ylabel('  CSF          White Matter           GM Networks');
-            
-            M = cleanM;
-            
+           
         else
           
             subplot(figplot + 4, 1, [plotindex:figplot + 2]);
             
-            imagesc(cleanM);
-            colormap('gray');
-            hold on;
-            plot([1:size(M, 2)], line_index .* ones(1, size(M, 2)), 'g', 'LineWidth', 2);
+            plot_carpet(M{1}, thin_line_width);
+            
             ylabel('CSF WM GM');
 
             subplot(figplot + 4, 1, [plotindex + 2:figplot + 4]);
             
-            imagesc(cleanM2);
-            colormap('gray');
-            hold on;
-            plot([1:size(M, 2)], line_index .* ones(1, size(M, 2)), 'g', 'LineWidth', 2);
-            xlabel('Time (scans)');
-            ylabel('CSF WM GM');
-            clear M;
+            plot_carpet(M{2}, thin_line_width);
             
-            M{1} = cleanM;
-            M{2} = cleanM2;
-        end
-
-        if iscell(fmridata)
-            fmridata = Vfmri(1).fname;
+            ylabel('CSF WM GM');
+            
         end
         
-        saveas(gcf, fullfile(fileparts(fmridata), 'voxplot.fig'), 'fig');
+        xlabel('Time (scans)');
+        
+        saveas(gcf, [figure_name '.fig'], 'fig');
         
         try
-            print (gcf, '-dpsc2', '-bestfit', fullfile(fileparts(fmridata), 'voxplot.ps'));
+            print (gcf, '-dpsc2', '-bestfit', [figure_name '.ps']);
         catch
-            print (gcf, '-dpsc2', fullfile(fileparts(fmridata), 'voxplot.ps'));
+            print (gcf, '-dpsc2', [figure_name '.ps']);
         end
         
-        close(gcf);
+%         close(gcf);
     end
+
+end
+
+function plot_carpet(cleanM, thin_line_width)
+  
+imagesc(cleanM);
+colormap('gray');
+hold on;
+plot(...
+  1:size(cleanM, 2), ...
+  size(cleanM, 1) .* ones(1, size(cleanM, 2)), ...
+  'g', ...
+  'LineWidth', thin_line_width);
+
+end
