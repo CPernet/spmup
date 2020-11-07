@@ -2,8 +2,12 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
     % routine to produce plots a la Jonathan Power
     %
-    % FORMAT spmup_timeseriesplot(P,c1, c2, c3, options)
-    %        M = spmup_timeseriesplot(P,c1, c2, c3, 'motion','on','nuisances','on','correlation','on')
+    % FORMAT spmup_timeseriesplot(fmridata, c1, c2, c3, options)
+    %        M = spmup_timeseriesplot(fmridata, c1, c2, c3, ...
+    %                                                       'motion','on',...
+    %                                                       'nuisances','on',...
+    %                                                       'correlation','on', ...
+    %                                                       'makefig', 'on')
     %
     % INPUT fmridata is a cell for the time series (see spm_select)
     %                if a cell array with 2 elements, both are plotted
@@ -149,15 +153,17 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
     end
 
     % if no figure, no point computing extra stuff
-    if makefig == 0
+    if strcmpi(makefig, 'off')
         motion      = 'off';
         nuisances   = 'off';
         correlation = 'off';
     end
 
     figplot = 0;
+    
     % Motion
     if strcmpi(motion, 'on') || ~exist('motion', 'var')
+      
         disp('getting frame wise displacement');
         rfile = dir([fileparts(Vfmri(1).fname) filesep '*.txt']);
         if isempty(rfile)
