@@ -17,14 +17,19 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
     %       'motion' 'on' (default) 'off' or a vector/matrix associated to the data
     %               --> this represent the motion computed from the motion parameter
     %              (see also spmup_FD.m)
+    %
     %       'correlation' 'on' (default) 'off' or a vector/matrix associated to the data
     %               --> for resting fMRI this is useful to check against motion
     %               and nuisance that volumes don't get decorrelated
     %               (see also spmup_volumecorr.m)
+    %
     %       'nuisances' 'on' (default) 'off' or a matrix (n*2) of noise computed from c2 and c3
     %               --> these typically reflect changes in globals, respiration and
     %               cardiac cycles that are not well captured by motion correction
     %               (see also spmup_nuisance.m)
+    %
+    %       'makefig' 'on' (default) 'off' to decide whether to plot the figure
+    %       or only return M which is the matrix containing the carpet plot.
     %
     %       Note that motion and correlation can be vectors or matrices, the
     %       second columns or row is then assumed to mark outliers
@@ -49,6 +54,7 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
     %% check fMRI data in
     if nargin == 0
+
         [fmridata, sts] = spm_select(1, 'image', 'Select fMRI data');
         if sts == 0
             disp('selection aborded');
@@ -57,25 +63,30 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
         if size(fmridata, 1) == 1 && strcmp(fmridata(length(fmridata) - 1:end), ',1')
             fmridata = fmridata(1:length(fmridata) - 2); % in case picked 4D put left ,1
         end
+        
         [cn1, sts] = spm_select(1, 'image', 'Select grey matter tissue image');
         if sts == 0
             disp('selection aborded');
             return
         end
+        
         [cn2, sts] = spm_select(1, 'image', 'Select white matter tissue image');
         if sts == 0
             disp('selection aborded');
             return
         end
+        
         [cn3, sts] = spm_select(1, 'image', 'Select csf tissue image');
         if sts == 0
             disp('selection aborded');
             return
         end
+        
     end
 
     % check fmridata is 4D
     if iscell(fmridata)
+      
         if strcmp(fmridata{1}(end - 1:end), ',1')
             fmridata{1} = fmridata{1}(1:end - 2);
         end
@@ -93,16 +104,18 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
             fmridata = fmridata(1:end - 2);
         end
         Vfmri = spm_vol(fmridata(1, :));
+        
     end
 
     %% deal with the masks
     disp('reading and thresholding masks ... ');
+    
     if iscell(cn1)
         cn1 = cell2mat(cn1);
     end
     greymatter = spm_vol(cn1);
     if any(greymatter.dim ~= Vfmri(1).dim)
-        disp('Dimension issue between data and grey matter - reslicing ... ');
+        disp('Dimension issue between data and grey matter');
     end
 
     if iscell(cn2)
@@ -182,11 +195,11 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
         motion(2, :) = spmup_comp_robust_outliers(motion);
 
     elseif isnumeric(motion)
-        motion = motion;
         if size(motion, 1) == size(Vfmri, 1)
             motion = motion';
         end
         figplot = figplot + 1;
+        
     end
 
     % Nuisance
@@ -205,6 +218,7 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
             nuisances = nuisances';
         end
         figplot = figplot + 1;
+        
     end
 
     % Correlation
@@ -235,8 +249,8 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
     Vroi = spm_vol(roi);
     if any(Vroi.dim ~= Vfmri(1).dim) % maybe we need to resize the ROI image
+      
         % 1st check if there is a resampled one that match
-
         roi2 = fullfile( ...
                         fileparts(mfilename('fullpath')), ...
                         '..', ...
@@ -255,6 +269,7 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
             Vroi = spm_vol(cell2mat(spmup_resize(roi, bb{1}.bb, abs(diag(Vfmri(1).mat(1:3, 1:3)))')));
         end
         clear Vroi2;
+        
     end
 
     % for each network, take gray matter voxels
@@ -263,6 +278,7 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
     ROIdata    = round(ROIdata);
     roi_values = unique(ROIdata);
     roi_values(roi_values == 0) = [];
+    
     disp('finally reading the data ...');
     for r = 1:length(roi_values)
         [x, y, z] = ind2sub(size(ROIdata), intersect(find(ROIdata == r), find(c1)));
@@ -284,20 +300,36 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
     X = [linspace(0, 1, length(Vfmri))' ones(length(Vfmri), 1)];
     cleanM = M - (X * (X \ M'))';
 
-    %% figure
     if iscell(fmridata) && size(fmridata, 2) == 2
-        cleanM2 = spmup_timeseriesplot(fmridata{2}, cn1, cn2, cn3, 'motion', 'off', 'nuisance', 'off', ...
-                                       'correlation', 'off', 'makefig', 'off');
+        cleanM2 = spmup_timeseriesplot(fmridata{2}, ...
+                                        cn1, ...
+                                        cn2, ...
+                                        cn3, ...
+                                        'motion', 'off', ...
+                                        'nuisance', 'off', ...
+                                        'correlation', 'off', ...
+                                        'makefig', 'off');
     end
 
+    %% figure
     if strcmpi(makefig, 'on')
+      
         figure('Name', 'voxplot');
-        set(gcf, 'Color', 'w', 'InvertHardCopy', 'off', 'units', 'normalized', 'outerposition', [0 0 1 1]);
+        
+        set(gcf, ...
+          'Color', 'w', ...
+          'InvertHardCopy', 'off', ...
+          'units', 'normalized', ...
+          'outerposition', [0 0 1 1]);
+        
         plotindex = 1;
+        
         % top of the figure are nuisance time courses: head motion as framewise
         % displacement and the white mattrer and csf time courses (detrended)
         if exist('motion', 'var')
+          
             subplot(figplot + 4, 1, plotindex);
+            
             plotindex = plotindex + 1;
             plot(motion(1, :), 'LineWidth', 3);
             hold on;
@@ -310,10 +342,13 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
             ylabel('motion');
             title('Framewise Displacement');
             grid on;
+            
         end
 
         if exist('nuisances', 'var')
+          
             subplot(figplot + 4, 1, plotindex);
+            
             plotindex = plotindex + 1;
             plot(nuisances', 'LineWidth', 3);
             hold on;
@@ -321,11 +356,14 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
             ylabel('mean');
             title('WM and CSF signals');
             grid on;
+            
         end
 
         % displacement and the white mattrer and csf time courses (detrended)
         if exist('r_course', 'var')
+          
             subplot(figplot + 4, 1, plotindex);
+            
             plotindex = plotindex + 1;
             plot(r_course(1, :), 'LineWidth', 3);
             hold on;
@@ -338,22 +376,31 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
             ylabel('r');
             title('Volume Correlations');
             grid on;
+            
         end
 
-        % plot is organized as follow: cortex (subdivided as Yeo et al networks), cerebellum, nuclei
+        % plot is organized as follow: 
+        % - cortex (subdivided as Yeo et al networks), 
+        % - cerebellum, nuclei
         % // thick line // white matter, ventricules - shows top 20% most variables voxels
 
         if ~exist('cleanM2', 'var')
+          
             subplot(figplot + 4, 1, [plotindex:figplot + 4]);
+            
             imagesc(cleanM);
             colormap('gray');
             hold on;
             plot([1:size(M, 2)], line_index .* ones(1, size(M, 2)), 'g', 'LineWidth', 2);
             xlabel('Time (scans)');
             ylabel('  CSF          White Matter           GM Networks');
+            
             M = cleanM;
+            
         else
+          
             subplot(figplot + 4, 1, [plotindex:figplot + 2]);
+            
             imagesc(cleanM);
             colormap('gray');
             hold on;
@@ -361,6 +408,7 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
             ylabel('CSF WM GM');
 
             subplot(figplot + 4, 1, [plotindex + 2:figplot + 4]);
+            
             imagesc(cleanM2);
             colormap('gray');
             hold on;
@@ -368,6 +416,7 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
             xlabel('Time (scans)');
             ylabel('CSF WM GM');
             clear M;
+            
             M{1} = cleanM;
             M{2} = cleanM2;
         end
@@ -375,11 +424,14 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
         if iscell(fmridata)
             fmridata = Vfmri(1).fname;
         end
+        
         saveas(gcf, fullfile(fileparts(fmridata), 'voxplot.fig'), 'fig');
+        
         try
             print (gcf, '-dpsc2', '-bestfit', fullfile(fileparts(fmridata), 'voxplot.ps'));
         catch
             print (gcf, '-dpsc2', fullfile(fileparts(fmridata), 'voxplot.ps'));
         end
+        
         close(gcf);
     end

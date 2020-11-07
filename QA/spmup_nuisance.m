@@ -4,7 +4,7 @@ function nuisances = spmup_nuisance(fmridata, whitematter, csf)
     % Masks are thresholded at 70%, the time series extracted, detrended (1st
     % order polynomial) and averaged
     %
-    % FORMAT: nuisances = spmup_nuisance(fmridata,whitematter,csf)
+    % FORMAT: nuisances = spmup_nuisance(fmridata, whitematter, csf)
     %
     % IMPUT fmridata is the time series of data
     %       whitematter is the WM mask
@@ -20,6 +20,7 @@ function nuisances = spmup_nuisance(fmridata, whitematter, csf)
 
     %% inputs
     if nargin == 0
+      
         [fmridata, sts] = spm_select(Inf, 'image', 'Select fMRI data');
         if sts == 0
             disp('selection aborded');
@@ -34,11 +35,13 @@ function nuisances = spmup_nuisance(fmridata, whitematter, csf)
             disp('selection aborded');
             return
         end
+        
         [csf, sts] = spm_select(1, 'image', 'Select csf tissue image');
         if sts == 0
             disp('selection aborded');
             return
         end
+        
     end
 
     % check fmridata is 4D
