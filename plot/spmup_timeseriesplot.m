@@ -239,27 +239,35 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
     %% get matrix to plot from fMRI data
     disp('Checking Yeo''s networks to organize GM voxels');
-
-    roi = fullfile( ...
+    
+    atlas_path = fullfile( ...
                    fileparts(mfilename('fullpath')), ...
                    '..', ...
-                   'external', ...
-                   'Yeo2011_7Networks_MNI152_FreeSurferConformed1mm_LiberalMask.nii');
+                   'external');
+    atlas_filename = 'Yeo2011_7Networks_MNI152_FreeSurferConformed1mm_LiberalMask.nii';
+
+    roi = fullfile(atlas_path, atlas_filename);
 
     Vroi = spm_vol(roi);
     if any(Vroi.dim ~= Vfmri(1).dim) % maybe we need to resize the ROI image
       
         % 1st check if there is a resampled one that match
-        roi2 = fullfile( ...
-                        fileparts(mfilename('fullpath')), ...
-                        '..', ...
-                        'external', ...
-                        'Yeo2011_7Networks_MNI152_FreeSurferConformed1mm_LiberalMask.nii');
+        roi2 = fullfile(atlas_path, ['r' atlas_filename]);
 
-        Vroi2 = spm_vol(roi2);
-        if Vroi2.dim ~= Vfmri(1).dim
+        reslice_atlas = true;              
+        if exist(roi2, 'file')  
+          
+          Vroi2 = spm_vol(roi2);
+          
+          if Vroi2.dim ~= Vfmri(1).dim
             Vroi = Vroi2;
-        else
+            reslice_atlas = false; 
+          end
+          
+          clear Vroi2;
+        end
+          
+        if reslice_atlas
             % 2nd if not resample
             clear matlabbatch;
             matlabbatch{1}.spm.util.bbox.image = {Vfmri(1).fname};
