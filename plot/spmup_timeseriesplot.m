@@ -286,6 +286,7 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
         tmp(sum(tmp, 2) == 0, :) = []; % remove 0
         M = [M; tmp]; %#ok<*AGROW>
     end
+    line_index = size(M, 1);
     NGM = size(M, 1);
 
     % get data for white matter and CSF
@@ -402,7 +403,7 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
           
             subplot(figplot + 4, 1, [plotindex:figplot + 4]);
             
-            plot_carpet(M{1}, thin_line_width);
+            plot_carpet(M{1}, line_index, thin_line_width);
             
             ylabel('  CSF          White Matter           GM Networks');
            
@@ -410,13 +411,13 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
           
             subplot(figplot + 4, 1, [plotindex:figplot + 2]);
             
-            plot_carpet(M{1}, thin_line_width);
+            plot_carpet(M{1}, line_index, thin_line_width);
             
             ylabel('CSF WM GM');
 
             subplot(figplot + 4, 1, [plotindex + 2:figplot + 4]);
             
-            plot_carpet(M{2}, thin_line_width);
+            plot_carpet(M{2}, line_index, thin_line_width);
             
             ylabel('CSF WM GM');
             
@@ -437,14 +438,14 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
 end
 
-function plot_carpet(cleanM, thin_line_width)
+function plot_carpet(cleanM, line_index, thin_line_width)
   
 imagesc(cleanM);
 colormap('gray');
 hold on;
 plot(...
   1:size(cleanM, 2), ...
-  size(cleanM, 1) .* ones(1, size(cleanM, 2)), ...
+  line_index .* ones(1, size(cleanM, 2)), ...
   'g', ...
   'LineWidth', thin_line_width);
 
