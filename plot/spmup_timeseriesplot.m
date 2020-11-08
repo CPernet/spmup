@@ -334,15 +334,9 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
       
         thick_line_width = 3;
         thin_line_width = 2;
+        
+        fig_handle = spm_figure('Create', 'Graphics', 'Carpet plot');
       
-        figure('Name', 'voxplot');
-        
-        set(gcf, ...
-          'Color', 'w', ...
-          'InvertHardCopy', 'off', ...
-          'units', 'normalized', ...
-          'outerposition', [0 0 1 1]);
-        
         plotindex = 1;
         
         % top of the figure are nuisance time courses: head motion as framewise
@@ -434,14 +428,10 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
         xlabel('Time (scans)');
         
         saveas(gcf, [figure_name '.fig'], 'fig');
+       
+        spm_print(figure_name, fig_handle)
         
-        try
-            print (gcf, '-dpsc2', '-bestfit', [figure_name '.ps']);
-        catch
-            print (gcf, '-dpsc2', [figure_name '.ps']);
-        end
-        
-%         close(gcf);
+        close(gcf);
     end
 
 end
