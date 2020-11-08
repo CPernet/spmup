@@ -341,8 +341,11 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
         plotindex = 1;
 
-        % top of the figure are nuisance time courses: head motion as framewise
-        % displacement and the white mattrer and csf time courses (detrended)
+        % top of the figure are nuisance time courses: 
+        % - head motion as framewise displacement 
+        % - the white mattrer and csf time courses (detrended)
+        % - volume correlations
+        
         if exist('motion', 'var')
 
             subplot(figplot + 4, 1, plotindex);
@@ -377,7 +380,6 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
         end
 
-        % displacement and the white mattrer and csf time courses (detrended)
         if exist('r_course', 'var')
 
             subplot(figplot + 4, 1, plotindex);
@@ -399,9 +401,16 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
         end
 
         % plot is organized as follow:
-        % - cortex (subdivided as Yeo et al networks),
-        % - cerebellum, nuclei
-        % // thick line // white matter, ventricules - shows top 20% most variables voxels
+        %
+        % - cortex (subdivided as Yeo et al networks)
+        % - cerebellum
+        % - nuclei
+        %
+        % // thick green line // 
+        %
+        % white matter - shows top 30% most variables voxels
+        % ventricules  - shows top 30% most variables voxels
+        %
 
         if numel(M) == 1
 
@@ -442,7 +451,10 @@ function plot_carpet(cleanM, line_index, thin_line_width)
 
     imagesc(cleanM);
     colormap('gray');
+    
     hold on;
+    
+    % plot green line separating GM from the rest
     plot( ...
          1:size(cleanM, 2), ...
          line_index .* ones(1, size(cleanM, 2)), ...
