@@ -28,13 +28,23 @@ function tSNR = spmup_temporalSNR(time_series,masks,fig)
 %            .physio2termal_corr: correlation between images
 %            .roi: tSNR for increased ROI (from in mask by increasing slices) ~linear function of srqrt(nb voxels)
 %            .signal_mean: sqrt(std(GM)^2+std(WM+CSF)^2) / sqrt((SNR0^2/tSNR- 1)/SNR0^2)
-%            Since tSNR = SNR0^2 / (1+L^2*SNR0^2), we have L^2 = (SNR0^2 /tSNR - 1) / SNR0^2
-%            and sqrt(std(GM)^2+std(WM+CSF)^2) = L*Smean
-%        tSNR_time_series.nii image is also saved on the drive, showing tSNR in each voxel for GM, WM and CSF as computed above
+%                          Since tSNR = SNR0^2 / (1+L^2*SNR0^2), 
+%                          we have L^2 = (SNR0^2 /tSNR - 1) / SNR0^2
+%                          and sqrt(std(GM)^2+std(WM+CSF)^2) = L*Smean
 %
-% References: (1) Thomas Liu  (2016) Noise contributions to the fMRI signal: An overview NeuroImage, 143, 141-151.
-%             (2) C�esar Caballero-Gaudes and Richard C. Reynolds (2016). Methods For Cleaning The BOLD fMRI Signal. NeuroImage, 154,128-149
-%             (3) Lawrence Wald and Jonathan R Polimeni (2016). Impacting the effect of fMRI noise through hardware and acquisition choices – Implications for controlling false positive rates. NeuroImage, 154,15-22
+%        tSNR_time_series.nii image is also saved on the drive, showing tSNR in each voxel 
+%        for GM, WM and CSF as computed above
+%
+% References: (1) Thomas Liu  (2016) 
+%                 Noise contributions to the fMRI signal: An overview
+%                 NeuroImage, 143, 141-151.
+%             (2) Cesar Caballero-Gaudes and Richard C. Reynolds (2016). 
+%                 Methods For Cleaning The BOLD fMRI Signal. 
+%                 NeuroImage, 154,128-149
+%             (3) Lawrence Wald and Jonathan R Polimeni (2016). 
+%                 Impacting the effect of fMRI noise through hardware and acquisition choices – 
+%                 Implications for controlling false positive rates. 
+%                 NeuroImage, 154,15-22
 %
 % Cyril Pernet - University of Edinburgh
 % -----------------------------------------
@@ -307,7 +317,7 @@ L2 = (tSNR.image^2 /tSNR.average - 1) / tSNR.image^2;
 tSNR.signal_mean = sqrt(stdGM^2+stdWMCSF^2) / sqrt(L2);
 
 %% per ROI (absolute masking)
-disp('tSNR - checking linearlity ..')
+disp('tSNR - checking linearity ..')
 GM  = spm_read_vols(VM(1));
 WM  = spm_read_vols(VM(2));
 CSF = spm_read_vols(VM(3));
