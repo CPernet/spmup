@@ -114,8 +114,8 @@ if std_nonbrain == 0
 end
 
 %% make a figure showing the mask and the data range
-figure('Name','Brain Mask')
-set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+figure_name = 'Brain Mask';
+fig_handle = open_spm_figure('save', 'Brain Mask');
 
 subplot(2,2,1); 
 tmp                = spm_read_vols(AnatV); % read anat
@@ -144,12 +144,8 @@ if isempty(filepath)
     filepath = pwd; 
 end
 
-try
-    print (gcf,'-dpdf', '-bestfit', fullfile(filepath,[filename '_AnatQC.pdf']));
-catch
-    print (gcf,'-dpdf', fullfile(filepath,[filename '_AnatQC.pdf']));
-end
-close(gcf)
+save_spm_figure('save', fig_handle, figure_name);
+
 
 %% now do all computations
 disp('spmup_anatQA: getting measures')
@@ -227,5 +223,25 @@ else
     writetable(struct2table(anatQA), fullfile(filepath,[filename '_anatQA.txt']));
 end
 
+end
         
+function fig_handle = open_spm_figure(fig, figure_name)
+    
+    if strcmpi(fig, 'on')
+        fig_handle = spm_figure('Create', 'Graphics', figure_name, 'on');
+    elseif strcmpi(fig, 'save')
+        fig_handle = spm_figure('Create', 'Graphics', figure_name, 'off');
+    end
+    
+    
+end
+
+function save_spm_figure(fig, fig_handle, figure_name)
+    
+    if strcmpi(fig,'save')
+        spm_print(['spmup_QC-' figure_name], fig_handle);
+        close(fig_handle);
+    end
+    
+end
 
