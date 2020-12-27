@@ -78,7 +78,7 @@ end
 if iscell(V); V = cell2mat(V); end
 if size(V,1) < 10; error('there is less than 10 images in your time series ??'); end
 
-for m=1:length(masks)
+for m=1:size(masks,1)
     if iscell(masks) ==0
         VM(m) = spm_vol(masks(m,:));
     else
@@ -165,16 +165,15 @@ end
 
 if sum(isnan(data(:))) ~= numel(data)
     if ~strcmpi(fig,'off')
+        
         % tSNR per voxel from background
         data = (nanmean(data,1)/stdBackground)';
         
         % see where is it and spatial distribition
-        figure('Name','Background SNR')
-        if strcmpi(fig,'on')
-            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-        else
-            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
-        end
+        figure_name = 'Background SNR';
+
+        fig_handle = open_spm_figure(fig, figure_name);
+        
         figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
         SNRimage = zeros(V(1).dim); index = 1;
         SNRimage(find(brain_mask~=1)) = data;
@@ -236,14 +235,9 @@ if sum(isnan(data(:))) ~= numel(data)
         bar(bc,K,1,'FaceColor',[0.5 0.5 1]);
         title('RAS Histogram - background noise');
         grid on; box on; ylabel('tSNR'); drawnow
-        if strcmpi(fig,'save')
-            if exist(fullfile(filepath,'spm.ps'),'file')
-                print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
-            else
-                print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
-            end
-            close('Background SNR')
-        end
+        
+        save_spm_figure(fig, fig_handle, figure_name);
+        
     end
 end
 
@@ -277,12 +271,12 @@ SNROimage  = zeros(V(1).dim);
 SNROimage(find(GM+WM+CSF)) = data;
 
 if ~strcmpi(fig,'off')
-    figure('Name','SNR0'); index = 1;
-    if strcmpi(fig,'on')
-        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-    else
-        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
-    end
+    
+    figure_name = 'SNR0';
+
+    fig_handle = open_spm_figure(fig, figure_name);
+   
+    index = 1;
     figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
     for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
         subplot(4,9,figindex(index));
@@ -296,14 +290,9 @@ if ~strcmpi(fig,'off')
         index = index+1; colormap(cubehelix(32,[3,1.9,1.5,1], [0,1], [0.2,0.8]))
     end
     drawnow
-    if strcmpi(fig,'save')
-        if exist(fullfile(filepath,'spm.ps'),'file')
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
-        else
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
-        end
-        close('SNR0')
-    end
+    
+    save_spm_figure(fig, fig_handle, figure_name);
+    
 end
 
 tSNR.SNR02tSNR_corr = corr(SNRimage(:),SNROimage(:));
@@ -346,26 +335,42 @@ B = pinv([sqrt(tSNR.roi.size)' ones(18,1)])*tSNR.roi.value';
 model = [sqrt(tSNR.roi.size)' ones(18,1)]*B;
 tSNR.roi.slope = B(1);
 
+
 if ~strcmpi(fig,'off')
-    figure('Name','SNR per size'); index = 1;
-    if strcmpi(fig,'on')
-        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-    else
-        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
-    end
+
+    figure_name = 'SNR per size';
+    
+    fig_handle = open_spm_figure(fig, figure_name);
+    
     plot(sqrt(tSNR.roi.size),[sqrt(tSNR.roi.size)' ones(18,1)]*B,'LineWidth',3);
     hold on; plot(sqrt(tSNR.roi.size),tSNR.roi.value,'ro','LineWidth',2);
     axis tight; box on; grid minor; ylabel('temporal SNR','FontSize',12)
     xlabel('sqrt of the number of in brain voxels used','FontSize',12)
     mytitle = sprintf('tSNR=%g*sqrt(nb of voxels)+%g \n RMSE=%g',B(1),B(2),sqrt(mean(model - tSNR.roi.value')));
     title(mytitle,'FontSize',12); drawnow
-    if strcmpi(fig,'save')
-        if exist(fullfile(filepath,'spm.ps'),'file')
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
-        else
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
-        end
-        close('SNR per size')
-    end
+    
+    save_spm_figure(fig, fig_handle, figure_name);
+    
 end
 
+end
+
+function fig_handle = open_spm_figure(fig, figure_name)
+    
+    if strcmpi(fig, 'on')
+        fig_handle = spm_figure('Create', 'Graphics', figure_name, 'on');
+    elseif strcmpi(fig, 'save')
+        fig_handle = spm_figure('Create', 'Graphics', figure_name, 'off');
+    end
+    
+    
+end
+
+function save_spm_figure(fig, fig_handle, figure_name)
+    
+    if strcmpi(fig,'save')
+        spm_print(['spmup_QC-' figure_name], fig_handle);
+        close(fig_handle);
+    end
+    
+end
