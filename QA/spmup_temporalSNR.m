@@ -3,7 +3,7 @@ function tSNR = spmup_temporalSNR(time_series,masks,varargin)
 % Computes the temporal SNR of the time_series input in the different
 % compartments provided by the masks images = mean signal / std over time
 % The routine recapitulates tSNR as described in Thomas Liu  (2016),
-% C�esar Caballero-Gaudes and Richard C. Reynolds (2016). &
+% Caesar Caballero-Gaudes and Richard C. Reynolds (2016). &
 % Lawrence Wald and Jonathan R Polimeni (2016).
 %
 % FORMAT tSNR = spmup_temporalSNR(time_series,masks,options)
