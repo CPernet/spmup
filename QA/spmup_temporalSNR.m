@@ -394,7 +394,7 @@ end
 
 if strcmpi(roi,'on')
     %% per ROI (absolute masking)
-    disp('tSNR - checking linearlity ..')
+    disp('tSNR - checking linearity ..')
     GM  = spm_read_vols(VM(1));
     WM  = spm_read_vols(VM(2));
     CSF = spm_read_vols(VM(3));
