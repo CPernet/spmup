@@ -3,7 +3,7 @@ function tSNR = spmup_temporalSNR(time_series,masks,varargin)
 % Computes the temporal SNR of the time_series input in the different
 % compartments provided by the masks images = mean signal / std over time
 % The routine recapitulates tSNR as described in Thomas Liu  (2016),
-% CÃesar Caballero-Gaudes and Richard C. Reynolds (2016). &
+% Caesar Caballero-Gaudes and Richard C. Reynolds (2016). &
 % Lawrence Wald and Jonathan R Polimeni (2016).
 %
 % FORMAT tSNR = spmup_temporalSNR(time_series,masks,options)
@@ -361,7 +361,6 @@ if strcmpi(snr0,'on')
             close('SNR0')
         end
     end
-<<<<<<< Updated upstream
 end
 
 tSNR.SNR02tSNR_corr = corr(SNRimage(:),SNROimage(:));
@@ -382,9 +381,6 @@ CSF = spm_read_vols(VM(3));
 
 index = 1;
 for p=0.95:-0.05:0.1
-=======
->>>>>>> Stashed changes
-    
     tSNR.SNR02tSNR_corr = corr(SNRimage(:),SNROimage(:));
     clear SNRimage SNROimage
     
@@ -398,7 +394,7 @@ end
 
 if strcmpi(roi,'on')
     %% per ROI (absolute masking)
-    disp('tSNR - checking linearlity ..')
+    disp('tSNR - checking linearity ..')
     GM  = spm_read_vols(VM(1));
     WM  = spm_read_vols(VM(2));
     CSF = spm_read_vols(VM(3));
