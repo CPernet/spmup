@@ -4,6 +4,11 @@
 *.~m
 
 #################
+## test related
+
+unit_test/data/*
+
+#################
 
 *.pydevproject
 .project
