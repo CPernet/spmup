@@ -76,10 +76,12 @@ parfor v=1:n
         [~,locs]=findpeaks(R(v,:));
         if ~isempty(locs)
             [~,maxloc]=max(R(v,:));
-            [~,closestpeak]=min(locs-maxloc);
+            tmp = locs-maxloc;
+            tmp(tmp <= 0) = NaN; % avoid being on itself
+            [~,closestpeak]=min(tmp);
             closestpeak = locs(closestpeak);
             [~,minloc]=min(R(v,maxloc:closestpeak));
-            autocorrelation_window(v) = minloc-maxloc;
+            autocorrelation_window(v) = maxloc+minloc;
         else
             autocorrelation_window(v) = 0;
         end

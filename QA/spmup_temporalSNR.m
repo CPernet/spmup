@@ -94,7 +94,7 @@ end
 if iscell(V); V = cell2mat(V); end
 if size(V,1) < 10; error('there is less than 10 images in your time series ??'); end
 
-for m=1:length(masks)
+for m=1:size(masks,1)
     if iscell(masks) ==0
         VM(m) = spm_vol(masks(m,:));
     else
@@ -426,5 +426,5 @@ if strcmpi(roi,'on')
             close('SNR per size')
         end
     end
+    
 end
-

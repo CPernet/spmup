@@ -75,6 +75,7 @@ end
 
 [pathstr,name,ext]= fileparts(V(1).fname);
 for v=1:length(operators)
+    clear out
     if strcmpi(operators{v},'mean')
         out = nanmean(Y,dim);
         V(1).fname = [pathstr filesep 'mean_' name ext];
@@ -82,7 +83,23 @@ for v=1:length(operators)
         out = spm_write_vol(V(1),out);
         meanimg = out.fname;
     elseif strcmpi(operators{v},'std')
-        out = nanstd(Y,0,dim);
+        try
+            out = nanstd(Y,0,dim);
+        catch
+            warning('serious issue can''t get std! trying voxel-wise')    
+            out = zeros(size(Y,1),size(Y,2),size(Y,3));
+            for x=1:size(Y,1)
+                for y=1:size(Y,2)
+                    for z=1:size(Y,3)
+                        try
+                            out(x,y,z) = nanstd(squeeze(Y(x,y,z,:)),0);
+                        catch
+                            sprintf('serious issue voxel %g %g %g \n',x,y,z)
+                        end
+                    end
+                end
+            end
+        end
         V(1).fname = [pathstr filesep 'std_' name ext];
         V(1).descrip = ['spmup ' operators{v}];
         out = spm_write_vol(V(1),out);
