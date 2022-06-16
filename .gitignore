@@ -5,7 +5,7 @@
 
 #################
 ## test related
-
+*.ps
 unit_test/data/*
 
 #################
