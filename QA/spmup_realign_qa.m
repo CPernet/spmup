@@ -180,6 +180,7 @@ if strcmpi(Globals,'on')
 end
 
 if isempty(data) && strcmpi(Voltera,'off')
+    new_files = {};
     disp('no design computed, no extra regressors selected')
 else
     spmup_censoring(fullfile(motion_file.folder,motion_file.name),...
