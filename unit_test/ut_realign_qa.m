@@ -93,10 +93,14 @@ assert(size(all_regressors, 2) == 30);
 % make sure all censoring regressors are at the end
 assert(all(sum(all_regressors(:, end - 2:end)) == [1 1 1]));
 
+metadata = spm_load(spm_file(new_files{1}, 'ext', '.json'));
+assert(strcmp(metadata.Columns{end}, 'outlier_0003'));
+
 teardown(new_files);
 
 %%
 function teardown(new_files)
     delete(new_files{1});
     delete(fullfile(test_folder(), 'data', 'sub-01', 'func', '*.ps'));
+    delete(fullfile(test_folder(), 'data', 'sub-01', 'func', '*design.json'));
 end
