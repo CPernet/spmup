@@ -115,10 +115,6 @@ if nargin >1
    end
 end
 
-if strcmpi(FramewiseDisplacement,'on')
-  MotionParameters = 'on'; 
-end
-
 % if movie we need AC
 if strcmp(Movie,'on')
     if isempty(Coordinates)
@@ -134,6 +130,11 @@ end
 findex = 1; % index for the new_files variables
 
 %% look at motion parameters
+if strcmpi(FramewiseDisplacement,'on')
+  % FD is computed at the motion stage
+  MotionParameters = 'on'; 
+end
+
 [filepath,filename]=fileparts(V(1).fname);
 if strcmpi(MotionParameters,'on')
     disp('getting displacement ... ')
@@ -141,8 +142,9 @@ if strcmpi(MotionParameters,'on')
     if size(motion_file,1) > 1
        error('more than one rp*.txt file was found that partially matches the time series name') 
     end
-    [FD,RMS] = spmup_FD(fullfile(motion_file.folder,motion_file.name),...
-        'Radius',Radius,'Figure',fig);
+    [FD,RMS] = spmup_FD(fullfile(motion_file.folder, motion_file.name),...
+                        'Radius', Radius, ...
+                        'Figure', fig);
 end
 
 %% look at globals
