@@ -64,7 +64,7 @@ if ~isempty(data)
         end
     end
     censoring_regressors(:,sum(censoring_regressors,1)==0) = [];
-    design = [motion censoring_regressors];
+    design = [motion data censoring_regressors];
 else
     design = motion;
 end
