@@ -6,8 +6,13 @@ function new_files = spmup_realign_qa(P,varargin)
 % FORMAT realign_qa ( = do it all)
 %        realign_qa(P,flags)
 %
-% INPUT P indicate the timeseries to load
-%       options are
+% INPUT P indicate the timeseries to load. Can be 
+%         - path to a 4D nifti
+%         - cellstring of path to 3D niftis
+%         - a 4D array x, y, z, t of the timeseries data
+%
+%       Options are:
+%
 %       'Motion Parameters': 'on' (default) or 'off'
 %              --> plots motion parameters and 1st derivatives
 %       'Framewise displacement': 'on' (default) or 'off'
