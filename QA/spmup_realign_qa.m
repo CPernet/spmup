@@ -216,9 +216,11 @@ end
 if isempty(data) && strcmpi(Voltera,'off')
     new_files = {};
     disp('no design computed, no extra regressors selected')
+    
 else
-    spmup_censoring(fullfile(motion_file.folder,motion_file.name),...
-        data,'Voltera',Voltera);
+    spmup_censoring(fullfile(motion_file.folder, motion_file.name),...
+                    data, ...
+                    'Voltera', Voltera);
     % remane using P
     if ~exist(fullfile(motion_file.folder,[filename '_design.txt']), 'file') 
       movefile(fullfile(motion_file.folder,[motion_file.name(4:end-4) '_design.txt']),...
@@ -231,8 +233,10 @@ end
 
 %% make movies
 if strcmpi(Movie, 'on')
-    new_files{findex} = spmup_movie(Y,'coordinates',Coordinates,...
-        'filename',fullfile(filepath,filename),'showfig','off');
+    new_files{findex} = spmup_movie(Y, ...
+                                    'coordinates', Coordinates,...
+                                    'filename', fullfile(filepath,filename), ...
+                                    'showfig', 'off');
 end
 cd(current)
 disp('realign QA done');
