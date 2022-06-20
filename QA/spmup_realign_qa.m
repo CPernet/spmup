@@ -191,8 +191,10 @@ else
     spmup_censoring(fullfile(motion_file.folder,motion_file.name),...
         data,'Voltera',Voltera);
     % remane using P
-    movefile(fullfile(motion_file.folder,[motion_file.name(4:end-4) '_design.txt']),...
-        fullfile(motion_file.folder,[filename '_design.txt']))
+    if ~exist(fullfile(motion_file.folder,[filename '_design.txt']), 'file') 
+      movefile(fullfile(motion_file.folder,[motion_file.name(4:end-4) '_design.txt']),...
+               fullfile(motion_file.folder,[filename '_design.txt']))
+    end
     new_files{findex} = fullfile(motion_file.folder,[filename '_design.txt']);
     findex = findex +1;
 end
