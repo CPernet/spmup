@@ -129,19 +129,21 @@ end
 
 findex = 1; % index for the new_files variables
 
+[filepath,filename]=fileparts(V(1).fname);
+motion_file = dir(fullfile(filepath,['rp*' filename(round(length(filename)/2):end) '.txt']));
+if size(motion_file,1) > 1
+  error('more than one rp*.txt file was found that partially matches the time series name')
+end
+
 %% look at motion parameters
 if strcmpi(FramewiseDisplacement,'on')
   % FD is computed at the motion stage
   MotionParameters = 'on'; 
 end
 
-[filepath,filename]=fileparts(V(1).fname);
 if strcmpi(MotionParameters,'on')
     disp('getting displacement ... ')
-    motion_file = dir(fullfile(filepath,['rp*' filename(round(length(filename)/2):end) '.txt'])); 
-    if size(motion_file,1) > 1
-       error('more than one rp*.txt file was found that partially matches the time series name') 
-    end
+
     [FD,RMS] = spmup_FD(fullfile(motion_file.folder, motion_file.name),...
                         'Radius', Radius, ...
                         'Figure', fig);
@@ -150,7 +152,9 @@ end
 %% look at globals
 
 if strcmpi(Globals,'on')
+  
     disp('computing globals for outliers ... ')
+    
     glo = zeros(length(V),1);
     for s=1:length(V)
         glo(s) = spm_global(V(s));
@@ -159,21 +163,40 @@ if strcmpi(Globals,'on')
     g_outliers = spmup_comp_robust_outliers(glo);
         
     % figure
-    figure('Name','Globals outlier detection','Visible','On');
-    if strcmpi(fig,'on')
-        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-    else
-        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    figure('Name', 'Globals outlier detection', ...
+           'Visible', 'on');
+    
+    if ismember(fig, {'off', 'save'})
+          set(gcf,'Visible','off')
     end
-    plot(glo,'LineWidth',3); title('Global intensity');
-    hold on; tmp = g_outliers.*glo; tmp(tmp==0)=NaN; plot(tmp,'or','LineWidth',3);
-    grid on; axis tight;  xlabel('scans'); ylabel('mean intensity')
+
+    set(gcf,'Color','w', ...
+            'InvertHardCopy','off', ...
+            'units','normalized', ...
+            'outerposition',[0 0 1 1])
+          
+    hold on;       
+    
+    plot(glo,'LineWidth',3); 
+
+    tmp = g_outliers.*glo; 
+    tmp(tmp==0)=NaN; 
+    
+    plot(tmp,'or','LineWidth',3);
+    
+    grid on; 
+    axis tight; 
+    
+    xlabel('scans');
+    ylabel('mean intensity');
+    title('Global intensity');
+    
     if strcmpi(fig,'save')
+        output_file = fullfile(filepath, 'spm.ps');
         if exist(fullfile(filepath,'spm.ps'),'file')
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
-        else
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+            output_file = fullfile(filepath, 'spmup_QC.ps');
         end
+        print (gcf,'-dpsc2', '-bestfit', '-append', output_file);
         close(gcf)
         cd(current)
     end
