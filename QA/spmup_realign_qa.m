@@ -160,7 +160,7 @@ if strcmpi(Globals,'on')
         glo(s) = spm_global(V(s));
     end
     glo = spm_detrend(glo,1); % since in spm the data are detrended
-    g_outliers = spmup_comp_robust_outliers(glo);
+    g_outliers = spmup_comp_robust_outliers(glo, 'Carling');
         
     % figure
     figure('Name', 'Globals outlier detection', ...
