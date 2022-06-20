@@ -115,6 +115,10 @@ if nargin >1
    end
 end
 
+if strcmpi(FramewiseDisplacement,'on')
+  MotionParameters = 'on'; 
+end
+
 % if movie we need AC
 if strcmp(Movie,'on')
     if isempty(Coordinates)
