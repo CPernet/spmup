@@ -6,8 +6,13 @@ function new_files = spmup_realign_qa(P,varargin)
 % FORMAT realign_qa ( = do it all)
 %        realign_qa(P,flags)
 %
-% INPUT P indicate the timeseries to load
-%       options are
+% INPUT P indicate the timeseries to load. Can be 
+%         - path to a 4D nifti
+%         - cellstring of path to 3D niftis
+%         - a 4D array x, y, z, t of the timeseries data
+%
+%       Options are:
+%
 %       'Motion Parameters': 'on' (default) or 'off'
 %              --> plots motion parameters and 1st derivatives
 %       'Framewise displacement': 'on' (default) or 'off'
@@ -124,45 +129,74 @@ end
 
 findex = 1; % index for the new_files variables
 
-%% look at motion parameters
 [filepath,filename]=fileparts(V(1).fname);
+motion_file = dir(fullfile(filepath,['rp*' filename(round(length(filename)/2):end) '.txt']));
+if size(motion_file,1) > 1
+  error('more than one rp*.txt file was found that partially matches the time series name')
+end
+
+%% look at motion parameters
+if strcmpi(FramewiseDisplacement,'on')
+  % FD is computed at the motion stage
+  MotionParameters = 'on'; 
+end
+
 if strcmpi(MotionParameters,'on')
     disp('getting displacement ... ')
-    motion_file = dir(fullfile(filepath,['rp*' filename(round(length(filename)/2):end) '.txt'])); 
-    if size(motion_file,1) > 1
-       error('more than one rp*.txt file was found that partially matches the time series name') 
-    end
-    [FD,RMS] = spmup_FD(fullfile(motion_file.folder,motion_file.name),...
-        'Radius',Radius,'Figure',fig);
+
+    [FD,RMS] = spmup_FD(fullfile(motion_file.folder, motion_file.name),...
+                        'Radius', Radius, ...
+                        'Figure', fig);
 end
 
 %% look at globals
 
 if strcmpi(Globals,'on')
+  
     disp('computing globals for outliers ... ')
+    
     glo = zeros(length(V),1);
     for s=1:length(V)
         glo(s) = spm_global(V(s));
     end
     glo = spm_detrend(glo,1); % since in spm the data are detrended
-    g_outliers = spmup_comp_robust_outliers(glo);
+    g_outliers = spmup_comp_robust_outliers(glo, 'Carling');
         
     % figure
-    figure('Name','Globals outlier detection','Visible','On');
-    if strcmpi(fig,'on')
-        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-    else
-        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    figure('Name', 'Globals outlier detection', ...
+           'Visible', 'on');
+    
+    if ismember(fig, {'off', 'save'})
+          set(gcf,'Visible','off')
     end
-    plot(glo,'LineWidth',3); title('Global intensity');
-    hold on; tmp = g_outliers.*glo; tmp(tmp==0)=NaN; plot(tmp,'or','LineWidth',3);
-    grid on; axis tight;  xlabel('scans'); ylabel('mean intensity')
+
+    set(gcf,'Color','w', ...
+            'InvertHardCopy','off', ...
+            'units','normalized', ...
+            'outerposition',[0 0 1 1])
+          
+    hold on;       
+    
+    plot(glo,'LineWidth',3); 
+
+    tmp = g_outliers.*glo; 
+    tmp(tmp==0)=NaN; 
+    
+    plot(tmp,'or','LineWidth',3);
+    
+    grid on; 
+    axis tight; 
+    
+    xlabel('scans');
+    ylabel('mean intensity');
+    title('Global intensity');
+    
     if strcmpi(fig,'save')
+        output_file = fullfile(filepath, 'spm.ps');
         if exist(fullfile(filepath,'spm.ps'),'file')
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
-        else
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+            output_file = fullfile(filepath, 'spmup_QC.ps');
         end
+        print (gcf,'-dpsc2', '-bestfit', '-append', output_file);
         close(gcf)
         cd(current)
     end
@@ -180,23 +214,98 @@ if strcmpi(Globals,'on')
 end
 
 if isempty(data) && strcmpi(Voltera,'off')
+    new_files = {};
     disp('no design computed, no extra regressors selected')
+    
 else
-    spmup_censoring(fullfile(motion_file.folder,motion_file.name),...
-        data,'Voltera',Voltera);
+    spmup_censoring(fullfile(motion_file.folder, motion_file.name),...
+                    data, ...
+                    'Voltera', Voltera);
     % remane using P
-    movefile(fullfile(motion_file.folder,[motion_file.name(4:end-4) '_design.txt']),...
-        fullfile(motion_file.folder,[filename '_design.txt']))
+    if ~exist(fullfile(motion_file.folder,[filename '_design.txt']), 'file') 
+      movefile(fullfile(motion_file.folder,[motion_file.name(4:end-4) '_design.txt']),...
+               fullfile(motion_file.folder,[filename '_design.txt']))
+    end
     new_files{findex} = fullfile(motion_file.folder,[filename '_design.txt']);
+    
+    % save info about column headers
+    options = struct('Voltera', Voltera, ...
+                     'FramewiseDisplacement', FramewiseDisplacement, ...
+                     'Globals', Globals);
+    metadata.Columns = column_headers(options);
+    
+    all_regressors = spm_load(new_files{findex});
+    nb_censoring_regressors = size(all_regressors, 2) - numel(metadata.Columns);
+    
+    for i = 1:numel(1:nb_censoring_regressors)
+      metadata.Columns{end+1} = sprintf('outlier_%04.0f', i);
+    end
+    
+    spm_save(spm_file(new_files{findex}, 'ext', '.json'), metadata)
+    
     findex = findex +1;
+    
 end
 
 
 %% make movies
 if strcmpi(Movie, 'on')
-    new_files{findex} = spmup_movie(Y,'coordinates',Coordinates,...
-        'filename',fullfile(filepath,filename),'showfig','off');
+    new_files{findex} = spmup_movie(Y, ...
+                                    'coordinates', Coordinates,...
+                                    'filename', fullfile(filepath,filename), ...
+                                    'showfig', 'off');
 end
 cd(current)
 disp('realign QA done');
+
+end
+
+function headers = column_headers(options)
+  
+  headers = {'trans_x'; ...
+            'trans_y'; ...
+            'trans_z'; ...
+            'rot_x'; ...
+            'rot_y'; ...
+            'rot_z'};
+  
+  if strcmpi(options.Voltera, 'on')
+    
+    headers = {'trans_x'; ...
+              'trans_y'; ...
+              'trans_z'; ...
+              'rot_x'; ...
+              'rot_y'; ...
+              'rot_z'; ...
+              'trans_x_derivative1'; ...
+              'trans_y_derivative1'; ...
+              'trans_z_derivative1'; ...
+              'rot_x_derivative1'; ...
+              'rot_y_derivative1'; ...
+              'rot_z_derivative1'; ...
+              'trans_x_power2'; ...
+              'trans_y_power2'; ...
+              'trans_z_power2'; ...
+              'rot_x_power2'; ...
+              'rot_y_power2'; ...
+              'rot_z_power2'; ...
+              'trans_x_derivative1_power2'; ...
+              'trans_y_derivative1_power2'; ...
+              'trans_z_derivative1_power2'; ...
+              'rot_x_derivative1_power2'; ...
+              'rot_y_derivative1_power2'; ...
+              'rot_z_derivative1_power2'};
+  end
+  
+  if strcmp(options.FramewiseDisplacement, 'on')
+    headers{end + 1, 1} = 'framewise_displacement';
+    headers{end + 1, 1} = 'root_mean_square';
+  end
+  
+  if strcmp(options.Globals, 'on')
+    headers{end + 1, 1} = 'global_signal';
+  end
+  
+end
+
 
