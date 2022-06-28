@@ -5,17 +5,22 @@
 % added with amplitude 1 (background) 2 (GM) 3 (WM) and 4 (CSF)
 % ------------------------------
 % Cyril Pernet 05 January 2016
-   
-%% make up the data
 
-% pick up SPM template and populate
+%% get data
+test_data_folder = fullfile(test_folder(), 'data');
 
-
+time_series = spm_select('FPlistRec', test_data_folder, '^sub.*bold.nii');
+gm = spm_select('FPlistRec', test_data_folder, '^rc1.*.nii');
+wm = spm_select('FPlistRec', test_data_folder, '^rc2.*.nii');
+csf = spm_select('FPlistRec', test_data_folder, '^rc3.*.nii');
 
 %% call
-tSNR = spmup_temporalSNR(time_series,masks,0);
+tSNR = spmup_temporalSNR(time_series, ...
+                        {gm; wm; csf},...
+                        'figure','save', ...
+                        'SNR0','on', ...
+                        'linearity','on')
 
-%% check we have what we expect
 
 
 
