@@ -1,10 +1,15 @@
-function spmup_roiextraction(varargin)
+function ROI_data = spmup_roiextraction(varargin)
 
 % routine to extract data for an arbitrary number of ROI and from an
 % arbitrary number of images - the routine follows the pattern of spm_voi
 %
-% INPUT can be empty the user is prompted
-%       spmup_roiextraction(ROI,Images) names of ROI and image to read (see spm_select)
+% FORMAT spmup_roiextraction
+%        spmup_roiextraction(ROI,Images,VarName)
+%
+% INPUT if empty the user is prompted
+%       ROI array of ROI (binary) images to read (see spm_select)
+%       Images array of fMRI data to read (see spm_select)
+%       VarName (optional) is the name of the file to save on drive
 %
 % OUTPUT the file is saved to the drive - the variable name is ROI_data
 %        a structure with n roi fields (ie the number of ROI images in input)
@@ -13,16 +18,15 @@ function spmup_roiextraction(varargin)
 %
 % Cyril Pernet v1 19-02-2015
 % ---------------------------
-% Copyright SPM-UP toolbox
-
+%  Copyright (C) SPMUP Team 
 
 
 %% Imputs
 if nargin == 0
-    ROI = spm_select(Inf,'image','select ROI images');
+    ROI    = spm_select(Inf,'image','select ROI images');
     Images = spm_select(Inf,'image','select images to extract data from');
-elseif nargin == 2
-    ROI = varargin{1};
+elseif nargin >= 2
+    ROI    = varargin{1};
     Images = varargin{2};    
 else
     error('no or 2 arguments (ROI and Images) are needed, input error')    
@@ -39,17 +43,17 @@ if ~spm_check_orientations(Images)
     error('some of the images to read have different dimensions')
 end
 
-%% meta-info
+%% check ROI and Images match
 ROIs = spm_read_vols(ROI); % load each ROI and make a large matrix 
-ROIs = ROIs > 0; % make sure it's binary
-[xx,yy,zz,nroi]=size(ROIs);
+ROIs = ROIs > 0;           % make sure it's binary
 
-x = Images(1).dim(1);
-y = Images(1).dim(2);
-z = Images(1).dim(3);
-nimage = size(Images,1);
+[xx,yy,zz,nroi] = size(ROIs);
+x               = Images(1).dim(1);
+y               = Images(1).dim(2);
+z               = Images(1).dim(3);
+
 if x~= xx || y~= yy || z~= zz
-    error('images to read data from and ROI images don''t have the same dimensions')
+    error(sprintf('images to read data from and ROI images don''t have the same dimensions \n you could use spmup_resize to fix ROI images'))
 end
 clear xx yy zz
 
@@ -87,12 +91,23 @@ for r=1:nroi
     end
     d       = sign(sum(v));
     u       = u*d;
-    v       = v*d;
+    % v     = v*d;
     ROI_data.roi(r).ev = u*sqrt(s(1)/n);
 end
 
-% save
-newname = spm_input('save as',1,'s');
-newdir = uigetdir(pwd,['choose directory to save ' newname '.mat']);
-save([newdir filesep newname '.mat'],'ROI_data')
+%% save
+varpath = [];
+if nargin == 3
+    [varpath,varname] = fileparts(varargin{3});
+    if isempty(varpath)
+        varpath = fileparts(Images(1).fname); % if only name, save next to the data
+    end
+end
+
+if nargout == 0 && isempty(varpath) % if no output (i.e. GUI call) and no name input
+    varname  = spm_input('save as',1,'s');
+    varpath  = uigetdir(pwd,['choose directory to save ' varname '.mat']);
+end
+
+save(fullflie(varpath,[varname '.mat']),'ROI_data')
 
