@@ -11,17 +11,14 @@ function options = spmup_getoptions(BIDS_dir)
 %               'overwrite_data' 'on' (default) turning it 'off' is useful to restart
 %               	             some processing while kepping previous steps
 %               'QC' 'on' (default) or 'off' performs quality control (also augment motion regressor file) 
-%               'anat' a cell array of file pattern to use e.g. {'_T1w','_T2w'} 
+%               'anat' a cell array of file pattern to use e.g. {'acq_MPRAGE_T1w','acq_SPACE_T2w'} 
 %               'removeNvol' set to '0' (default) is the number of initial volumes to remove
-%               'VDM' cellarray (either a file on drive or a memory mapped variable)
 %               'task' [] (default) to specificy which bold task to analyze.
-%               'rec' [] (default) to specificy which bold reconstruction to analyze. 
-%               'acq' [] (default) to specificy which bold acquisition to analyze. 
 %               'despike' 'on' (default) or 'off' runs median despiking
+%               'VDM' cellarray of file on drive (to apply field map distorsion correction)
 %               'motionexp' 'off' (default) or 'on' compute voltera motion expansion
 %               'scrubbing' 'on' (default) or 'off' find outliers in motion derivatives and in globals
 %                'norm' 'T1norm' (default) or 'EPInorm' choice of the type of template for normalization
-%               'ignore_fieldmaps' 'on' or 'off' (default) to ignore distorsion correction for T1norm
 %               'skernel' 3 by default is the smoothing kernel as how many times the voxel size
 %
 % Cyril Pernet July 2022
@@ -37,7 +34,6 @@ options = struct(...
     'task',[], ...
     'removeNvol', '0', ...
     'despike', 'on', ...
-    'ignore_fieldmaps', 'off', ...
     'VDM', [], ...
     'motionexp', 'off', ...
     'scrubbing', 'on', ...
