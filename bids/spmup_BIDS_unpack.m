@@ -35,6 +35,7 @@ function [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options)
 %               [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options)
 %
 % see also spmup_getoptions
+%
 % Cyril Pernet & Remi Gau
 % --------------------------
 %  Copyright (C) SPMUP Team 
@@ -76,6 +77,10 @@ end
 
 subjs_ls = spm_BIDS(BIDS,'subjects');
 nb_sub   = numel(subjs_ls);
+anatypes = length(options.anat);
+if anatypes == 0
+    anatypes = 1;
+end
 
 % unpack anat and center [0 0 0]
 % -------------------------------
@@ -104,10 +109,10 @@ for s=nb_sub:-1:1 % for each subject
         fprintf(' subject %g - session %i: checking anat \n', s, session)
 
         % lists all the anat images for that subject and session
-        for type = 1:length(options.anat)
-            in = char(spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
+        for type = 1:anatypes
+             in = char(spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'modality', 'anat'));
-            
+           
             % only pick the anat file matching the pattern
             if ~isempty(options.anat)
                 pattern = fullfile(BIDS.subjects(BIDSindex).path, ...
@@ -174,11 +179,19 @@ parfor s=1:nb_sub
         end
 
         % list all bold files for that subject and session
-        run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
-            'ses', sess_ls{session}, 'type', 'bold','task',options.task);
-        metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
-            'ses', sess_ls{session}, 'type', 'bold','task',options.task);
-
+        if isempty(options.task)
+            run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
+                'ses', sess_ls{session}, 'type', 'bold');
+            metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
+                'ses', sess_ls{session}, 'type', 'bold');
+        else
+            run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
+                'ses', sess_ls{session}, 'type', 'bold', 'task', options.task);
+            metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
+                'ses', sess_ls{session}, 'type', 'bold', 'task', options.task);
+            
+        end
+        
         %% functional
         for frun = 1:size(run_ls,1) % for each run
 
