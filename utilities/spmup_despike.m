@@ -1,4 +1,4 @@
-function [despiked,filtered] = spmup_despike(varargin)
+function [despiked,filtered,spmup_despike_log] = spmup_despike(varargin)
 %
 % SPM UP routine to 'despike' fMRI time-series.
 % Note is requires the statistics toolbox (nansum, icdf are called)
@@ -30,12 +30,12 @@ function [despiked,filtered] = spmup_despike(varargin)
 %                          therefore some initial scans needs to be discarded because
 %                          the series hasn't reach staty-state (unless prescan
 %                          normalizalise)
+%             - flags.savelog is 'on' or 'off' to save as .mat
 %
 % OUTPUT despiked is either the list of despiked images save onto disk or
 %                 the despiked data, matching the input P
 %        filtered corresponds to the data after median smoother (despiked
 %                 images comes from the difference to these filtered images)
-%
 %        spmup_despike_log is saved onto disk where the data are
 %        spmup_despike_log can be reviewed using spmup_review_despike_log
 %        spmup_despike_log is structure with the fields: 
@@ -65,7 +65,7 @@ function [despiked,filtered] = spmup_despike(varargin)
 %
 % Cyril Pernet Decembre 2016
 % --------------------------------------------------------------------------
-% Copyright (c) SPM Utility Plus toolbox
+%  Copyright (C) SPMUP Team 
 
 if exist('nansum','file') ~= 2
     error('you do not have stats toolbox to perform this operation, sorry')
@@ -76,7 +76,7 @@ end
 % defaults
 get_data = 1; % request data
 get_mask = 0; % auto_mask
-flags = struct('auto_mask','on','method','median');
+flags    = struct('auto_mask','on','method','median','savelog','on');
 
 % inputs
 if nargin == 1
@@ -130,6 +130,10 @@ elseif nargin == 3
     else
         flags.skip = 0;
     end
+    
+    if isfield(varargin{3},'savelog')
+        flags.savelog = varargin{3}.savelog;
+    end
 end
 
 disp('running spmup_despike ...')
@@ -173,7 +177,6 @@ else
     end
 end
 
-
 % memory mapped mask
 if get_mask == 1
     [M,sts] = spm_select(1,'image','select the mask',[],pwd,'.*',1);
@@ -199,19 +202,29 @@ else
     Mask = spmup_auto_mask(V());
 end
 
-
 %% now do the despiking
 % although the smooting method is different, the detection of spike and
 % interpolation follows 3dDespike
 % http://afni.nimh.nih.gov/pub/dist/doc/program_help/3dDespike.html
 
+if ischar(P)
+    spmup_despike_log.P = P; 
+end
+spmup_despike_log.flags = flags;
+
 if ~isfield(flags,'window') || isempty(flags.window)
-    R = spmup_autocorrelation(V,Mask); 
-    % figure; for z=1:size(R,3);imagesc(flipud(squeeze(R(:,:,z))')); pause; end
+    R                              = spmup_autocorrelation(V,Mask); 
+    spmup_despike_log.window.stats = [min(R(:)) mode(R(:)) max(R(:))];
+    [~,position]                   = max(R(:));
+    [x,y,z]                        = ind2sub(size(R),position(1)); % get coordinate
+    spmup_despike_log.window.xyz   = [x,y,z];
+    spmup_despike_log.window.obs   = squeeze(Y(x,y,z,:));
 else
-    R = ones(size(Y,1),size(Y,2),size(Y,3)).*flags.window;
+    R                              = ones(size(Y,1),size(Y,2),size(Y,3)).*flags.window;
+    spmup_despike_log.window       = flags.window;
 end
 
+filtered = [];
 disp('smoothing data')
 if strcmp(flags.method,'median')
     % doesn't matter how fast is the autocorr coef - min is 3 TR to smooth
@@ -258,10 +271,10 @@ if strcmp(flags.method,'median')
         newdata(:,N) = data(:,N);
         
         % MAD of the residuals
-        res = data-newdata;
-        MAD = nanmedian(abs(res - repmat(nanmedian(res,2),1,N)),2);
+        res   = data-newdata;
+        MAD   = nanmedian(abs(res - repmat(nanmedian(res,2),1,N)),2);
         SIGMA = sqrt(pi/2).*MAD;
-        s = res./repmat(SIGMA,1,N);
+        s     = res./repmat(SIGMA,1,N);
         
         %  * Values with s > c1 are replaced with a value that yields
         %     a modified s' = c1+(c2-c1)*tanh((s-c1)/(c2-c1)).
@@ -286,7 +299,7 @@ if strcmp(flags.method,'median')
         s2 = (s2.*repmat(SIGMA,1,N)) + newdata;
         
         % can we use indices here and remove that coord loop ?
-        for coord = 1:size(x,1)
+        for coord = size(x,1):-1:1
             if nargout == 2
                 filtered(x(coord),y(coord),z(coord),:) = newdata(coord,:);
             end
@@ -315,9 +328,9 @@ else  % smooth function
     
     parpool('local',feature('numCores')-1); % use all available cores -1
     parfor i=1:length(index)
-        [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(i));
-        data = squeeze(Y(x,y,z,:))';
-        newdata = zeros(size(data));
+        [x,y,z] = ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(i));
+        data    = squeeze(Y(x,y,z,:))';
+        newdata = zeros(size(data)); %#ok<PREALL>
         
         % define window size
         window = R(x,y,z); % need at least 3 points
@@ -330,10 +343,10 @@ else  % smooth function
         ZZ{i} = newdata;
         
         % MAD of the residuals
-        res = data-newdata;
-        MAD = nanmedian(abs(res - repmat(nanmedian(res),1,N)));
+        res   = data-newdata;
+        MAD   = nanmedian(abs(res - repmat(nanmedian(res),1,N)));
         SIGMA = sqrt(pi/2)*MAD;
-        s = res/SIGMA;
+        s     = res/SIGMA;
         
         %  * Values with s > c1 are replaced with a value that yields
         %     a modified s' = c1+(c2-c1)*tanh((s-c1)/(c2-c1)).
@@ -343,7 +356,7 @@ else  % smooth function
         
         if SIGMA ~=0 % i.e. not res / 0
             out = find(s > 2.5);
-            c1 = 2.5; c2=4; s2 = s;
+            c1  = 2.5; c2=4; s2 = s;
             for p=1:length(out)
                 s2(out(p)) = c1+(c2-c1)*tanh((s(out(p))-c1)/(c2-c1));
             end
@@ -369,88 +382,81 @@ if ~isempty(Mask)
     end
 end
 
-% CHECK DATA
-% D = (YY-Y).^2; D = sum(reshape(D,64*64*35,326),2); % sum of squared differences
-% [~,position] = max(D); % find witch voxel has maximum difference
-% [x,y,z]=ind2sub(size(Y),position); % get coordinate
-% figure('Name','Despiking effect')
-% set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-% plot(squeeze(Y(x,y,z,:))); hold on; grid on; box on
-% plot(squeeze(YY(x,y,z,:)),'r--','LineWidth',2); title('Most different time series');
+%% write the report for QC
 
-%% quick QA and reformating
+% how many voxels are different from the original data
+% ----------------------------------------------------
 if strcmp(flags.method,'median')
-    Despiked_QA = sum((YY == Y),4);
-    despiked = YY; %clear YY
+    percent_change = 100 - (sum((YY == Y),4)/size(Y,4).*100);
 else
-    Despiked_QA = NaN(size(Y,1),size(Y,2),size(Y,3));
-    for i=1:length(index)
-        [x,y,z]=ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(i));
-        Despiked_QA(x,y,z) = sum(YY{i} ~= squeeze(Y(x,y,z,:))')/size(Y,4).*100;
-        if ~isnan(Despiked_QA(x,y,z))
+    percent_change = NaN(size(Y,1),size(Y,2),size(Y,3));
+    for i=length(index):-1:1
+        [x,y,z] = ind2sub([size(Y,1),size(Y,2),size(Y,3)],index(i));
+        percent_change(x,y,z) = 100- (sum(YY{i} ~= squeeze(Y(x,y,z,:))')/size(Y,4).*100);
+        if ~isnan(percent_change(x,y,z))
             Y(x,y,z,:) = YY{i};
         end
-        despiked(x,y,z,:) = YY{i}; 
         filtered(x,y,z,:) = ZZ{i};
     end
-    clear ZZ
-%     clear YY
 end
 
-Despiked_QA = despiked; %set aside for QA report (see below)
+if ischar(P)
+    V(1).descrip       = 'spmup despiked percent change';
+    [pathstr,name,ext] = fileparts(P);
+    V(1).fname         = [pathstr filesep name(1:end-4) 'rec-despikedPercentChange_bold'  ext];
+    spm_write_vol(V(1),percent_change .* Mask);
+end
 
-% figure('Name','QA'); colormap('hot') 
-% for z=1:size(Despiked_QA,3)
-%     imagesc(flipud(Despiked_QA(:,:,z)')); axis square; 
-%     title(['Slice ' num2str(z)]); pause
-% end
+% how much data are different from the original data
+% ----------------------------------------------------
+D                         = sqrt(mean((YY-Y).^2,numel(size(Y)))); 
+if ischar(P)
+    V(1).descrip              = 'spmup despiked RMS';
+    [pathstr,name,ext]        = fileparts(P);
+    V(1).fname                = [pathstr filesep name(1:end-4) 'rec-despikedRMS_bold'  ext];
+    spm_write_vol(V(1),D);
+end
 
+[~,position]              = max(D(:)); % find witch voxel has maximum difference 
+[x,y,z]                   = ind2sub(size(D),position(1)); % get coordinate (1) in case many identical
+spmup_despike_log.RMS.xyz = [x,y,z];
+spmup_despike_log.RMS.obs = squeeze(Y(x,y,z,:));
+spmup_despike_log.RMS.cmp = squeeze(YY(x,y,z,:));
+% figure; plot(squeeze(Y(x,y,z,:))); hold on; plot(squeeze(YY(x,y,z,:)));
 
-%% write and return the data
+%% write and return the data and QC
+
 if ischar(P)
     disp('writing data')
     if size(P,1) == size(YY,4) % 3D
-        for v=1:size(Y,4)
-            V(v).descrip = 'spmup despiked';
-            [pathstr,name,ext]= fileparts(V(v).fname);
-            V(v).fname = [pathstr filesep 'despiked_' name ext];
-            despiked{v} = V(v).fname;
+        for v = size(Y,4):-1:1
+            V(v).descrip       = 'spmup despiked';
+            [pathstr,name,ext] = fileparts(P);
+            V(v).fname         = [pathstr filesep name(1:end-4) 'rec-despiked_bold'  ext ',' num2str(v)];
+            despiked{v}        = V(v).fname;
             spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
         end
     else % 4D
-        [pathstr,name,ext]= fileparts(V(1).fname);
-        fname = [pathstr filesep 'despiked_' name ext];
-        for v=1:size(Y,4)
+        [pathstr,name,ext] = fileparts(P);
+        fname              = [pathstr filesep name(1:end-4) 'rec-despiked_bold'  ext];
+        for v = size(Y,4):-1:1
             V(v).descrip = 'spmup despiked';
-            V(v).fname=fname;
-            despiked = spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
+            V(v).fname   = fname;
+            despiked     = spm_write_vol(V(v),squeeze(YY(:,:,:,v)));
         end
     end
+else
+    despiked = YY;
 end
 
-%% write the report for QA
-disp('saving spmup_despike_log')
-if ischar(P); spmup_despike_log.P = P; end
-spmup_despike_log.flags = flags;
-if isempty(flags.window)
-    spmup_despike_log.window = R;
-else
-    spmup_despike_log.window = flags.window;
+if strcmp(flags.savelog,'on')
+    if ischar(P)
+        [pathstr,name] = fileparts(P);
+        save([pathstr filesep name(1:end-4) 'rec-despikedlog'],'spmup_despike_log')
+    else
+        save([pwd 'despikedlog'],'spmup_despike_log')
+    end
 end
-Despiked_QA = sqrt(mean((Despiked_QA-Y).^2,4)); % how much different
-spmup_despike_log.RMS = Despiked_QA;
-if ischar(P)
-    [pathstr,name,ext]= fileparts(V(1).fname);
-else
-    pathstr = pwd;
-end
-save([pathstr filesep 'spmup_despike_log'],'spmup_despike_log')
-
-% figure('Name','QA'); colormap('hot');
-% for z=1:size(Despiked_QA,3)
-%     imagesc(flipud(Despiked_QA(:,:,z)')); axis square;
-%     title(['Slice ' num2str(z)]); pause
-% end
 
 disp('despiking done')
 disp('--------------')

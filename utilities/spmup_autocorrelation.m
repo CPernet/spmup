@@ -14,13 +14,15 @@ function R = spmup_autocorrelation(varargin)
 %
 % OUTPUT R is a 2D or 3D matrix of autocorrelation coefficients
 %
-% The Wiener�Khinchin theorem relates the autocorrelation function to the 
+% The Wiener-Khinchin theorem relates the autocorrelation function to the 
 % power spectral density via the Fourier transform. It states that the 
 % autocorrelation function of a wide-sense-stationary random process 
 % (the 1st moment does not vary in time) has a spectral decomposition given 
 % by the power spectrum of that process. Since FFT can be applied to a
-% matrix, this means we can get all autocorrelation func tion estimates in 
-% one pass - and ten derive the coefficents. 
+% matrix, this means we can get all autocorrelation functions estimates 
+% in one pass - and then derive the coefficents, i.e. the distance in the 
+% spectrum between the peak and it's neighbourgh (harmonic?) which is 
+% equivalent to the lag of the autocorrelation.
 %
 % Cyril Pernet v1: 13 Decembre 2016
 % --------------------------------------------------------------------------
@@ -35,14 +37,14 @@ if nargin == 2
         else
             index = find(varargin{2});
         end
-        [X Y Z] = ind2sub(varargin{1}(1).dim,index); % coordinates
-        Data = spm_get_data(varargin{1},[X Y Z]'); % 2D matrix
-        Format = 'image';
+        [X, Y, Z] = ind2sub(varargin{1}(1).dim,index); % coordinates
+        Data      = spm_get_data(varargin{1},[X Y Z]'); % 2D matrix
+        Format    = 'image';
     catch
         error('could not read the data')
     end
 else
-    Data = varargin{1};
+    Data   = varargin{1};
     Format = 'matrix';
     clear varargin
 end
@@ -51,10 +53,10 @@ end
 if length(size(Data)) ~= 2
     error('the data used don''t seem to make a 2D array');
 else
-    [p,n]=size(Data);
+    [p,n] = size(Data);
     if isvector(Data) && n>1
-        Data = Data';
-        [p,n]=size(Data);
+        Data  = Data';
+        [p,n] = size(Data);
     end
 end
 
@@ -64,29 +66,31 @@ disp('estimating autocorrelation for each voxel')
 
 nfft = 2^nextpow2(2*p-1);
 Data = spm_detrend(Data,1);
-R = ifft(fft(Data,nfft).*conj(fft(Data,nfft)));
-R = R(1:p,:)'; % [R(end-p+2:end,:) ; R(1:p,:)]'; for a full window
+R    = ifft(fft(Data,nfft).*conj(fft(Data,nfft)));
+R    = R(1:p,:)'; % [R(end-p+2:end,:) ; R(1:p,:)]'; for a full window
 
 %% now the slow part
 autocorrelation_window = NaN(n,1);
+
 parfor v=1:n
     if sum(R(v,:)) == 0
         autocorrelation_window(v) = 0;
     else
-        [~,locs]=findpeaks(R(v,:));
+        [~,locs] = findpeaks(R(v,:)); % get local maxima
         if ~isempty(locs)
-            [~,maxloc]=max(R(v,:));
-            tmp = locs-maxloc;
-            tmp(tmp <= 0) = NaN; % avoid being on itself
-            [~,closestpeak]=min(tmp);
-            closestpeak = locs(closestpeak);
-            [~,minloc]=min(R(v,maxloc:closestpeak));
-            autocorrelation_window(v) = maxloc+minloc;
+            [~,maxloc]                = max(R(v,:));   % find spectral peak
+            tmp                       = locs-maxloc; 
+            tmp(tmp <= 0)             = NaN;           % avoid being on itself
+            [~,closestpeak]           = min(tmp);      % find next peak
+            closestpeak               = locs(closestpeak);
+            [~,minloc]                = min(R(v,maxloc:closestpeak));
+            autocorrelation_window(v) = maxloc+minloc; % return the distance
         else
             autocorrelation_window(v) = 0;
         end
     end
 end
+
 try
     parpool close
 catch
@@ -96,9 +100,9 @@ end
 %% reformat as input
 clear R
 if strcmp(Format,'image')
-    R = NaN(varargin{1}(1).dim);
+    R        = NaN(varargin{1}(1).dim);
     R(index) = autocorrelation_window;
 else
-    R = autocorrelation_window;
+    R        = autocorrelation_window;
 end
 

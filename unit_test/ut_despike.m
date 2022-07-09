@@ -1,5 +1,5 @@
 %% unit testing for spmup_despike
-% uses medfilt1(x,3) from matlab on a small synthetic 4D set 
+% uses medfilt1(x,3) from matlab on a small synthetic 4D set
 % the comparison focuses on the median filter itself from which one derives
 % the despiked data - but if the filter is bad so will be the despiked data
 % outputs the percentage difference, look at what is different and by how
@@ -12,23 +12,22 @@
 %% make data up
 
 clear variables
-
-Data = NaN(5,5,5,101);
+Data     = NaN(5,5,5,101);
 Filtered = Data;
+fs       = 100;     % Sampling rate
+t        = 0:1/fs:1; % Time vector
 
-fs = 100;     % Sampling rate
-t = 0:1/fs:1; % Time vector
 % Noise Signal - Input
 for x=1:5
     for y=1:5
         for z=1:5
-            Data(x,y,z,:) = sin(2*pi*t*randi(10,1,1))+.25*sin(2*pi*t*randi(50,1,1)); 
-            Filtered(x,y,z,:) = medfilt1(squeeze(Data(x,y,z,:)),[],'truncate',3); 
+            Data(x,y,z,:)     = sin(2*pi*t*randi(10,1,1))+.25*sin(2*pi*t*randi(50,1,1));
+            Filtered(x,y,z,:) = medfilt1(squeeze(Data(x,y,z,:)),[],'truncate',3);
         end
     end
 end
 
-flags = struct('auto_mask','off','method','median','window',3);
+flags = struct('auto_mask','off','method','median','window',3,'savelog','off');
 [despiked,filtered]  = spmup_despike(Data,[],flags);
 
 index = 1;
@@ -90,7 +89,7 @@ goodfit = sum(M < 1) / size(M,1);
 fprintf('spmup filter matches the data correctly in %g%% of cases (rms<1)\n',goodfit*100)
 
 bad_fit = find(M>=1);
-figure; 
+figure;
 for i=1:length(bad_fit)
     subplot(1,2,1);
     plot([1:101],DataM(bad_fit(i),:),'*b','LineWidth',2);
@@ -99,7 +98,7 @@ for i=1:length(bad_fit)
     plot(filteredM(bad_fit(i),:),'r','LineWidth',2);
     title(['filtered data ' num2str(indices(i)) ' RMS ' num2str(M(bad_fit(i)))])
     hold off
-
+    
     subplot(1,2,2);
     plot([1:101],DataM(bad_fit(i),:),'*b','LineWidth',2);
     hold on; grid on; axis tight
@@ -111,26 +110,27 @@ end
 
 
 %% do additional testing for other smoother - just to check the function works
- flags.method = 'moving';
-[despiked2,filtered2]  = spmup_despike(Data,[],flags);
-
-index = 1;
-for x=1:5
-    for y=1:5
-        for z=1:5
-            filteredMM(index,:) = squeeze(filtered2(x,y,z,:));
-            SS(index,:)  = squeeze(despiked(x,y,z,:));
-            index = index+1;
+if exist('smooth.m','file')
+    flags.method = 'moving';
+    [despiked2,filtered2]  = spmup_despike(Data,[],flags);
+    
+    index = 1;
+    for x=1:5
+        for y=1:5
+            for z=1:5
+                filteredMM(index,:) = squeeze(filtered2(x,y,z,:));
+                SS(index,:)  = squeeze(despiked(x,y,z,:));
+                index = index+1;
+            end
         end
     end
+    
+    DF = (filteredM(:,1:100) == filteredMM(:,1:100));
+    DS = (S(:,1:100) == SS(:,1:100));
+    
+    figure
+    subplot(1,2,1); plot(mean(filteredM),'LineWidth',3); hold on;
+    plot(mean(filteredMM),'LineWidth',2); title('SPMUP filters median and moving avg'); axis tight; grid on
+    subplot(1,2,2); plot(mean(S),'LineWidth',3); hold on;
+    plot(mean(SS),'LineWidth',2); title('SPMUP data median and moving avg'); axis tight; grid on
 end
-
-DF = (filteredM(:,1:100) == filteredMM(:,1:100));
-DS = (S(:,1:100) == SS(:,1:100));
-
-figure
-subplot(1,2,1); plot(mean(filteredM),'LineWidth',3); hold on; 
-plot(mean(filteredMM),'LineWidth',2); title('SPMUP filters median and moving avg'); axis tight; grid on
-subplot(1,2,2); plot(mean(S),'LineWidth',3); hold on; 
-plot(mean(SS),'LineWidth',2); title('SPMUP data median and moving avg'); axis tight; grid on
-
