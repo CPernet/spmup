@@ -1,154 +1,79 @@
-function [anatQA, fMRIQA, subjects, options] = spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s, options)
+function [anatQA, fMRIQA, subjects] = spmup_BIDS_preprocess(BIDS, subjects, s, options)
 
-% routine to preprocess BIDS fMRI data - with various options available
+% routine to preprocess BIDS fMRI data following 'options'
+%
 % FORMAT spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s)
 %        spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s, options)
 %
-% INPUTS
-%           - BIDS_dir is the BIDS directory
-%           - BIDS: the structure returned by spm_BIDS and possibly modified
-%           by spmup_BIDS_unpack
-%           - subjects: a structure containing the fullpath of the unpacked anat,
+% INPUT - BIDS: the structure returned by spm_BIDS
+%       - subjects: a structure containing the fullpath of the unpacked anat,
 %           fmap and func files for each subject (see spmup_BIDS_unpack)
-%           - s is the subject index to preprocess
-%           - choices a structure with the following fields:
-%               .outdir = where to write the data
-%               .keep_data = 'off' (default) or 'on' to keep all steps - off means
-%               	only the last processed data are available
-%               .overwrite_data = 'on' turning it 'off' is useful to restart
-%               	some processing while kepping previous steps
-%               .QC = 'on' (default) or 'off' performs quality controls for
-%               	anatomical (T1) scans and EPI time series
-%               .removeNvol = number of initial volumes to remove
-%               .realign_unwarp =  'off' (default) to turn on if you want
-%               .carpet_plot = 'off' will create the carpet plots on the
-%                   preprocessed bold runs (see spmup_timeseriesplot.m)
-%                   to run realign and unwarp (will reslice data) instead of
-%                   realign (will not reslice data)
-%               .task = [] (default) to specificy which bold task to analyze.
-%                   Default is to run them all together. This could be problematic
-%                   if the tasks have different acquisiton parameters or dimensions.
-%               .rec = [] (default) to specificy which bold reconstruction
-%               to analyze. Default is to run them all together.
-%               .acq = [] (default) to specificy which bold acquisition to
-%               analyze. Default is to run them all together. This could be problematic
-%                   if the tasks have different dimensions.
-%               .despike = 'on' (default) or 'off' runs median despiking
-%               .drifter = 'off' ('default') or 'on' removes cardiac and respiratory signals using the drifter toolbox
-%               .motionexp = 'off' (default) or 'on' compute 24 motion parameters
-%               .scrubbing = 'off' (default) or 'on' find outliers in motion derivatives and in globals
-%               .compcor = 'on' (default) or 'off' does the equivalent of compcor
-%               .norm = 'EPInorm' (default) or 'T1norm' choice of the type of template for normalization
-%               .ignore_fieldmaps = 'on' or 'off' (default) to include distorsion correction for T1norm
-%               .skernel = [8 8 8] by default is the smoothing kernel
-%               .derivatives = 'off', 1 or 2 to use for GLM
-%               	if derivatives are used, beta hrf get boosted
-%               	and smoothing is performed after the GLM
+%       - s is the subject index to preprocess
+%       - options the structure of SPMUP options (see spmup_getoptions)
 %
-% usage:
-% choice = struct('removeNvol', 0, 'keep_data', 'off',  'overwrite_data', 'on', ...
-%     'despike', 'off', 'drifter', 'off', 'motionexp', 'off', 'scrubbing', 'off', ...
-%     'compcor', 'off', 'norm', 'EPInorm', 'skernel', [8 8 8], 'derivatives', 'off', ...
-%     'ignore_fieldmaps', 'on',  'outdir', ['..' filesep 'derivatives' filesep 'spmup_BIDS_processed'], 'QC', 'off'); % standard SPM pipeline
-% [BIDS,subjects,options]=spmup_BIDS_unpack(pwd,choice)
-% for s=1:numel(subjects)
-% [anatQA, fMRIQA, subjects, options] = spmup_BIDS_preprocess(BIDS_dir, BIDS, subjects, s, options)
-% end
+% Example usage: BIDS_dir        = 'F:\WakemanHenson_Faces\fmri';
+%                options         = spmup_getoptions(BIDS_dir);
+%                options.overwrite_data = 'off';
+%                [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options);
+%                [anatQA, fMRIQA, subjects] = spmup_BIDS_preprocess(BIDS, subjects, 1, options)
+%
+% Cyril Pernet & Remi Gau
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
-% TO DO:
-% - implement fieldmap and epi types for fieldmap modality ?
-% - add an spm_check_coregistration to vizualize how the spmup_autoreorient
-%   worked on the anat data?
-% - change prefix name appending of preprocessed data (i.e a la SPM) to
-% suffix name appending as per the BIDS derivative specs
-% - create json files for each preprocessing step (see bids derivative
-% specs)
-
-if isfield(options,'removeNvol')
-    start_at = options.removeNvol;
-else
-    start_at = 1;
+%% check a few things
+if strcmpi(options.norm,'T1norm') && isempty(options.VDM)
+    warning(' Calhoun et al. (2017) showed T1 normalization is not good without FieldMaps \n (%s) add VDM map to options \n switching to ''EPInorm''', ...
+        'https://onlinelibrary.wiley.com/doi/full/10.1002/hbm.23737')
+    options.norm = 'EPI';
 end
 
 % each subject build a job structure around matlabbatch
 % this is where each subject is analysed using the various options
-
-fprintf('\n\nrunning subject %g \n',s)
 spm_root = fileparts(which('spm'));
 spm_jobman('initcfg');
-
-subjs_ls = spm_BIDS(BIDS,'subjects');
-all_names = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
-    'type', 'bold');
-
+opts.indent = ' '; % for spm_jsonwrite
+fprintf('\n\nrunning subject %g \n',s)
 
 % ---------------------------------------
 % reorient anat file to template
 % ---------------------------------------
 
-target_dir = spm_fileparts(subjects{s}.anat);
-file_exists = spm_select('FPList',target_dir,'^reorient_mat_anat.*' );
-if strcmp(options.overwrite_data,'on') || ( strcmp(options.overwrite_data,'off') ...
-        && isempty(file_exists) )
-    
-    RM = spmup_auto_reorient(subjects{s}.anat); disp(' anat reoriented');
-    
-    % saves reorient matrix
-    date_format = 'yyyy_mm_dd_HH_MM';
-    saved_RM_file = fullfile(target_dir, ...
-        strcat('reorient_mat_anat', datestr(now, date_format), '.mat'));
-    save(saved_RM_file, 'RM')
-    
-    % apply reorientation to functional imges
-    matlabbatch{1}.spm.util.reorient.srcfiles = {};
-    for irun = 1:size(subjects{s}.func,1)
-        n_vol = numel(spm_vol(subjects{s}.func{irun}));
-        for i_vol = 1:n_vol
-            matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                [subjects{s}.func{irun} ',' num2str(i_vol)];
-        end
+RMexist = 0;
+[target_dir,filename] = fileparts(subjects{s}.anat);
+if exist(fullfile(target_dir,[filename '_preprocessed.json']),'file')
+    anatinfo = spm_jsonread(fullfile(target_dir,[filename '_preprocessed.json']));
+    if isfield(anatinfo,'reorientation_matrix')
+        RMexist = 1;
     end
-    
-    % and also to fmaps
-    if strcmp(options.ignore_fieldmaps, 'off') && isfield(subjects{s}, 'fieldmap')
-        for ifmap = 1:size(subjects{s}.fieldmap,1)
-            
-            switch subjects{s}.fieldmap(ifmap).type
-                case 'phasediff'
-                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                        subjects{s}.fieldmap(ifmap).phasediff;
-                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                        subjects{s}.fieldmap(ifmap).mag1;
-                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                        subjects{s}.fieldmap(ifmap).mag2;
-                case 'phase12'
-                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                        subjects{s}.fieldmap(ifmap).phase1;
-                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                        subjects{s}.fieldmap(ifmap).phase2;
-                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                        subjects{s}.fieldmap(ifmap).mag1;
-                    matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                        subjects{s}.fieldmap(ifmap).mag2;
-                case 'fieldmap'
-                    % not implemented
-                case 'epi'
-                    % not implemented
-                otherwise
-                    % not implemented
-            end
-            matlabbatch{1}.spm.util.reorient.srcfiles{end+1,1} = ...
-                [subjects{s}.func{irun} ',' num2str(i_vol)];
-            
-        end
-    end
-    
-    matlabbatch{1}.spm.util.reorient.transform.transM = RM;
-    matlabbatch{1}.spm.util.reorient.prefix = '';
-    
-    spm_jobman('run',matlabbatch); clear matlabbatch;
 end
-
+    
+if strcmp(options.overwrite_data,'on') || ...
+        (strcmp(options.overwrite_data,'off') && ~RMexist)
+    
+    Data = [subjects{s}.anat; subjects{s}.func];
+    if isfield(subjects{s},'fieldmap')
+        Data = [Data ; subjects{s}.fieldmap];
+    end
+    if ~isempty(options.VDM)
+        Data = [Data ; options.VDM{s}]; % this assumes only 1 field map though, will need to be changed
+    end
+    RM = spmup_auto_reorient(Data,1);
+    disp(' Data reoriented');
+   
+    % update info about all those files
+    for f=1:size(Data,1)
+       [filepath,filename] = fileparts(Data{f});
+       if f==1
+           meta.reoriented = '(0,0,0) set with spmup_auto_reorient';
+           meta.reorientation_matrix = RM;
+       else
+           meta.reoriented = '(0,0,0) set from anat with spmup_auto_reorient';
+       end
+       spm_jsonwrite(fullfile(filepath,[filename '_preprocessed.json']),meta,opts)
+       clear meta
+    end
+end
 
 % ---------------------------------------
 % Despiking and slice timing for each run
@@ -159,6 +84,11 @@ for frun = 1:size(subjects{s}.func, 1) % each run
     
     filesin = subjects{s}.func{frun};
     [filepath,filename,ext] = fileparts(filesin);
+    if exist(fullfile(filepath,[filename '_preprocessed.json']),'file')
+        meta = spm_jsonread(fullfile(filepath,[filename '_preprocessed.json'])); %#ok<NASGU>
+    end
+    metadata.run = frun;
+    metadata.TaskName = subjects{s}.func_metadata{frun}.TaskName;
     
     % check that this BOLD file is of the right task, acquisition,
     % reconstruction
@@ -185,74 +115,70 @@ for frun = 1:size(subjects{s}.func, 1) % each run
     if bold_include(frun)
         
         included_idx = included_idx + 1;
-        
-        
-        % !!!! TO DO: this will need to be passed on to the
-        % spmup_BIDS_1rstlevel !!!
-        
-        [~,~,info_position] = intersect([filename(1:end-4) 'events.tsv'], all_names);
-        
-        
-        
-        hdr = spm_vol(subjects{s}.func{frun});
-        epi_res = diag(hdr(1).mat);
+        hdr          = spm_vol(subjects{s}.func{frun});
+        epi_res      = diag(hdr(1).mat);
         epi_res(end) = [];
         
-        if isfield(subjects{s}.func_metadata{frun}, 'SliceTiming')
+        if ~isfield(subjects{s}.func_metadata{frun}, 'SliceTiming')
+            error('Slice Timing Information missing')
+        else
             SliceTiming = subjects{s}.func_metadata{frun}.SliceTiming;
         end
-        if isfield(subjects{s}.func_metadata{frun}, 'RepetitionTime')
+        
+        if ~isfield(subjects{s}.func_metadata{frun}, 'RepetitionTime')
+            error('RepetitionTime Information missing')
+        else
             RepetitionTime = subjects{s}.func_metadata{frun}.RepetitionTime;
         end
-        
         
         % -----------------------------------------
         % remove first volumes
         % -----------------------------------------
         
-        file_exists = exist(fullfile(filepath,[filename '_removevol.json']),'file');
-        if start_at ~= 1 && ( strcmp(options.overwrite_data,'on')...
-                || (strcmp(options.overwrite_data,'off') && ~file_exists) )
-            
-            % remove from the 4D the files we don't want and proceed
-            fprintf('\nadjusting 4D file sizes run %g \n',frun)
-            
-            three_dim_files = spm_file_split(filesin);
-            V = three_dim_files; V(1:start_at) = [];
-            spm_file_merge(V,filesin);
-            spm_unlink(three_dim_files.fname)
-            
-            % write a json file containing the details of what volumes were
-            % removed (see BIDS derivatives specs)
-            spm_jsonwrite(fullfile(filepath,[filename '_removevol.json']),'')
-            
+        if options.removeNvol ~=0
+            if strcmp(options.overwrite_data,'on')...
+                    || ((strcmp(options.overwrite_data,'off') && ~isfield(meta,'NumberOfVolumesDiscarded')))
+                
+                % remove from the 4D the files we don't want and proceed
+                fprintf('\nadjusting 4D file sizes run %g \n',frun)
+                
+                three_dim_files         = spm_file_split(filesin);
+                V                       = three_dim_files; 
+                V(1:options.removeNvol) = [];
+                spm_file_merge(V,filesin);
+                spm_unlink(three_dim_files.fname)
+                
+                % write a json file containing the details of what volumes were
+                % removed (see BIDS derivatives specs)
+                meta.NumberOfVolumesDiscarded = options.removeNvol;
+                spm_jsonwrite(fullfile(filepath,[filename '_preprocessed.json']),meta,opts)
+            end
         end
-        
         
         % -----------------------------------------
         % despiking using adaptive median filter
         % -----------------------------------------
         
-        if strcmp(options.despike,'on')
-            
-            if ~isfield(options,'despiking_window')
-                options.despiking_window = [];
-            end
-            flags = struct('auto_mask','on', 'method','median', 'window', ...
-                options.despiking_window,'skip',0);
-            
-            if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-                    && ~exist([filepath filesep 'despiked_' filename ext],'file'))
-                Vin = spmup_despike(fullfile(filepath,[filename,ext]),[],flags);
+        if strcmp(options.despike,'before')
+            if strcmp(options.overwrite_data,'on') || ...
+                    (strcmp(options.overwrite_data,'off') && ~isfield(meta,'Despiked'))
+                flags = struct('auto_mask','on', 'method','median', 'window', [],'skip',0, 'savelog', 'off');
+                [Vin,~,loginfo] = spmup_despike(fullfile(filepath,[filename,ext]),[],flags);
                 filesin = Vin.fname; clear Vin;
+
+                meta.Despiked = 'before slice timing using spmup_despike';
+                meta.despike.param = 'median filter based on the autocorrelation function';
+                meta.despike.RMS   = loginfo.RMS;
+                spm_jsonwrite(fullfile(filepath,[filename '_preprocessed.json']),meta,opts)
             else
-                filesin = fullfile(filepath, ['despiked_' filename ext]);
+                if exist(fullfile(filepath, ['despiked_' filename ext]),'file')
+                    filesin = fullfile(filepath, ['despiked_' filename ext]);
+                else
+                    filesin = fullfile(filepath, [filename ext]);
+                end
             end
-            
             [filepath,filename,ext] = fileparts(filesin);
-            
         end
-        
         
         % -------------
         % slice timing
@@ -273,13 +199,10 @@ for frun = 1:size(subjects{s}.func, 1) % each run
                 fprintf('\n\nstarting slice timing correction run %g subject %g \n',frun,s)
                 spm_slice_timing(filesin, sliceorder, refslice, timing, 'st_');
             end
-            
         else
             st_files{included_idx,1} = fullfile(filepath, [filename ext]);
         end
-        
     end
-    
 end % end processing per run
 
 
@@ -507,7 +430,6 @@ if strcmp(options.realign_unwarp, 'off')
         
     end
 else
-    
     
     %which fieldmap for each run of this task / acq /rec
     which_fmap = subjects{s}.which_fmap(find(bold_include));
