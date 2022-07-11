@@ -18,9 +18,9 @@ function [fmri_out,V4] = spmup_skip(varargin)
 % OUTPUTS fmri_out is the name of the new reduced data set
 %         V4 the spm_vol handle of the concatenated 3D files
 %
-% Cyril Pernet - University of Edinburgh
-% -----------------------------------------
-% Copyright (c) SPM Utility Plus toolbox
+% Cyril Pernet 
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
 if nargin == 0
     [P,sts] = spm_select(1,'image' ,'Select your fMRI time series',{},pwd,'.*',[1 Inf]);
@@ -92,7 +92,7 @@ if nargin > 2
     end
 end
 
-if strcmpi(derivatives,'on')
+if strcmpi(derivatives,'on') && ~contains(P,'derivatives')
     index_name    = strfind(P,'sub-');
     index_name    = index_name(1); % just in case
     index_name(2) = strfind(P,[filesep 'func']);
@@ -103,10 +103,10 @@ else
 end
     
 if isempty(newname) 
-    if strcmp(derivatives,'on')
+    if strcmp(derivatives,'on') && ~contains(P,'derivatives')
         newname = fullfile(root_name, P(index_name(2):end));
     else
-        newname = fullfile(root_name,['skiped_' sub_name ext]);
+        newname = fullfile(root_name,[sub_name(1:end-5) '_skip-' num2str(skipped) '_bold' ext]);
     end
 else
     if ~strcmp(newname(end-3:end),'.nii')
