@@ -195,7 +195,7 @@ elseif get_mask == 0 && strcmp(flags.auto_mask,'off')
     else
         Mask = varargin{2};
         % just to make sure - binarize
-        Mask(find(Mask)) = 1;
+        Mask(find(Mask)) = 1; %#ok<FNDSB>
     end
 else
     disp('generating a mask')
@@ -417,11 +417,11 @@ if ischar(P)
     spm_write_vol(V(1),D);
 end
 
-[~,position]              = max(D(:)); % find witch voxel has maximum difference 
-[x,y,z]                   = ind2sub(size(D),position(1)); % get coordinate (1) in case many identical
-spmup_despike_log.RMS.xyz = [x,y,z];
-spmup_despike_log.RMS.obs = squeeze(Y(x,y,z,:));
-spmup_despike_log.RMS.cmp = squeeze(YY(x,y,z,:));
+[~,position]                   = max(D(:)); % find witch voxel has maximum difference 
+[x,y,z]                        = ind2sub(size(D),position(1)); % get coordinate (1) in case many identical
+spmup_despike_log.RMS.xyz      = [x,y,z];
+spmup_despike_log.RMS.observed = squeeze(Y(x,y,z,:));
+spmup_despike_log.RMS.computed = squeeze(YY(x,y,z,:));
 % figure; plot(squeeze(Y(x,y,z,:))); hold on; plot(squeeze(YY(x,y,z,:)));
 
 %% write and return the data and QC
