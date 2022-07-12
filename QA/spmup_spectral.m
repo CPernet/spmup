@@ -14,9 +14,9 @@ function [f,outliers] = spmup_spectral(varargin)
 % OUTPUT f a matrix of power spectral values [volumes * slice * freq]
 %        outliers 0/1 indicates which volumes are outliers, slice by slice
 %
-% Cyril Pernet - University of Edinburgh
-% -----------------------------------------
-% Copyright (c) SPM Utility Plus toolbox
+% Cyril Pernet 
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
 %% get data and mask
 % memory mapped data

@@ -18,9 +18,9 @@ function [FD,RMS,FD_outliers,RMS_outliers] = spmup_FD(varargin)
 %         FD_outliers the S-outliers from FD
 %         RMS_outliers  the S-outliers from RMS
 %
-% Cyril Pernet - University of Edinburgh
-% -----------------------------------------
-% Copyright (c) SPM Utility Plus toolbox
+% Cyril Pernet 
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
 %% input
 current = pwd;

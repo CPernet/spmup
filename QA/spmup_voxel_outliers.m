@@ -23,8 +23,8 @@ function [outlying_volumes,outlying_voxels] = spmup_voxel_outliers(varargin)
 % volumes with high number of outlying voxels (same procedure)
 %
 % Cyril Pernet 
-% --------------------------------------------------------------------------
-% Copyright (c) SPM Utility Plus toolbox
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
 if exist('nansum','file') ~= 2
     error('you do not have stats toolbox to perform this operation, sorry')
@@ -32,11 +32,7 @@ end
 
 %% check inputs
 
-disp('running spmup_outliers ...')
-disp('-------------------------')
-
-%% get data and mask
-% memory mapped data
+% get data and mask
 if nargin == 0
     [P,sts] = spm_select(Inf,'image' ,'Select your fMRI time series',{},pwd,'.*',Inf);
     if sts == 0
@@ -106,7 +102,16 @@ end
 %% compute
 
 % detrend, get the MAD and classify
-disp('looking for outlier volumes')
+if ischar(P)
+    [~,filename] = fileparts(V(1).fname); 
+    disp   ('----------------------------------')
+    fprintf('running spmup_voxel_outliers on %s\n',filename)
+    disp   ('----------------------------------')
+else
+    disp   ('----------------------------')
+    disp   ('running spmup_voxel_outliers')
+    disp   ('----------------------------')
+end
 class  = NaN(size(Y));
 alphav = icdf('Normal',1-(0.001/N),0,1);
 

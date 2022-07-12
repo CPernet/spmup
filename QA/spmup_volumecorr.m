@@ -15,9 +15,9 @@ function [r_course,r_outliers] = spmup_volumecorr(varargin)
 % OUTPUT r_course a vector of correlations between volumes
 %        outliers 0/1 indicates which volumes are outliers
 %
-% Cyril Pernet - University of Edinburgh
-% -----------------------------------------
-% Copyright (c) SPM Utility Plus toolbox
+% Cyril Pernet 
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
 if exist('nansum','file') ~= 2
     error('you do not have stats toolbox to perform this operation, sorry')
@@ -109,9 +109,16 @@ if any([size(Y,1) size(Y,2) size(Y,3)] ~= size(Mask))
 end
 
 % filename
-[filepath,filename] = fileparts(V(1).fname); 
-fprintf('running spmup_volumecorr on %s\n',filename)
-disp   ('---------------------------')
+if ischar(P)
+    [filepath,filename] = fileparts(V(1).fname); 
+    disp   ('------------------------------')
+    fprintf('running spmup_volumecorr on %s\n',filename)
+    disp   ('------------------------------')
+else
+    disp   ('------------------------')
+    disp   ('running spmup_volumecorr')
+    disp   ('------------------------')
+end
 filename(strfind(filename,'_')) = ' ';
 
     

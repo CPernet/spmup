@@ -14,9 +14,9 @@ function [volume_outliers, slice_outliers] = spmup_spatialcorr(varargin)
 %         slice_outliers indexes slices with an average correlation between
 %                        volumes bigger or lower than the other slices
 %
-% Relies on SPM functions (see http://www.fil.ion.ucl.ac.uk/spm/)
-% Cyril Pernet v4 - 25 Feb 2016, The University of Edinburgh
-% ---------------------------------------------------------------
+% Cyril Pernet 
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
 if exist('nansum','file') ~= 2
     error('you do not have stats toolbox to perform this operation, sorry')
@@ -78,9 +78,16 @@ if nargin > 1 && strcmpi(varargin{2},'figure')
 end
 
 % filename
-[filepath,filename] = fileparts(V(1).fname); 
-fprintf('running spmup_spatialcorr on %s\n',filename)
-disp   ('---------------------------')
+if ischar(P)
+    [filepath,filename] = fileparts(V(1).fname); 
+    disp   ('-------------------------------')
+    fprintf('running spmup_spatialcorr on %s\n',filename)
+    disp   ('-------------------------------')
+else
+    disp   ('-------------------------')
+    disp   ('running spmup_spatialcorr')
+    disp   ('-------------------------')
+end
 filename(strfind(filename,'_')) = ' ';
 
 
