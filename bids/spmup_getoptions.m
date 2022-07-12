@@ -23,8 +23,15 @@ function options = spmup_getoptions(BIDS_dir)
 %               'scrubbing' 'on' (default) or 'off' find outliers in motion derivatives and in globals
 %                'norm' 'T1norm' (default) or 'EPInorm' choice of the type of template for normalization
 %               'skernel' 3 by default is the smoothing kernel as how many times the voxel size
+%               'GLM', 'on' (default) or 'off' to compute the simple GLM (see spm_BIDS_1rstlevel.m)
+%               'derivatives' to include '1'st (default), '2'nd or '0' derivatives in the model
+%                             --> when the 1st derivative is included, the hrf amplitude estimates are
+%                                 automatcally 'boosted' and time delay also computed
+%               'carpet_plot' is 'on' (default) or 'off' to display GLM residuals voxels in 2D 
+%                            (like for resting state - if denoised, and regressed propertly, 
+%                             residuals should be clean)
 %
-% see also see spmup_compute_vdm.m
+% see also see spmup_compute_vdm.m and spm_BIDS_1rstlevel.m 
 %
 % Cyril Pernet July 2022
 % --------------------------
@@ -47,6 +54,6 @@ options = struct(...
     'scrubbing', 'on', ...
     'norm', 'T1norm', ...
     'skernel', 3, ...
+    'GLM', 'on', ...
     'derivatives', '1', ...
-    'carpet_plot', 'on', ...
-    'GLM', 'on');
+    'carpet_plot', 'on');
