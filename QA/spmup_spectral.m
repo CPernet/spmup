@@ -90,7 +90,6 @@ if nargin == 2
         end
     end
 else
-    disp('generating a mask')
     Mask = spmup_auto_mask(V);
 end
 
@@ -108,6 +107,9 @@ nbimage = size(V,1);
 f       = zeros(nbimage,V(1).dim(3),256/2+1);
 Image   = Y.*repmat(Mask,[1,1,1,nbimage]);
 clear   Y
+
+[filepath,filename] = fileparts(V(1).fname);
+fprintf(' Computing slice-wise spectrum for %s\n',filename)
 
 for j=1:nbimage
     for i=1:V(1).dim(3)-1 % for each slice
@@ -153,10 +155,10 @@ if ~strcmpi(fig,'off')
     axis tight; grid on;  xlabel('volumes'); ylabel('power'); hold on; 
     
     if strcmpi(fig,'save')
-        if exist(fullfile(fileparts(V(1).fname),'spmup_QC.ps'),'file')
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(fileparts(V(1).fname),'spmup_QC.ps'));
+        if exist(fullfile(filepath,'spmup_QC.ps'),'file')
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
         else
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(fileparts(V(1).fname),'spmup_QC.ps'));
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
         end
         close(gcf)
     end
