@@ -374,13 +374,13 @@ else  % smooth function
     end
 end
 
-% quick cleanup
-if ~isempty(Mask)
-    for v=1:size(Y,4)
-        Y(:,:,:,v)  = Y(:,:,:,v).*Mask;
-        YY(:,:,:,v) = YY(:,:,:,v).*Mask;
-    end
-end
+% quick cleanup - the issue being we loose background std for SNR
+% if ~isempty(Mask)
+%     for v=1:size(Y,4)
+%         Y(:,:,:,v)  = Y(:,:,:,v).*Mask;
+%         YY(:,:,:,v) = YY(:,:,:,v).*Mask;
+%     end
+% end
 
 %% write the report for QC
 
