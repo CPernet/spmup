@@ -137,14 +137,13 @@ CSF        = spm_read_vols(VM(3));
 if length(VM) == 4
     brain_mask = spm_read_vols(VM(4));
 else
-    disp('making up brain mask')
     brain_mask = (smooth3(GM,'box',15)+smooth3(WM,'box',15)+smooth3(CSF,'box',15))>0;
 end
 GM         = GM.*(GM>0.5);
 WM         = WM.*(WM>0.5);
-CSF        = CSF.*(CSF>0.5); % baseline prob 50%
-GM         = GM.*(GM>(WM+CSF)); % figure; rst_hist(GM(:))
-WM         = WM.*(WM>(GM+CSF)); % figure; rst_hist(WM(:))
+CSF        = CSF.*(CSF>0.5);     % baseline prob 50%
+GM         = GM.*(GM>(WM+CSF));  % figure; rst_hist(GM(:))
+WM         = WM.*(WM>(GM+CSF));  % figure; rst_hist(WM(:))
 CSF        = CSF.*(CSF>(WM+GM)); % figure; rst_hist(CSF(:))
 
 %% in masks tSNR
@@ -171,19 +170,31 @@ tSNR.CSF = nanmean(nanmean(data,1)) /stdCSF;
 clear x y z
 [x,y,z]             = ind2sub(size(brain_mask),find(brain_mask ~= 1));
 data                = spm_get_data(V,[x y z]');
-try
-    stdBackground       = nanmean(nanstd(data,1));
-catch
-    warning('serious issue can''t get std in background! trying voxel-wise')
-    out = zeros(1,size(data,2));
-    for v=1:size(data,2)
-        try
-            out(v) = nanstd(squeeze(data(:,v)),1);
-        catch
-            fprintf('serious issue voxel %g %g %g \n',x(v),y(v),z(v))
+if sum(data(:)) ~= 0
+    try
+        stdBackground       = nanmean(nanstd(data,1));
+    catch
+        warning('serious issue can''t get std in background! trying voxel-wise')
+        out = zeros(1,size(data,2));
+        for v=1:size(data,2)
+            try
+                out(v) = nanstd(squeeze(data(:,v)),1);
+            catch
+                fprintf('serious issue voxel %g %g %g \n',x(v),y(v),z(v))
+            end
         end
+        stdBackground       = nanmean(out);
     end
-    stdBackground       = nanmean(out);
+else
+    % data have been masked - backgound = 0, looking for a mean image
+    % might not work either
+    [fpath,fname,ext] = fileparts(V(1).fname);
+    if exist(fullfile(fpath,['mean' fname ext]),'file')
+        data          = spm_get_data(spm_vol(fullfile(fpath,['mean' fname ext])),[x y z]');
+        stdBackground = nanmean(nanstd(data,1));
+    else
+        stdBackground = 0;
+    end
 end
 
 % tSNR.Background_raw = data;
@@ -199,7 +210,9 @@ elseif contains(ext,'img')
     ext = '.img';
 end
 
-if sum(isnan(data(:))) ~= numel(data) && ~strcmpi(fig,'off')
+if sum(isnan(data(:))) ~= numel(data) && stdBackground ~= 0 && ...
+        ~strcmpi(fig,'off')
+         
     % tSNR per voxel from background
     data = (nanmean(data,1)/stdBackground)';
     
@@ -216,16 +229,6 @@ if sum(isnan(data(:))) ~= numel(data) && ~strcmpi(fig,'off')
     if mymin<0 || isnan(mymin)
         mymin = 0;
     end
-    
-%     Mat = Nii.mat;
-% 
-% % Convert to world-to-voxel mapping
-% iMat = inv(Mat);
-% 
-% % Voxels to read
-% x_vox = iMat(1,1)*x_mm + iMat(1,2)*y_mm + iMat(1,3)*z_mm + iMat(1,4);
-% y_vox = iMat(2,1)*x_mm + iMat(2,2)*y_mm + iMat(2,3)*z_mm + iMat(2,4);
-% z_vox = iMat(3,1)*x_mm + iMat(3,2)*y_mm + iMat(3,3)*z_mm + iMat(3,4);
 
     for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
         subplot(4,9,figindex(index));
@@ -294,7 +297,6 @@ disp('tSNR - making voxel wise tSNR image ..')
 [x,y,z]  = ind2sub(size(WM),find(WM+CSF));
 data     = spm_get_data(V,[x y z]');
 stdWMCSF = nanmean(nanstd(data,1)); % presumably non BOLD
-
 [x,y,z]  = ind2sub(size(brain_mask),find(GM+WM+CSF+(brain_mask ~= 1)));
 try
     data         = spm_get_data(V,[x y z]'); % the whole image or so
@@ -320,8 +322,8 @@ SNRimage     = zeros(V(1).dim);
 SNRimage(find(GM+WM+CSF+(brain_mask ~= 1))) = data;
 
 W                    = V(1);
-W.fname              = [filepath filesep filename '_tSNR' ext];
-W.private.dat.fname  = [filepath filesep filename '_tSNR' ext];
+W.fname              = [filepath filesep filename(1:end-5) '_tSNR' ext];
+W.private.dat.fname  = [filepath filesep filename(1:end-5) '_tSNR' ext];
 W.descrip            = 'tSNR image - see spmup_temporalSNR';
 W.private.dat.dim    = V(1).private.dat.dim(1:3);
 W.n                  = [1 1];
@@ -329,7 +331,7 @@ spm_write_vol(W,SNRimage);
 
 %% --------  optional -------------------
 
-if strcmpi(snr0,'on')
+if strcmpi(snr0,'on') && stdBackground ~= 0
     %% SNR0 (brain only)
     [x,y,z]    = ind2sub(size(brain_mask),find(GM+WM+CSF));
     data       = spm_get_data(V,[x y z]');
