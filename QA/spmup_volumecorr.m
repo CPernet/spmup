@@ -98,7 +98,6 @@ if nargin > 1
 end
 
 if isempty(M)
-    disp('generating a mask')
     Mask = spmup_auto_mask(V);
 end
 
