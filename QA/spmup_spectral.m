@@ -124,7 +124,7 @@ for j=1:nbimage
         [~,rho]     = cart2pol(X,Y); % equivalent in polar coordinates
         rho         = round(rho);
         for r =(256/2):-1:0
-            f(j,i,r+1) = mean(impf(find(rho==r))); % average power values of all the same freq
+            f(j,i,r+1) = mean(impf(rho==r)); % average power values of all the same freq
         end
         % subplot(1,3,3); freq2=0:256/2; loglog(freq2,squeeze(f(j,i,:))); title('frequency spectrum','Fontsize',14); axis tight
     end
@@ -143,18 +143,20 @@ if ~strcmpi(fig,'off')
     else
         set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
     end
-    subplot(1,2,1); loglog(0:256/2,avgf); 
+    
+    subplot(1,2,1); loglog(0:256/2,avgf);
     title('Slices power spectrum averaged over volumes','LineWidth',2);
     axis tight; grid on;  xlabel('freq'); ylabel('power')
     subplot(1,2,2); semilogy(1:size(avgv,1),avgv); 
     semilogy(1:size(avgv,1),avgv.*outliers,'ro');
     title('Avg power spectra per slice','LineWidth',2);
     axis tight; grid on;  xlabel('volumes'); ylabel('power'); hold on; 
+    
     if strcmpi(fig,'save')
-        if exist(fullfile(filepath,'spm.ps'),'file')
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+        if exist(fullfile(fileparts(V(1).fname),'spmup_QC.ps'),'file')
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(fileparts(V(1).fname),'spmup_QC.ps'));
         else
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(fileparts(V(1).fname),'spmup_QC.ps'));
         end
         close(gcf)
     end

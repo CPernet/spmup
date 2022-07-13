@@ -423,7 +423,7 @@ if strcmpi(roi,'on')
         mytitle = sprintf('tSNR=%g*sqrt(nb of voxels)+%g \n RMSE=%g',B(1),B(2),sqrt(mean(model - tSNR.roi.value')));
         title(mytitle,'FontSize',12); drawnow
         if strcmpi(fig,'save')
-            if exist(fullfile(filepath,'spm.ps'),'file')
+            if exist(fullfile(filepath,'spmup_QC.ps'),'file')
                 print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
             else
                 print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));

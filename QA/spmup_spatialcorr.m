@@ -166,7 +166,7 @@ if strcmpi(fig,'on') || strcmpi(fig,'save')
 end
 
 if strcmpi(fig,'save')
-    if exist(fullfile(filepath,'spm.ps'),'file')
+    if exist(fullfile(filepath,'spmup_QC.ps'),'file')
         print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
     else
         print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
