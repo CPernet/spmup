@@ -147,7 +147,7 @@ if strcmpi(fig,'on') || strcmpi(fig,'save')
     tmp = r_course.*r_outliers; tmp(tmp==0) = NaN; plot(tmp,'ro','LineWidth',3)
     if strcmpi(fig,'save')
         if exist(fullfile(filepath,'spm.ps'),'file')
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
         else
             print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
         end

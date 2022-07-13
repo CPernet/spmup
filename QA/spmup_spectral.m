@@ -14,6 +14,14 @@ function [f,outliers] = spmup_spectral(varargin)
 % OUTPUT f a matrix of power spectral values [volumes * slice * freq]
 %        outliers 0/1 indicates which volumes are outliers, slice by slice
 %
+% Compute the spatial power spectrum (i.e. abs(fft)^2) per slice using a
+% zero-padded 256-by-256 element matrix and then average power values
+% of all the same freqencies, returning f. Outliers are computed after 
+% averaging all frequencies, computing S-outliers among volumes, for each
+% slice.
+%
+% see also spmup_comp_robust_outliers
+%
 % Cyril Pernet 
 % --------------------------
 %  Copyright (C) SPMUP Team 
@@ -95,19 +103,14 @@ elseif nargin == 4
     end
 end
 
-
 %% computye the image spectral power slice by slice
-xmax    = V(1).dim(1);
-ymax    = V(1).dim(2);
-zmax    = V(1).dim(3);
 nbimage = size(V,1);
-f       = zeros(nbimage,zmax,256/2+1);
-pow     = zeros(256,256,zmax-1);
+f       = zeros(nbimage,V(1).dim(3),256/2+1);
 Image   = Y.*repmat(Mask,[1,1,1,nbimage]);
 clear   Y
 
 for j=1:nbimage
-    for i=1:zmax-1 % for each slice
+    for i=1:V(1).dim(3)-1 % for each slice
         im          = squeeze(Image(:,:,i,j)); im(isnan(im)) = 0;
         % figure; subplot(1,3,1); imagesc(im); title('Observed slice')
         N           = min(size(im));
@@ -118,12 +121,10 @@ for j=1:nbimage
         impf        = abs(imf2).^2; 
         % subplot(1,3,2); imagesc(freq,freq,log10(impf)); title('slice in Fourier space')
         [X,Y]       = meshgrid(freq,freq); % get coordinates of the power spectrum image
-        [theta,rho] = cart2pol(X,Y); % equivalent in polar coordinates
+        [~,rho]     = cart2pol(X,Y); % equivalent in polar coordinates
         rho         = round(rho);
-        for r=0:256/2
-            ii{r+1}=find(rho==r); % for each freq return the location in the polar
-                                  % array ('find') of the corresponding frequency
-            f(j,i,r+1)=mean(impf(ii{r+1})); % average power values of all the same freq
+        for r =(256/2):-1:0
+            f(j,i,r+1) = mean(impf(find(rho==r))); % average power values of all the same freq
         end
         % subplot(1,3,3); freq2=0:256/2; loglog(freq2,squeeze(f(j,i,:))); title('frequency spectrum','Fontsize',14); axis tight
     end
@@ -134,21 +135,26 @@ avgf     = squeeze(mean(f,1)); % avg over time series
 avgv     = squeeze(mean(f,3)); % avg freq to get one value per volume and slice
 outliers = spmup_comp_robust_outliers(avgv);
 
-if strcmpi(fig,'on') || strcmpi(fig,'save')
-    figure('Name','Slice spectral analysis');
-    set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-    subplot(1,2,1); loglog(0:256/2,avgf); title('Slices power spectrum averaged over volumes','LineWidth',2);
-    axis tight; grid on;  xlabel('freq'); ylabel('power')
-    subplot(1,2,2); semilogy(1:size(avgv,1),avgv); title('Avg power spectra per slice','LineWidth',2);
-    axis tight; grid on;  xlabel('volumes'); ylabel('power'); hold on; 
-    semilogy(1:size(avgv,1),avgv.*outliers,'ro');
+if ~strcmpi(fig,'off') 
     
+    figure('Name','Slice spectral analysis');
+    if strcmpi(fig,'on')
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    else
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    end
+    subplot(1,2,1); loglog(0:256/2,avgf); 
+    title('Slices power spectrum averaged over volumes','LineWidth',2);
+    axis tight; grid on;  xlabel('freq'); ylabel('power')
+    subplot(1,2,2); semilogy(1:size(avgv,1),avgv); 
+    semilogy(1:size(avgv,1),avgv.*outliers,'ro');
+    title('Avg power spectra per slice','LineWidth',2);
+    axis tight; grid on;  xlabel('volumes'); ylabel('power'); hold on; 
     if strcmpi(fig,'save')
-        [filepath,filename] = fileparts(V(1).fname);
-        try
-            print (gcf,'-dpdf', '-bestfit', fullfile(filepath,[filename '_slice_power.pdf']));
-        catch
-            print (gcf,'-dpdf', fullfile(filepath,[filename '_slice_power.pdf']));
+        if exist(fullfile(filepath,'spm.ps'),'file')
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+        else
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
         end
         close(gcf)
     end

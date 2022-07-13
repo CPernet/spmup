@@ -70,7 +70,7 @@ if nargin == 0
     if sts == 0
         return
     end
-    [masks,sts]      = spm_select(3,'image' ,'Select tissue masks (GM,WM,CSF)',{},pwd,'.*',1);
+    [masks,sts]       = spm_select(3,'image' ,'Select tissue masks (GM,WM,CSF)',{},pwd,'.*',1);
     if sts == 0
         return
     end
@@ -81,7 +81,7 @@ if size(time_series,1) == 1 && strcmp(time_series(length(time_series)-1:end),',1
 end
 
 if iscell(time_series)
-    for v=1:size(time_series,1)
+    for v=size(time_series,1):-1:1
         V(v) =spm_vol(time_series{v});
     end
 else
@@ -91,7 +91,11 @@ end
 if iscell(V); V = cell2mat(V); end
 if size(V,1) < 10; error('there is less than 10 images in your time series ??'); end
 
-for m=1:size(masks,1)
+if iscell(masks) && size(masks,2) > size(masks,1)
+    masks = masks'; % appears like char array P but as cell
+end
+    
+for m=size(masks,1):-1:1
     if iscell(masks) ==0
         VM(m) = spm_vol(masks(m,:));
     else
@@ -181,16 +185,13 @@ catch
     end
     stdBackground       = nanmean(out);
 end
+
 % tSNR.Background_raw = data;
 tSNR.Background     = nanmean(nanmean(data,1)) /stdBackground; % figure; rst_hist(data(:))
 
 % Computes the density estimate of data using a Random Average Shifted
 % Histogram algorithm is coded based on Bourel et al. Computational
 % Statistics and Data Analysis 79 (2014)
-if exist('cubehelix','file') == 0
-    addpath([fileparts(which('spmup_temporalSNR.m')) filesep 'external']);
-end
-
 [filepath, filename, ext] = fileparts(time_series(1,:));
 if contains(ext,'nii') % make sure we remove any frame trail
     ext = '.nii';
@@ -203,9 +204,11 @@ if sum(isnan(data(:))) ~= numel(data) && ~strcmpi(fig,'off')
     data = (nanmean(data,1)/stdBackground)';
     
     % see where is it and spatial distribition
-    figure_name = 'Background SNR';
-    fig_handle = open_spm_figure(fig, figure_name);       
-    
+    if strcmpi(fig,'on')
+        figure('Name','Background SNR');
+    else
+        figure('Name','Background SNR','Visible','Off');
+    end
     figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
     SNRimage = zeros(V(1).dim); index = 1;
     SNRimage(find(brain_mask~=1)) = data;
@@ -213,11 +216,22 @@ if sum(isnan(data(:))) ~= numel(data) && ~strcmpi(fig,'off')
     if mymin<0 || isnan(mymin)
         mymin = 0;
     end
+    
+%     Mat = Nii.mat;
+% 
+% % Convert to world-to-voxel mapping
+% iMat = inv(Mat);
+% 
+% % Voxels to read
+% x_vox = iMat(1,1)*x_mm + iMat(1,2)*y_mm + iMat(1,3)*z_mm + iMat(1,4);
+% y_vox = iMat(2,1)*x_mm + iMat(2,2)*y_mm + iMat(2,3)*z_mm + iMat(2,4);
+% z_vox = iMat(3,1)*x_mm + iMat(3,2)*y_mm + iMat(3,3)*z_mm + iMat(3,4);
+
     for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
         subplot(4,9,figindex(index));
         imagesc((squeeze(SNRimage(:,:,z))'));
         index = index+1; colormap(cubehelix(32,[1.15,0.1,4,1], [0,1], [0,0.85]))
-        caxis([mymin, nanmedian(data)+3*iqr(data)]);
+        try caxis([mymin, nanmedian(data)+3*iqr(data)]); end
         set(gca,'XtickLabel',[],'YtickLabel',[])
         xlabel(['slice ' num2str(z)]);
     end
@@ -241,7 +255,7 @@ if sum(isnan(data(:))) ~= numel(data) && ~strcmpi(fig,'off')
         binedge(out(2:end)) = [];
     end
     % 2 Get the weight vector.
-    kern = inline('(15/16)*(1-x.^2).^2');
+    kern = @(x) (15/16)*(1-x.^2).^2; % inline('(15/16)*(1-x.^2).^2');
     ind = (1-m):(m-1);
     den = sum(kern(ind/m));% Get the denominator.
     wm = m*(kern(ind/m))/den;% Create the weight vector.
@@ -267,8 +281,12 @@ if sum(isnan(data(:))) ~= numel(data) && ~strcmpi(fig,'off')
     bar(bc,K,1,'FaceColor',[0.5 0.5 1]);
     title('RAS Histogram - background noise');
     grid on; box on; ylabel('tSNR'); drawnow
-    
-    save_spm_figure(fig, fig_handle, figure_name);
+    if exist(fullfile(filepath,'spmup_QC.ps'),'file')
+        print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+    else
+        print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+    end
+    close(gcf)
 end
 
 %% average (tSNR)
@@ -288,8 +306,8 @@ catch
     for v=length(x):-1:1
         try
             tmp                  = spm_get_data(V,[x(v) y(v) z(v)]');
-        average(v)           = nanmean(tmp);
-        data(x(v),y(v),z(v)) = nanmean(tmp)/sqrt(stdGM^2+stdWMCSF^2);
+            average(v)           = nanmean(tmp);
+            data(x(v),y(v),z(v)) = nanmean(tmp)/sqrt(stdGM^2+stdWMCSF^2);
         catch
             fprintf('serious issue voxel %g %g %g \n',x(v),y(v),z(v));
             average(v) = NaN;
@@ -322,11 +340,13 @@ if strcmpi(snr0,'on')
     
     if ~strcmpi(fig,'off')
       
-        figure_name = 'SNR0';
-        fig_handle = open_spm_figure(fig, figure_name); 
-        index = 1;
-      
+        if strcmpi(fig,'on')
+            figure('Name','SNR0');
+        else
+            figure('Name','SNR0','Visible','Off');
+        end
         figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
+        index = 1;
         for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
             subplot(4,9,figindex(index));
             imagesc(flipud(squeeze(SNRimage(:,:,z)')));
@@ -339,8 +359,12 @@ if strcmpi(snr0,'on')
             index = index+1; colormap(cubehelix(32,[3,1.9,1.5,1], [0,1], [0.2,0.8]))
         end
         drawnow
-        
-        save_spm_figure(fig, fig_handle, figure_name);
+        if exist(fullfile(filepath,'spmup_QC.ps'),'file')
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+        else
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+        end
+        close(gcf)
     end
     
     tSNR.SNR02tSNR_corr = corr(SNRimage(:),SNROimage(:));
@@ -387,39 +411,25 @@ if strcmpi(roi,'on')
     
     if ~strcmpi(fig,'off')
       
-        figure_name = 'SNR per size';
-        fig_handle = open_spm_figure(fig, figure_name);
-
+        if strcmpi(fig,'on')
+            figure('Name','SNR per size');
+        else
+            figure('Name','SNR per size','Visible','Off');
+        end
         plot(sqrt(tSNR.roi.size),[sqrt(tSNR.roi.size)' ones(18,1)]*B,'LineWidth',3);
         hold on; plot(sqrt(tSNR.roi.size),tSNR.roi.value,'ro','LineWidth',2);
         axis tight; box on; grid minor; ylabel('temporal SNR','FontSize',12)
         xlabel('sqrt of the number of in brain voxels used','FontSize',12)
         mytitle = sprintf('tSNR=%g*sqrt(nb of voxels)+%g \n RMSE=%g',B(1),B(2),sqrt(mean(model - tSNR.roi.value')));
         title(mytitle,'FontSize',12); drawnow
-        
-        save_spm_figure(fig, fig_handle, figure_name);
-        
+        if strcmpi(fig,'save')
+            if exist(fullfile(filepath,'spm.ps'),'file')
+                print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+            else
+                print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+            end
+            close(gcf)
+        end
     end
-    
 end
 
-end
-
-function fig_handle = open_spm_figure(fig, figure_name)
-    
-    if strcmpi(fig, 'on')
-        fig_handle = spm_figure('Create', 'Graphics', figure_name, 'on');
-    elseif strcmpi(fig, 'save')
-        fig_handle = spm_figure('Create', 'Graphics', figure_name, 'off');
-    end
-
-end
-
-function save_spm_figure(fig, fig_handle, figure_name)
-    
-    if strcmpi(fig,'save')
-        spm_print(['spmup_QC-' figure_name], fig_handle);
-        close(fig_handle);
-    end
-    
-end
