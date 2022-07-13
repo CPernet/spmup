@@ -1,12 +1,13 @@
 function outliers = spmup_comp_robust_outliers(time_series,type)
 
-% Computes robust ouliers of a time series using S-outliers (default) or Carling's k
+% Computes robust ouliers of a time series using S-outliers or Carling's k
 %
 % FORMAT outliers = spmup_comp_robust_outliers(time_series,type)
 %
-% INPUTS time_series are the time courses as row vectors 
-%        type is 'S-outliers' or 'Carling'
-% OUTPUT outliers a binary indicating outliers
+% INPUTS - time_series are the time courses as row vectors 
+%        - type is 'S-outliers' (default) or 'Carling'
+%
+% OUTPUT outliers a binary vector indicating outliers
 %
 % S-outliers is the default options, it is independent of a mesure of
 % centrality as this is based on the median of pair-wise distances. This is
@@ -15,25 +16,24 @@ function outliers = spmup_comp_robust_outliers(time_series,type)
 %
 % The adjusted Carling's box-plot rule can also be used, and derived from
 % the median of the data: outliers are outside the bound of median+/- k*IQR, 
-% k = k=(17.63*n-23.64)/(7.74*n-3.71). This is a more specific measure,
+% with k = (17.63*n-23.64)/(7.74*n-3.71). This is a more specific measure,
 % as such it is 'better' than S-outliers to regress-out, removing bad data
 % points (assuming we don't want to 'remove' too many).
 %
-% see:
-%
-% Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the the median 
-% absolute deviation. J. Am. Stat. Assoc. 88, 1273–1263.
+% Ref:
+% - Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the the median 
+% absolute deviation. J. Am. Stat. Assoc. 88, 1273-1263.
 % <https://www.tandfonline.com/doi/abs/10.1080/01621459.1993.10476408>
-% Carling, K. (2000). Resistant outlier rules and the non-Gaussian case. 
+% - Carling, K. (2000). Resistant outlier rules and the non-Gaussian case. 
 % Stat. Data Anal. 33, 249:258. 
 % <http://www.sciencedirect.com/science/article/pii/S0167947399000572>
-% Hoaglin, D.C., Iglewicz, B. (1987) Fine-tuning some resistant rules for
+% - Hoaglin, D.C., Iglewicz, B. (1987) Fine-tuning some resistant rules for
 % outlier labelling. J. Amer. Statist. Assoc., 82 , 1147:1149
 % <http://www.tandfonline.com/doi/abs/10.1080/01621459.1986.10478363>
 %
-% Cyril Pernet - University of Edinburgh
-% -----------------------------------------
-% Copyright (c) SPM Utility Plus toolbox
+% Cyril Pernet 
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
 if ~exist('type','var')
     type = 'S-outliers';
