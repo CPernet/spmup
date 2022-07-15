@@ -10,16 +10,17 @@ function design = spmup_censoring(varargin)
 %        data is a n volumes * m matrix to censor column wise
 %        Voltera indicate to expand the motion parameters
 %
-% OUTPUT censoring_regressors a matrix with ones in each column for
-%        outliers found in coumns of data (also saved as design.txt)
+% OUTPUT censoring_regressors matrix with ones in each column for
+%        outliers found in coumns of data 
+%        if no output specified saves it as design.txt
 % 
 % Exemple of data matrix data = [outlying_voxels' r_course']
 % Volterra expansion of motion parameters 
 % Friston et al (1996) Magn Reson Med. 1996;35:346:355.
-
+%
 % Cyril Pernet
-% --------------------------------
-% Copyright (C) spmup 2017
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
 %% inputs
 
@@ -34,9 +35,8 @@ end
 data = varargin{2};
 
 % motion
-
-[filepath,filename]=fileparts(varargin{1});
-motion = load(varargin{1}); % load data
+[filepath,filename] = fileparts(varargin{1});
+motion              = load(varargin{1}); % load data
    
 if strcmpi(Voltera,'on')
     D      = diff(motion,1,1); % 1st order derivative
@@ -68,7 +68,10 @@ if ~isempty(data)
 else
     design = motion;
 end
-save(fullfile(filepath,[filename(4:end) '_design.txt']),'design','-ascii')
+
+if nargout == 0
+    save(fullfile(filepath,[filename(4:end) '_design.txt']),'design','-ascii')
+end
 
 % % quick check
 % if sum(censoring_regressors(:))/size(censoring_regressors,1)*100 > 10

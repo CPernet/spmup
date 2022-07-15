@@ -23,7 +23,6 @@ function [FD,RMS,FD_outliers,RMS_outliers] = spmup_FD(varargin)
 %  Copyright (C) SPMUP Team 
 
 %% input
-current = pwd;
 radius  = 50;
 fig     = 'save';
 FD      = NaN;
@@ -37,14 +36,15 @@ if nargin == 0
     else
         realignment_file = [filepath filesep filename];
     end
+    
 elseif nargin >=1
     realignment_file = varargin{1};
-    [filepath,filename]=fileparts(realignment_file);
+    filepath         = fileparts(realignment_file);
     for v=2:nargin
         if strcmpi(varargin{v},'Radius')
             radius = varargin{v+1};
         elseif strcmpi(varargin{v},'Figure')
-            fig = varargin{v+1};
+            fig    = varargin{v+1};
         end
     end
 end
@@ -56,15 +56,15 @@ motion            = spm_detrend(motion,1); % de-mean and detrend
 motion(:,[4 5 6]) = motion(:,[4 5 6]).*radius; % angle in radian by average head size = displacement in mm
 
 %% compute
-D            = diff(motion,1,1); % 1st order derivative
-D            = [zeros(1,6); D];  % set first row to 0
-FD           = sum(abs(D),2); % framewise displacement a la Powers
-RMS          = sqrt(mean(detrend(D).^2,2)); % root mean square for each column a la Van Dijk
-FD_outliers  = spmup_comp_robust_outliers(FD);
-RMS_outliers = spmup_comp_robust_outliers(RMS);
+D                = diff(motion,1,1); % 1st order derivative
+D                = [zeros(1,6); D];  % set first row to 0
+FD               = sum(abs(D),2); % framewise displacement a la Powers
+RMS              = sqrt(mean(detrend(D).^2,2)); % root mean square for each column a la Van Dijk
+FD_outliers      = spmup_comp_robust_outliers(FD);
+RMS_outliers     = spmup_comp_robust_outliers(RMS);
 
 %% figure
-if strcmpi(fig,'on') || strcmpi(fig,'save')
+if ~strcmpi(fig,'off')
     figure('Name','Motion and displacement')
     if strcmpi(fig,'on')
         set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
@@ -83,13 +83,12 @@ if strcmpi(fig,'on') || strcmpi(fig,'save')
     xlabel('Volumes'); ylabel('average displacement in mm')
     
     if strcmpi(fig,'save')
-        if exist(fullfile(filepath,'spm.ps'),'file')
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spm.ps'));
+        if exist(fullfile(filepath,'spmup_QC.ps'),'file')
+            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC'));
         else
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+            print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,'spmup_QC.ps'));
         end
         close(gcf)
-        cd(current)
     end
 end
 

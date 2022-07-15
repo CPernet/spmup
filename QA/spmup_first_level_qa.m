@@ -9,12 +9,12 @@ function jobs = spmup_first_level_qa(varargin)
 %       options define various choices to be used:
 %       'Motion Parameters': 'on' (default) or 'off'
 %              --> plots motion parameters and 1st derivatives
-%       'Radius' 50mm as default
+%       'Radius': 50 (default)
 %              --> the average head size to compute rotation displacement
 %       'Framewise displacement': 'on' (default) or 'off'
 %              --> plots displacement (FD and RMS)                   
 %              --> generates/appends new design.txt file with displacement outliers
-%       'Voltera': 'off' (fefault) or 'on'
+%       'Voltera': 'off' (default) or 'on'
 %              --> clompute the motion parameter expansion
 %              --> generates/appends new design.txt file with displacement outliers
 %       'Globals': 'on' (default) or 'off'
@@ -86,19 +86,23 @@ end
 
 %% do the different jobs
 
-fprintf('processing data %s \n',time_series);
+disp('-----------------------------------')
+fprintf(' 1st level QA - processing data %s \n',time_series);
+disp('-----------------------------------')
 
 if strcmpi(Basics,'on')
     [jobs.mean_image,jobs.std_image] = spmup_basics(time_series,'mean','std');
     V = spm_vol(jobs.mean_image);
-    Coordinate = V.dim /2; % take the middle of the image
 else
     V = spm_vol(time_series);
-    Coordinate = V(1).dim /2; 
 end
 
 % motion QA
-realign_files = spmup_realign_qa(time_series,...
+if ~exist('Coordinate','var')
+    Coordinate = V(1).dim /2;
+end
+
+[realign_files,jobs.FD,jobs.glo] = spmup_realign_qa(time_series,...
     'Motion Parameters', MotionParameters,...
     'Radius',Radius,...
     'Framewise Displacement', FramewiseDisplacement,...
@@ -108,15 +112,11 @@ realign_files = spmup_realign_qa(time_series,...
     'Coordinate', Coordinate, ...
     'Figure',Figure);
 
-ri = 1;
-if strcmp(MotionParameters,'on') || strcmp('Framewise Displacement','on') || strcmp('Globals','on')
+if strcmp(FramewiseDisplacement,'on') || strcmp(Globals,'on')
     jobs.design = realign_files{1};
-    ri = 2;
 end
 
 if strcmpi(Movie, 'on')
-    jobs.movies = {realign_files{ri}};
+    jobs.movies = realign_files{2}; 
 end
 
-disp('1st level QA done')
-cd(current)
