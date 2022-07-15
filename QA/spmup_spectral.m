@@ -109,7 +109,9 @@ Image   = Y.*repmat(Mask,[1,1,1,nbimage]);
 clear   Y
 
 [filepath,filename] = fileparts(V(1).fname);
+disp('-------------------------------------')
 fprintf(' Computing slice-wise spectrum for %s\n',filename)
+disp('-------------------------------------')
 
 for j=1:nbimage
     for i=1:V(1).dim(3)-1 % for each slice
@@ -158,7 +160,7 @@ if ~strcmpi(fig,'off')
         if exist(fullfile(filepath,'spmup_QC.ps'),'file')
             print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
         else
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+            print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,'spmup_QC.ps'));
         end
         close(gcf)
     end

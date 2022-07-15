@@ -111,11 +111,11 @@ end
 if ischar(P)
     [filepath,filename] = fileparts(V(1).fname); 
     disp   ('------------------------------')
-    fprintf('running spmup_volumecorr on %s\n',filename)
+    fprintf(' running spmup_volumecorr on %s\n',filename)
     disp   ('------------------------------')
 else
     disp   ('------------------------')
-    disp   ('running spmup_volumecorr')
+    disp   (' running spmup_volumecorr')
     disp   ('------------------------')
 end
 filename(strfind(filename,'_')) = ' ';
@@ -138,7 +138,7 @@ end
 r_course = [r_course(sub2ind(size(r_course),diag,(diag+1))) r_course(1,size(r_course,2))];
 
 %% get the outliers from the r_course
-r_outliers = spmup_comp_robust_outliers(r_course);
+r_outliers = spmup_comp_robust_outliers(r_course,'Carling');
 if strcmpi(fig,'on') || strcmpi(fig,'save')
     subplot(2,1,2); 
     plot(r_course,'LineWidth',2); grid on; title(sprintf('Volume to volume correlation \n%s', filename));
@@ -148,9 +148,16 @@ if strcmpi(fig,'on') || strcmpi(fig,'save')
         if exist(fullfile(filepath,'spmup_QC.ps'),'file')
             print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
         else
-            print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+            print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,'spmup_QC.ps'));
         end
         close(gcf)
     end
 end
-fprintf('outlier volumes: %g\n',find(r_outliers));
+
+if sum(r_outliers ~= 0)
+    if sum(r_outliers) == 1
+        fprintf('correlation between volumes: %g is a potiential outlier\n',find(r_outliers));
+    else
+        fprintf(['correlation between volumes ' repmat('%g ', [1 sum(r_outliers)]) ' are potiential outliers\n'],find(r_outliers));
+    end
+end

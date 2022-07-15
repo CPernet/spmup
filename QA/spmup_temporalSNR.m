@@ -129,8 +129,12 @@ if nargin > 2
    end
 end
 
+[~,filename] = fileparts(V(1).fname);
+disp   ('-------------------------------')
+fprintf(' running spmup_temporalSNR on %s\n',filename)
+disp   ('-------------------------------')
+
 %% Compute relative masks
-disp('tSNR - reading data ..')
 GM         = spm_read_vols(VM(1));
 WM         = spm_read_vols(VM(2));
 CSF        = spm_read_vols(VM(3));
@@ -147,7 +151,6 @@ WM         = WM.*(WM>(GM+CSF));  % figure; rst_hist(WM(:))
 CSF        = CSF.*(CSF>(WM+GM)); % figure; rst_hist(CSF(:))
 
 %% in masks tSNR
-disp('tSNR - computing metrics ..')
 clear x y z
 [x,y,z]  = ind2sub(size(GM),find(GM));
 data     = spm_get_data(V,[x y z]');
@@ -217,12 +220,6 @@ if sum(isnan(data(:))) ~= numel(data) && stdBackground ~= 0 && ...
     data = (nanmean(data,1)/stdBackground)';
     
     % see where is it and spatial distribition
-    if strcmpi(fig,'on')
-        figure('Name','Background SNR');
-    else
-        figure('Name','Background SNR','Visible','Off');
-    end
-    figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
     SNRimage = zeros(V(1).dim); index = 1;
     SNRimage(find(brain_mask~=1)) = data;
     mymin = nanmedian(data)-3*iqr(data);
@@ -230,6 +227,13 @@ if sum(isnan(data(:))) ~= numel(data) && stdBackground ~= 0 && ...
         mymin = 0;
     end
 
+    figure('Name','Background SNR');
+    if strcmpi(fig,'on')
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    else
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    end
+    figindex = [1 2 3 4 10 11 12 13 19 20 21 22 28 29 30 31];
     for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
         subplot(4,9,figindex(index));
         imagesc((squeeze(SNRimage(:,:,z))'));
@@ -241,43 +245,43 @@ if sum(isnan(data(:))) ~= numel(data) && stdBackground ~= 0 && ...
     clear SNRimage
     
     % do the histogram (kernel density)
-    n = length(data);
-    m = 100; % number of hist to compute
-    h = 2.15*sqrt(var(data))*n^(-1/5);
+    n     = length(data);
+    m     = 100; % number of hist to compute
+    h     = 2.15*sqrt(var(data))*n^(-1/5);
     delta = h/m;
     % 1 make a mesh with size delta
-    t0 = min(data)-min(diff(data))/2;
-    tf = max(data)+min(diff(data))/2;
-    nbin = ceil((tf-t0)/delta);
+    t0      = min(data)-(min(diff(data))/2);
+    tf      = max(data)+(min(diff(data))/2);
+    nbin    = ceil((tf-t0)/delta);
     binedge = t0:delta:(t0+delta*nbin);
-    out = find(binedge>tf);
-    if out == 1
+    out     = find(binedge>tf);
+    if isempty(out) || out == 1
         binedge(out) = tf;
     else
-        binedge(out(1)) = tf;
+        binedge(out(1))     = tf;
         binedge(out(2:end)) = [];
     end
     % 2 Get the weight vector.
     kern = @(x) (15/16)*(1-x.^2).^2; % inline('(15/16)*(1-x.^2).^2');
-    ind = (1-m):(m-1);
-    den = sum(kern(ind/m));% Get the denominator.
-    wm = m*(kern(ind/m))/den;% Create the weight vector.
+    ind  = (1-m):(m-1);
+    den  = sum(kern(ind/m));% Get the denominator.
+    wm   = m*(kern(ind/m))/den;% Create the weight vector.
     % 3 compute bin with shifted edges
-    RH=zeros(1,nbin);
-    RSH=zeros(m,nbin);
+    RH  = zeros(1,nbin);
+    RSH = zeros(m,nbin);
     for e=1:m
-        v = binedge + (delta*randn(1,1)); % e is taken from N(0,h);
-        v(v<t0) = t0; % lower bound
-        v(v>tf) = tf; % upper bound
-        nu = histc(data,v);
-        nu = [zeros(1,m-1) nu' zeros(1,m-1)];
-        for k=1:nbin
-            ind=k:(2*m+k-2);
-            RH(k)=sum(wm.*nu(ind));
+        v        = binedge + (delta*randn(1,1)); % e is taken from N(0,h);
+        v(v<t0)  = t0; % lower bound
+        v(v>tf)  = tf; % upper bound
+        nu       = histc(data,v);
+        nu       = [zeros(1,m-1) nu' zeros(1,m-1)];
+        for k = 1:nbin
+            ind  = k:(2*m+k-2);
+            RH(k)= sum(wm.*nu(ind));
         end
         RSH(e,:) = RH/(n*h);
     end
-    K = mean(RSH,1);
+    K  = mean(RSH,1);
     bc = t0+((1:nbin)-0.5)*delta;
     
     subplot(4,8,[5 6 7 8 13 14 15 16 21 22 23 24 29 30 31 32]);
@@ -293,7 +297,6 @@ if sum(isnan(data(:))) ~= numel(data) && stdBackground ~= 0 && ...
 end
 
 %% average (tSNR)
-disp('tSNR - making voxel wise tSNR image ..')
 [x,y,z]  = ind2sub(size(WM),find(WM+CSF));
 data     = spm_get_data(V,[x y z]');
 stdWMCSF = nanmean(nanstd(data,1)); % presumably non BOLD
@@ -428,7 +431,7 @@ if strcmpi(roi,'on')
             if exist(fullfile(filepath,'spmup_QC.ps'),'file')
                 print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
             else
-                print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+                print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,'spmup_QC.ps'));
             end
             close(gcf)
         end

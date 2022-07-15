@@ -81,11 +81,11 @@ end
 if ischar(P)
     [filepath,filename] = fileparts(V(1).fname); 
     disp   ('-------------------------------')
-    fprintf('running spmup_spatialcorr on %s\n',filename)
+    fprintf(' running spmup_spatialcorr on %s\n',filename)
     disp   ('-------------------------------')
 else
     disp   ('-------------------------')
-    disp   ('running spmup_spatialcorr')
+    disp   (' running spmup_spatialcorr')
     disp   ('-------------------------')
 end
 filename(strfind(filename,'_')) = ' ';
@@ -116,9 +116,11 @@ end
 r = nanmean(r,2); % average over slices
 volume_outliers = spmup_comp_robust_outliers(r);
 if sum(volume_outliers ~= 0)
-    fprintf('volume %g is potiential outlier\n',find(volume_outliers));
-else
-    disp('no volume outliers detected');
+    if sum(volume_outliers) == 1
+        fprintf('volume %g is a potiential outlier\n',find(volume_outliers));
+    else
+        fprintf(['volumes ' repmat('%g ', [1 sum(volume_outliers)]) ' are potiential outliers\n'],find(volume_outliers));
+    end
 end
 
 if strcmpi(fig,'on') || strcmpi(fig,'save')
@@ -153,9 +155,11 @@ tmp = spmup_comp_robust_outliers(tmp);
 slice_outliers = zeros(length(r),1);
 slice_outliers(~isnan(r)) = tmp;
 if sum(slice_outliers ~= 0)
-    fprintf('slice %g is potiential outlier\n',find(slice_outliers));
-else
-    disp('no slice outliers detected');
+    if sum(slice_outliers) == 1
+        fprintf('slice %g is a potiential outlier\n',find(slice_outliers));
+    else
+        fprintf(['slices ' repmat('%g ', [1 sum(slice_outliers)]) ' are potiential outliers\n'],find(slice_outliers));
+    end
 end
 
 if strcmpi(fig,'on') || strcmpi(fig,'save')
@@ -169,7 +173,7 @@ if strcmpi(fig,'save')
     if exist(fullfile(filepath,'spmup_QC.ps'),'file')
         print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
     else
-        print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+        print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,'spmup_QC.ps'));
     end
     close(gcf)
 end

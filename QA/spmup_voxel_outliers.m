@@ -95,7 +95,6 @@ if nargin == 2
         end
     end
 else
-    disp('generating a mask')
     Mask = spmup_auto_mask(V);
 end
 
@@ -105,11 +104,11 @@ end
 if ischar(P)
     [~,filename] = fileparts(V(1).fname); 
     disp   ('----------------------------------')
-    fprintf('running spmup_voxel_outliers on %s\n',filename)
+    fprintf(' running spmup_voxel_outliers on %s\n',filename)
     disp   ('----------------------------------')
 else
     disp   ('----------------------------')
-    disp   ('running spmup_voxel_outliers')
+    disp   (' running spmup_voxel_outliers')
     disp   ('----------------------------')
 end
 class  = NaN(size(Y));
