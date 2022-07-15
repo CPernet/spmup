@@ -10,6 +10,7 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 %        c1 is the gray matter image
 %        c2 is the white matter image
 %        option is 'no background' set to 'true' or 'false'
+%                  'figure': off/on/save (default) 
 %
 % OUTPUT anatQA is a structure with the following fields:
 %        - SNR : the signal-to-Noise Ratio, ie the mean intensity within gray and white matter divided
@@ -25,10 +26,6 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 %        - EFC : Entropy Focus Criterion, i.e. the entropy of voxel intensities proportional to the maximum 
 %                possibly entropy for a similarly sized image. Indicates ghosting and head motion-induced blurring. 
 %                Lower values are better. See <http://ieeexplore.ieee.org/document/650886/>
-%       - asym : a simple measure of assymmetry (Left-Right/Left+Right). Assuming the [0,0,0]
-%                coordinate is roughly in the middle of the image (+/- 20 mm), asymmetry is
-%                computed for the combined gray/white matter masks - large difference
-%                can indicate an issue with the image (for healthy brains)
 %
 % * when the background has 0 variance (e.g. a sequence with noise suppression like FLAIR) then the standard 
 %   deviation of the white matter is used as reference instead of the background
@@ -81,10 +78,13 @@ if any(AnatV.dim ~= WhiteV.dim)
 end
 
 option.background = 1;
+option.fig        = 'save'; % make invisible figures and save as/append spmup_QC.ps
 if nargin > 3
     for n = 4:2:nargin
         if strcmpi(varargin{n},'no background') && strcmpi(varargin{n+1},'true')
-        option.background = 0;
+            option.background = 0;
+        elseif contains(varargin{n},'fig')
+            option.fig  = varargin{n+1}; 
         end
     end
 end
@@ -92,7 +92,9 @@ end
     
 %% compute
 
-disp('spmup_anatQA: computing brain mask and background value')
+disp('---------------------------')
+fprintf(' running spmup_anatQA on %s\n',AnatV.fname)
+disp('---------------------------')
 
 % define a large brain mask making sure the background has nothing but background in it
 brain_mask = (smooth3(spm_read_vols(GrayV),'box',25)+smooth3(spm_read_vols(WhiteV),'box',25)) > 0.1;
@@ -114,41 +116,50 @@ if std_nonbrain == 0
 end
 
 %% make a figure showing the mask and the data range
-figure_name = 'Brain Mask';
-fig_handle = open_spm_figure('save', 'Brain Mask');
-
-subplot(2,2,1); 
-tmp                = spm_read_vols(AnatV); % read anat
-tmp                = tmp ./max(tmp(:))*100; % nornalize to 100
-tmp(brain_mask==0) = 200; % set non brain to 200
-imagesc(fliplr(squeeze(tmp(:,:,round(AnatV.dim(3)/2))))');
-title('brain mask - sagital');
-subplot(2,2,2); 
-imagesc(flipud(squeeze(tmp(:,round(AnatV.dim(2)/2),:))'));
-title('brain mask - axial');
-subplot(2,2,4); 
-imagesc(flipud(squeeze(tmp(round(AnatV.dim(1)/2),:,:))'));
-title('brain mask - coronal');
-clear tmp
-
-subplot(2,2,3);
-k = round(1+log2(length(data)));
-histogram(data,k,'FaceColor',[1 1 0],'EdgeColor',[1 1 0],'FaceAlpha',0.8); hold on
-plot(repmat(down,max(hist(data,k)),1),[1:max(hist(data,k))],'k','LineWidth',3);
-plot(repmat(up,  max(hist(data,k)),1),[1:max(hist(data,k))],'k','LineWidth',3);
-clear x y z; [x,y,z] = ind2sub(AnatV.dim,find(brain_mask));
-histogram(spm_get_data(AnatV,[x y z]'),k,'FaceColor',[0 0 1],'EdgeColor',[0 0 1],'FaceAlpha',0.4); hold on
-title('background voxels & limits vs brain mask'); axis tight; box on; grid on; 
-[filepath,filename] = fileparts(AnatV.fname);
-if isempty(filepath)
-    filepath = pwd; 
+if ~strcmpi(option.fig,'off')
+    figure('Name','Brain Mask')
+    if strcmpi(option.fig,'on')
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+    else
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+    end
+    
+    subplot(2,2,1);
+    tmp                = spm_read_vols(AnatV); % read anat
+    tmp                = tmp ./max(tmp(:))*100; % nornalize to 100
+    tmp(brain_mask==0) = 200; % set non brain to 200
+    imagesc(fliplr(squeeze(tmp(:,:,round(AnatV.dim(3)/2))))');
+    title('brain mask - sagital');
+    subplot(2,2,2);
+    imagesc(flipud(squeeze(tmp(:,round(AnatV.dim(2)/2),:))'));
+    title('brain mask - axial');
+    subplot(2,2,4);
+    imagesc(flipud(squeeze(tmp(round(AnatV.dim(1)/2),:,:))'));
+    title('brain mask - coronal');
+    clear tmp
+    
+    subplot(2,2,3);
+    k = round(1+log2(length(data)));
+    histogram(data,k,'FaceColor',[1 1 0],'EdgeColor',[1 1 0],'FaceAlpha',0.8); hold on
+    plot(repmat(down,max(hist(data,k)),1),[1:max(hist(data,k))],'k','LineWidth',3);
+    plot(repmat(up,  max(hist(data,k)),1),[1:max(hist(data,k))],'k','LineWidth',3);
+    clear x y z; [x,y,z] = ind2sub(AnatV.dim,find(brain_mask));
+    histogram(spm_get_data(AnatV,[x y z]'),k,'FaceColor',[0 0 1],'EdgeColor',[0 0 1],'FaceAlpha',0.4); hold on
+    title('background voxels & limits vs brain mask'); axis tight; box on; grid on;
+    
+    [filepath,filename] = fileparts(AnatV.fname);
+    if isempty(filepath)
+        filepath = pwd;
+    end
+    
+    if exist(fullfile(filepath,'spmup_QC.ps'),'file')
+        print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+    else
+        print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,'spmup_QC.ps'));
+    end
 end
 
-save_spm_figure('save', fig_handle, figure_name);
-
-
 %% now do all computations
-disp('spmup_anatQA: getting measures')
 % make gray/white mutually exclusive
 I_GM = spm_read_vols(GrayV)  > spm_read_vols(WhiteV);
 I_WM = spm_read_vols(WhiteV) > spm_read_vols(GrayV); 
@@ -184,34 +195,6 @@ catch
     anatQA.EFC = nansum((data(:)./Bmax).*abs(log((data(:)./Bmax))));
 end
 
-% asym
-middle_img = abs((AnatV.dim(1).*AnatV.mat(1))./2);
-xoffset    = AnatV.mat(1,4);
-if abs(xoffset)<(middle_img-20) || abs(xoffset)>(middle_img+20)
-    anatQA.asym = NaN;
-    disp('skipping assymmetry index, the 0 x coordinate doesn''t seem to be in the middle of the image')
-else
-    try
-        voxoffset = abs(xoffset./AnatV.mat(1));
-        left      = floor(voxoffset)-1; 
-        right     = ceil(voxoffset)+1;
-        data      = (spm_read_vols(GrayV)+spm_read_vols(WhiteV))>0;
-        if left < right
-            L = 1:left;
-        else
-            L = 1:right;        
-        end
-        data_size   = length(squeeze(data(right:end,1,1)));
-        N           = data(L(1:data_size),:,:)-flipud(data(right:end,:,:));
-        D           = data(L(1:data_size),:,:)+flipud(data(right:end,:,:));
-        asym        = N./D; clear N D
-        anatQA.asym = nanmean(asym(:));
-    catch
-        anatQA.asym = NaN;
-    end
-end
-
-
 %% outpouts for unit test
 if nargout == 2
     int_data.meanGM = meanGM;
@@ -219,29 +202,9 @@ if nargout == 2
     int_data.std_nonbrain = std_nonbrain;
     int_data.varGMWM = var([dataGM dataWM]);
     int_data.Bmax = Bmax;
-else
+end
+
+if nargout == 0
     writetable(struct2table(anatQA), fullfile(filepath,[filename '_anatQA.txt']));
-end
-
-end
-        
-function fig_handle = open_spm_figure(fig, figure_name)
-    
-    if strcmpi(fig, 'on')
-        fig_handle = spm_figure('Create', 'Graphics', figure_name, 'on');
-    elseif strcmpi(fig, 'save')
-        fig_handle = spm_figure('Create', 'Graphics', figure_name, 'off');
-    end
-    
-    
-end
-
-function save_spm_figure(fig, fig_handle, figure_name)
-    
-    if strcmpi(fig,'save')
-        spm_print(['spmup_QC-' figure_name], fig_handle);
-        close(fig_handle);
-    end
-    
 end
 
