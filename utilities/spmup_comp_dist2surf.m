@@ -1,4 +1,4 @@
-function davg = spmup_comp_dist2surf(anat)
+function davg = spmup_comp_dist2surf(anat,c1,c2)
 
 % Compute the average surface to the brain. Will return a default value of
 % 50 mm if this fails.
@@ -17,48 +17,56 @@ function davg = spmup_comp_dist2surf(anat)
 %
 % OUTPUT: davg is the average distance to the brain surface
 %
-% Remi Gau - University of Birmingham
+% Remi Gau & Cyril Pernet
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
+davg = [];
 
-fprintf('Computing average distance to brain surface.\n')
+%% deal with inputs
 
 [path, file] = spm_fileparts(anat);
+if ~exist(anat,'file')
+    error(' anat file %s doesn''t exist\n',file);
+end
 
-try
-
-surface_file = spm_select('FPList', path, ['^c1' file '.*\.surf\.gii$']);
+if nargin == 1
+    surface_file = [];
+    surface_file = spm_select('FPList', path, ['^c1' file '.*\.surf\.gii$']);
+else
+    spath        = spm_fileparts(anat);
+    files(1,:)   = c1;
+    files(2,:)   = c2; 
+    spm_surf(files, 2);
+    surface_file = spm_select('FPList', spath, '.*\.surf\.gii$');
+end
 
 if isempty(surface_file)
-    
     fprintf(' No brain surface was found. Trying to create one.\n')
-    % create a surface of the brain using the TPM if we don't have one
     files = spm_select('FPList', path, ['^c[12]' file '.*\.nii$']);
     if isempty(files)
-        warning(' Could not find TPMs resulting from brain segmentation.\n')
+        warning(' Could not find c1 c2 files resulting from brain segmentation.\n')
+        warning(' Returning the default value 50 instead.\n')
+        davg = 50; % we give it a default value if anything fails
+    else
+        spm_surf(files, 2);
+        surface_file = spm_select('FPList', spath, '.*\.surf\.gii$');
+    end    
+end
+
+%% compute the average surface to the brain
+if isempty(davg)
+    if isempty(surface_file)
+        warning(' Could not find surface gii file from runing spm_surf.\n')
+        warning(' Returning the default value 50 instead.\n')
+        davg = 50; % we give it a default value if anything fails
+    else
+        FV       = gifti(surface_file);
+        center   = FV.vertices(FV.faces(:, :), :);
+        center   = reshape(center, [size(FV.faces,1) 3 3]);
+        center   = squeeze(mean(center,2));
+        ori_dist = sqrt(sum((center.*-1).^2,2));
+        davg     = mean(ori_dist);
+        fprintf(' Average distance to the cortex surface: %f mm \n', davg)
     end
-    spm_surf(files, 2);
-    surface_file = spm_select('FPList', path, ['^c1' file '.*\.surf\.gii$']);
-    
 end
-
-% compute the average surface to the brain
-FV = gifti(surface_file);
-center = FV.vertices(FV.faces(:, :), :);
-center = reshape(center, [size(FV.faces,1) 3 3]);
-center = squeeze(mean(center,2));
-ori_dist = sqrt(sum((center.*-1).^2,2))';
-davg = mean(ori_dist);
-
-catch
-
-    fprintf(' Could not compute the average distance to the brain surface.\n')
-    fprintf(' Using the default value instead.\n')
-    davg = 50; % we give it a default value if anything fails
-
-end
-
-fprintf(' Average distance to the cortex surface: %f mm \n', davg)
-
-
-end
-
