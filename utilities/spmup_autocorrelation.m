@@ -72,14 +72,14 @@ R    = R(1:p,:)'; % [R(end-p+2:end,:) ; R(1:p,:)]'; for a full window
 %% now the slow part
 autocorrelation_window = NaN(n,1);
 
-parfor v=1:n
+for v=1:n
     if sum(R(v,:)) == 0
         autocorrelation_window(v) = 0;
     else
         [~,locs] = findpeaks(R(v,:)); % get local maxima
         if ~isempty(locs)
             [~,maxloc]                = max(R(v,:));   % find spectral peak
-            tmp                       = locs-maxloc; 
+            tmp                       = locs-maxloc;
             tmp(tmp <= 0)             = NaN;           % avoid being on itself
             [~,closestpeak]           = min(tmp);      % find next peak
             closestpeak               = locs(closestpeak);
@@ -89,12 +89,6 @@ parfor v=1:n
             autocorrelation_window(v) = 0;
         end
     end
-end
-
-try
-    parpool close
-catch
-    delete(gcp('nocreate'))
 end
 
 %% reformat as input
