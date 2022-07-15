@@ -18,7 +18,7 @@ function [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options)
 %
 % OUTPUT - BIDS: the structure returned by spm_BIDS and possibly modified by spmup_BIDS_unpack
 %        - subjects: a structure containing the fullpath of the unpacked
-%                  anat, fmap and func files for each subject
+%                  anat, fmap and func files for each subject + link to events
 %
 % Example usage BIDS_dir        = 'F:\WakemanHenson_Faces\fmri';
 %               options         = spmup_getoptions(BIDS_dir); 
@@ -198,9 +198,10 @@ parfor s=1:nb_sub
             target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
                 sess_folder, 'func', ['run' num2str(frun)]);            
             in = run_ls{frun,1};
-            [~,name,ext] = spm_fileparts(in);
+            [rootpath,name,ext] = spm_fileparts(in);
             [ext,name,compressed] = iscompressed(ext,name);
-            subjects{s}.func{bold_run_count,1} = fullfile(target_dir, [name ext]);
+            subjects{s}.func{bold_run_count,1}  = fullfile(target_dir, [name ext]);
+            subjects{s}.event{bold_run_count,1} = fullfile(rootpath, [name(1:end-5) '_events.tsv']);
             if iscell(metadata)
                 subjects{s}.func_metadata{bold_run_count,1} = metadata{frun};
             else
