@@ -1,81 +1,157 @@
-function [] = spmup_BIDS_1rstlevel(BIDS_dir, BIDS, subjects, s, options)
+function subject = spmup_BIDS_1rstlevel(subject, options)
 
-% level analysis of BIDS fMRI data - with various options available
+% 1st level analysis of BIDS fMRI data
+%
+% FORMAT subject = spmup_BIDS_1rstlevel(subject, options)
+%
+% INPUT - subject: a structure containing the fullpath of the unpacked anat,
+%           fmap and func files for a given subject (see spmup_BIDS_unpack)
+%       - options the structure of SPMUP options (see spmup_getoptions)
+%
+% OUTPUT subject is the same structure updated
+%        - with the preprocessed data information
+%        - with QC metrics
+%
+% Example usage: BIDS_dir        = 'F:\WakemanHenson_Faces\fmri';
+%                options         = spmup_getoptions(BIDS_dir);
+%                [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options);
+%                subject         = spmup_BIDS_preprocess(subjects{7}, options)
+%                subject         = spmup_BIDS_1rstlevel(subjects{7}, options)
+%
+% Cyril Pernet 
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
-%UNTITLED2 Summary of this function goes here
-%   Detailed explanation goes here
+opts.indent = ' '; % for spm_jsonwrite
+spm_root    = fileparts(which('spm'));
+spm_jobman('initcfg');
 
+%% get the 1st level motion regressors updated
+
+% if possible get the right distance between (0,0,0) and the surface
+[filepath,filename,ext] = fileparts(subject.anat{1});
+if exist(fullfile(filepath,[filename(1:end-4) '_desc-preprocessed_anat.json']),'file')
+    anatinfo = spm_jsonread(fullfile(filepath,[filename(1:end-4) '_desc-preprocessed_anat.json']));
+    if isfield(anatinfo,'distance2surface')
+        davg = anatinfo.distance2surface;
+    end
+end
+    
+if ~exist('davg','var')
+    c1 = dir(fullfile(filepath,[filename(1:end-4) '_label-GM_probseg' ext]));
+    if isempty(c1)
+        c1 = dir(fullfile(filepath,['c1' filename ext]));
+    end
+    c2 = dir(fullfile(filepath,[filename(1:end-4) '_label-WM_probseg' ext]));
+    if isempty(c1)
+        c1 = dir(fullfile(filepath,['c2' filename ext]));
+    end
+    
+    if ~isempty(c1) && ~isempty(c2)
+        c1   = fullfile(c1.folder,c1.name);
+        c2   = fullfile(c2.folder,c2.name);
+        davg = spmup_comp_dist2surf(subject.anat{1},c1,c2);
+        anatinfo.distance2surface = davg;
+    else
+        davg = 50;
+    end
+end
+
+if davg ~= 50
+    spm_jsonwrite(fullfile(filepath,[filename(1:end-4) '_desc-preprocessed_anat.json']),anatinfo,opts)
+end
+
+% now compute
+for frun = size(subject.func, 1):-1:1
+    QAjobs{frun} = spmup_first_level_qa(subject.func{frun}, 'Radius',davg, 'Movie','off');
+    if ~isfield(subject.func_qa{frun},'FramewiseDisplacement') && ~isempty(QAjobs{frun}.FD)
+        subject.func_qa{frun}.FD = QAjobs{frun}.FD;
+    end
+    if ~isfield(subject.func_qa{frun},'Globals') && ~isempty(QAjobs{frun}.glo)
+        subject.func_qa{frun}.Globals = QAjobs{frun}.glo;
+    end
+end
 
 % --------------------
 % 1st level modelling
 % --------------------
-filepath = fileparts(fileparts([BIDS_dir filesep subjects{s}.func(frun,:)]));
-SPMmat_file = [filepath filesep 'Stats' filesep 'SPM.mat'];
-if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') && ~exist(SPMmat_file,'file'))
+filepath    = fileparts(fileparts(subject.func{1}));
+Statspath   = [filepath filesep 'spmup_stats'];
+SPMmat_file = [Statspath filesep 'SPM.mat'];
+if strcmp(options.overwrite_data,'on') || ...
+        (strcmp(options.overwrite_data,'off') && ~exist(SPMmat_file,'file'))
     
-    clear matlabbatch; mkdir([filepath filesep 'Stats'])
-    matlabbatch{1}.spm.stats.fmri_spec.dir = {[filepath filesep 'Stats']};
-    matlabbatch{1}.spm.stats.fmri_spec.timing.units = 'secs';
-    matlabbatch{1}.spm.stats.fmri_spec.timing.RT = BIDS.subjects(1).func(1).meta.RepetitionTime;
-    N = length(BIDS.subjects(s).func(1).meta.SliceTiming);
-    matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t = N;
+    clear matlabbatch; 
+    if ~exist(Statspath,'dir')
+        mkdir(Statspath)
+    end
+    N                                                 = length(subject.func_metadata{1}.SliceTiming);
+    matlabbatch{1}.spm.stats.fmri_spec.dir            = {Statspath};
+    matlabbatch{1}.spm.stats.fmri_spec.timing.units   = 'secs';
+    matlabbatch{1}.spm.stats.fmri_spec.timing.RT      = subject.func_metadata{1}.RepetitionTime;
+    matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t  = N;
     matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0 = round(N/ 2);
     
     % sessions, onsets and durations
-    for frun = 1:size(subjects{s}.func,1)
-        [~,filename,~]=fileparts(subjects{s}.func(frun,:));
-        [~,~,info_position] = intersect([filename(1:end-4) 'events.tsv'], all_names);
-        N_events = length(BIDS.subjects(s).func(info_position).meta.trial_type);
-        for n=1:N_events
-            cond{n} = cell2mat(BIDS.subjects(s).func(info_position).meta.trial_type(n,:));
+    for frun = size(subject.func,1):-1:1
+        copyfile(subject.event{frun},fullfile(Statspath,'tmp.txt'))
+        events   = readtable(fullfile(Statspath,'tmp.txt'),'FileType','delimitedtext');
+        delete(fullfile(Statspath,'tmp.txt'))
+        cond = unique(events.trial_type);
+        for n=1:length(cond)
+            cond{n} = cond{n};
         end
-        cond = unique(cond);
         all_cond{frun} = cond;
-        N_cond = length(cond);
-        
-        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {stats_ready{frun}};
-        onsets = NaN(N_events,N_cond);
-        durations = NaN(N_events,N_cond);
+        N_cond         = length(cond);
+        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {subject.func{frun}}; %#ok<CCAT1>
         for C = 1:N_cond
-            for n=1:N_events
-                if strcmp(cell2mat(BIDS.subjects(s).func(info_position).meta.trial_type(n,:)),cond{C})
-                    onsets(n,C) = BIDS.subjects(s).func(info_position).meta.onset(n);
-                    durations(n,C) = BIDS.subjects(s).func(info_position).meta.duration(n);
-                end
-            end
-            
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).name = cond{C};
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).onset = onsets(~isnan(onsets(:,C)),C);
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).duration = durations(~isnan(durations(:,C)),C);
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).tmod = 0;
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).pmod = struct('name', {}, 'param', {}, 'poly', {});
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).orth = 1;
+            trial_index = cellfun(@(x) strcmp(cond{C},x), events.trial_type);
+            onsets      = events.onset(trial_index);
+            durations   = events.duration(trial_index);
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).name     = cond{C};
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).onset    = onsets(~isnan(onsets));
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).duration = durations(~isnan(durations));
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).tmod     = 0;
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).pmod     = struct('name', {}, 'param', {}, 'poly', {});
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).orth =    1;
         end
-        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi = {''};
-        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).regress = struct('name', {}, 'val', {});
-        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi_reg = {multi_reg{frun}};
-        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf = 128;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi     = {''};
+        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).regress   = struct('name', {}, 'val', {});
+        if strcmpi(options.scrubbing,'off')
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi_reg = {subject.motionfile{frun}};
+        else
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi_reg = {QAjobs{frun}.design};
+        end
+        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf       = 128;
     end
     
     matlabbatch{1}.spm.stats.fmri_spec.fact = struct('name', {}, 'levels', {});
-    if strcmp(options.derivatives,'off') % otherwise do it after stats
+    if options.derivatives == 1 || strcmp(options.derivatives, '1')
+        matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [1 0];
+    elseif options.derivatives == 2 || strcmp(options.derivatives, '2')
+        matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [1 1];
+    else
         matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [0 0];
     end
-    matlabbatch{1}.spm.stats.fmri_spec.volt = 1;
-    matlabbatch{1}.spm.stats.fmri_spec.global = 'None';
-    matlabbatch{1}.spm.stats.fmri_spec.mthresh = 0.8;
-    matlabbatch{1}.spm.stats.fmri_spec.mask = {''};
-    if BIDS.subjects(1).func(1).meta.RepetitionTime >=1
-        matlabbatch{1}.spm.stats.fmri_spec.cvi = 'AR(1)';
+    matlabbatch{1}.spm.stats.fmri_spec.volt     = 1;
+    matlabbatch{1}.spm.stats.fmri_spec.global   = 'None';
+    matlabbatch{1}.spm.stats.fmri_spec.mthresh  = 0.8;
+    matlabbatch{1}.spm.stats.fmri_spec.mask     = {''};
+    if subject.func_metadata{frun}.RepetitionTime >=1
+        matlabbatch{1}.spm.stats.fmri_spec.cvi  = 'AR(1)';
     else
-        matlabbatch{1}.spm.stats.fmri_spec.cvi = 'FAST';
+        matlabbatch{1}.spm.stats.fmri_spec.cvi  = 'FAST';
     end
     matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = cfg_dep('fMRI model specification: SPM.mat File', ...
         substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
         substruct('.','spmmat'));
-    matlabbatch{2}.spm.stats.fmri_est.write_residuals = 0;
+    if strcmp(options.carpet_plot,'on')
+        matlabbatch{2}.spm.stats.fmri_est.write_residuals = 1;
+    else
+        matlabbatch{2}.spm.stats.fmri_est.write_residuals = 0;
+    end
     matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
-    save([filepath filesep 'stats_batch_sub' num2str(s) '.mat'],'matlabbatch');
+    save([Statspath filesep 'stats_batch.mat'],'matlabbatch');
     spm_jobman('run',matlabbatch); clear matlabbatch;
 end
 
@@ -84,68 +160,82 @@ end
 % is only one run, no need this is the same as betas, if there are
 % seveal runs, simply match condition labels - and do it for each
 % derivatives if any
-if size(subjects{s}.func,1) > 1
-    if ~exist('CI','var') %% if we did not recompute the model this is missing
-        for frun = 1:size(subjects{s}.func,1)
-            [~,filename,~]=fileparts(subjects{s}.func(frun,:));
-            [~,~,info_position] = intersect([filename(1:end-4) 'events.tsv'], all_names);
-            N_events = length(BIDS.subjects(s).func(info_position).meta.trial_type);
-            for n=1:N_events
-                cond{n} =cell2mat(BIDS.subjects(s).func(info_position).meta.trial_type(n,:));
-            end
-            all_cond{frun} = unique(cond);
-            if frun > 1
-                CI = intersect(all_cond{frun-1},all_cond{frun});
+if size(subject.func,1) > 1
+    cond = cellfun(@(x) x{1}, all_cond, 'UniformOutput', false);
+    con_file1 = [Statspath filesep 'con_0001.nii'];
+    
+    if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+            && ~exist(con_file1,'file'))
+        
+        SPM        = load([Statspath filesep 'SPM.mat']);
+        SPM        = SPM.SPM;
+        otherreg   = arrayfun(@(x) matches(x.name ,"Sn(" + digitsPattern + ") R" + digitsPattern), SPM.xX, 'UniformOutput', false);
+        constant   = arrayfun(@(x) matches(x.name ,"Sn(" + digitsPattern + ") constant"), SPM.xX, 'UniformOutput', false);
+        conditions = find((cell2mat(constant)==0).*(cell2mat(otherreg)==0));
+        SPMnames   = unique(SPM.xX.name(conditions));
+        for n=1:length(SPMnames)
+            SPMnames{n} = SPMnames{n}(strfind(SPMnames{n},' ')+1:end);
+        end
+        SPMnames   = unique(SPMnames);
+        
+        % make contrast vectors
+        cindex = 1; c = [];
+        for n=1:length(SPMnames)
+            test = cell2mat(arrayfun(@(x) contains(x.name,SPMnames{n}),SPM.xX,'UniformOutput',false));
+            if sum(test) ~= 0
+                cname{cindex} = SPMnames{n}; %#ok<AGROW>
+                c(cindex,:)  = test; %#ok<AGROW>
+                cindex       = cindex +1;
             end
         end
-    end
-    
-    if ~isempty(CI)
-        filepath = fileparts(SPMmat_file);
-        con_file1 = [filepath filesep 'con_0001.nii'];
-        if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-                && ~exist(con_file1,'file'))
-            
-            % check contrast weight for run 1 and replicate if needed
-            for n=1:length(BIDS.subjects(s).func(info_position).meta.trial_type)
-                cond{n} = cell2mat(BIDS.subjects(s).func(info_position).meta.trial_type(n));
+        
+        if ~isempty(c)
+            matlabbatch{1}.spm.stats.con.spmmat                      = {SPMmat_file};
+            for contrast = size(c,1):-1:1
+                matlabbatch{1}.spm.stats.con.consess{contrast}.tcon.name    = cname{contrast};
+                matlabbatch{1}.spm.stats.con.consess{contrast}.tcon.weights = c(contrast,:);
+                matlabbatch{1}.spm.stats.con.consess{contrast}.tcon.sessrep = 'none';
             end
-            cond = unique(cond);
-            v = zeros(length(cond));
-            for c=1:length(cond) % that's the columns to span
-                for a=1:length(all_cond{1}) % that's the contrast to do
-                    if strcmp(all_cond{1}{a},cond{c})
-                        v(a,c) = 1;
-                    end
-                end
-            end
-            
-            matlabbatch{1}.spm.stats.con.spmmat = {SPMmat_file};
-            for frun = 1:size(subjects{s}.func,1)
-                for c=1:length(CI)
-                    matlabbatch{1}.spm.stats.con.consess{c}.tcon.name = CI{c};
-                    matlabbatch{1}.spm.stats.con.consess{c}.tcon.weights = v(c,:);
-                    if size(BIDS.subjects(s).func,2) == 1
-                        matlabbatch{1}.spm.stats.con.consess{c}.tcon.sessrep = 'none';
-                    else
-                        matlabbatch{1}.spm.stats.con.consess{c}.tcon.sessrep = 'repl';
-                    end
-                end
-            end
-            matlabbatch{1}.spm.stats.con.delete = 1;
+            matlabbatch{1}.spm.stats.con.delete                      = 1;
             spm_jobman('run',matlabbatch); clear matlabbatch;
         end
     end
-    
-    if strcmp(options.derivatives,'on')
-       outfiles = spmup_hrf_boost(SPMmat_file);
-       spmup_smooth_boostedfiles(outfiles{1},options.skernel);
-       if length(outfiles) == 2
-           spmup_smooth_boostedfiles(outfiles{2},options.skernel);
-       end
+end
+
+%% correct hrf for time dispersion 
+if ~strcmp(options.derivatives,'off')
+    outfiles = spmup_hrf_boost(SPMmat_file);
+    if isempty(options.skernel)
+        options.skernel = [3 3 3];
+    end
+    subject.boostedhrf = spmup_smooth_boostedfiles(outfiles{1},options.skernel);
+    if length(outfiles) == 2
+        subject.boostedcontrast = spmup_smooth_boostedfiles(outfiles{2},options.skernel);
     end
 end
 
-
+%% last QA! carpet plot of residuals
+if strcmp(options.carpet_plot,'on')
+    Res = dir([Statspath filesep 'Res_*.nii']);
+    for n = size(Res,1):-1:1
+        P(n,:) = fullfile(Res(n).folder,Res(n).name);
+    end
+    % spm_file_merge(spm_vol(P),fullfile(Statspath,'Residuals.nii'))
+    
+    % create carpet plots
+    if ~exist(fullfile(Statspath,'voxplot.fig'), 'file')
+        FD = [];
+        for frun = 1:size(subject.func)
+            FD = [FD; subject.func_qa{frun}.FD];
+        end
+        spmup_timeseriesplot(P, subject.tissues{1},subject.tissues{2},subject.tissues{3}, ...
+            'motion',FD,'nuisances','on','correlation','off','clean','off','figure','save');
+    end
+    
+    if strcmp(options.keep_data,'off')
+        for n = 1:size(P,1)
+            delete(P(n,:));
+        end
+    end
 end
 
