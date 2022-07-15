@@ -52,11 +52,7 @@ else
             end
         end
     else
-        if numel(size(P)) == 4 % this is already data in
-            Y = P; 
-        else
-            error('input data are not char nor 4D data matrix, please check inputs')
-        end
+        error('input data are not char or cell, please check inputs')
     end
 end
 dim = numel(size(Y));
@@ -77,11 +73,15 @@ end
 for v=1:length(operators)
     clear out
     if strcmpi(operators{v},'mean')
-        out = nanmean(Y,dim);
-        V(1).fname = [pathstr filesep 'mean_' name ext];
+        out          = nanmean(Y,dim);
+        if strcmpi(name(end-4:end),'_bold')
+            V(1).fname   = [pathstr filesep name(1:end-5) '-mean_bold' ext];
+        else
+            V(1).fname   = [pathstr filesep name '_mean' ext];
+        end
         V(1).descrip = ['spmup ' operators{v}];
-        out = spm_write_vol(V(1),out);
-        meanimg = out.fname;
+        out          = spm_write_vol(V(1),out);
+        meanimg      = out.fname;
     elseif strcmpi(operators{v},'std')
         try
             out = nanstd(Y,0,dim);
@@ -100,10 +100,14 @@ for v=1:length(operators)
                 end
             end
         end
-        V(1).fname = [pathstr filesep 'std_' name ext];
+        if strcmpi(name(end-4:end),'_bold')
+            V(1).fname   = [pathstr filesep name(1:end-5) '-std_bold' ext];
+        else
+            V(1).fname   = [pathstr filesep 'std_' name ext];
+        end
         V(1).descrip = ['spmup ' operators{v}];
-        out = spm_write_vol(V(1),out);
-        stdimg = out.fname;
+        out          = spm_write_vol(V(1),out);
+        stdimg       = out.fname;
     end
 end
 
