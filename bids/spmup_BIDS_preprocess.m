@@ -21,7 +21,7 @@ function subject = spmup_BIDS_preprocess(subject, options)
 %
 % Cyril Pernet, Remi Gau & Patrick Fisher
 % ---------------------------------------
-%  Copyright (C) SPMUP Team 
+%  Copyright (C) SPMUP Team
 
 % -------------------
 %% check a few things
@@ -58,7 +58,7 @@ if exist(fullfile(anat_dir,[filename(1:end-4) '_desc-preprocessed_anat.json']),'
         RMexist = 1;
     end
 end
-    
+
 if strcmp(options.overwrite_data,'on') || ...
         (strcmp(options.overwrite_data,'off') && ~RMexist)
     
@@ -71,14 +71,14 @@ if strcmp(options.overwrite_data,'on') || ...
     end
     RM = spmup_auto_reorient(Data,1);
     disp(' Data reoriented');
-   
+    
     % update info about all those files
     func_index = 0;
     fmap_index = 0;
     for f=1:size(Data,1)
         [filepath,filename] = fileparts(Data{f});
         if f==1
-            anatinfo.reoriented = '(0,0,0) set with spmup_auto_reorient';
+            anatinfo.reoriented           = '(0,0,0) set with spmup_auto_reorient';
             anatinfo.reorientation_matrix = RM;
             spm_jsonwrite(fullfile(filepath,[filename(1:end-4) '_desc-preprocessed_anat.json']),anatinfo,opts)
         else
@@ -93,7 +93,7 @@ if strcmp(options.overwrite_data,'on') || ...
                 spm_jsonwrite([subject.func{func_index}(1:end-9) '_desc-preprocessed_bold.json'],meta,opts)
                 func_index = func_index+1;
             elseif contains(filepath,'fmap')
-                 if fmap_index == 0
+                if fmap_index == 0
                     fmap_index = 1;
                 end
                 meta.reoriented = '(0,0,0) set from anat with spmup_auto_reorient';
@@ -113,10 +113,12 @@ bold_include = [];
 included_idx = 0;
 for frun = 1:size(subject.func, 1) % each run
     
-    filesin = subject.func{frun};
+    filesin                 = subject.func{frun};
     [filepath,filename,ext] = fileparts(filesin);
     if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
-        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json'])); 
+        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+    elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
     end
     meta.run      = frun;
     meta.TaskName = subject.func_metadata{frun}.TaskName;
@@ -143,7 +145,7 @@ for frun = 1:size(subject.func, 1) % each run
     
     % only preprocess this file if it fits what has been requested
     bold_include(frun) = all([task acq rec]);
-    if bold_include(frun) 
+    if bold_include(frun)
         
         included_idx = included_idx + 1;
         if ~isfield(subject.func_metadata{frun}, 'SliceTiming')
@@ -226,6 +228,7 @@ for frun = 1:size(subject.func, 1) % each run
             st_files{included_idx,1} = fullfile(filepath, [filename ext]);
         end
     end
+    clear meta
 end % end processing per run
 
 % ------------------------
@@ -234,10 +237,10 @@ end % end processing per run
 
 if isempty(options.VDM) && isfield(subject, 'fieldmap')
     for ifmap = 1:numel(subject.fieldmap)
-
+        
         % list which fieldmap goes to which bold run and vice versa
-        [~, filename]                                   = spm_fileparts(subject.fieldmap(ifmap).metadata.IntendedFor);
-        which_func_file                                 = contains(subject.func, filename);
+        [~, filename]                               = spm_fileparts(subject.fieldmap(ifmap).metadata.IntendedFor);
+        which_func_file                             = contains(subject.func, filename);
         subject.fieldmap(ifmap).metadata.which_func = find(which_func_file); % to know which func files needs this fmap
         subject.which_fmap(find(which_func_file))   = ifmap; % to know which fmap is needed by which func files
         
@@ -307,7 +310,7 @@ if isempty(options.VDM) && isfield(subject, 'fieldmap')
                     fprintf('\ncoregistering fmap %g subject %g to its reference run ',ifmap,s)
                     spm_jobman('run',matlabbatch); clear matlabbatch;
                     
-                     % VDM creation: input images
+                    % VDM creation: input images
                     if strcmp(subject.fieldmap(ifmap).type, 'phasediff')
                         % two magnitudes (use only 1) and 1 phase difference image
                         matlabbatch = spmup_get_FM_workflow('phasediff');
@@ -327,7 +330,7 @@ if isempty(options.VDM) && isfield(subject, 'fieldmap')
                         matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.longmag    = ...
                             {subject.fieldmap(ifmap).mag2};
                     end
-                                       
+                    
                     % fieldmap metadata
                     fmap_metadata = subject.fieldmap(ifmap).metadata;
                     echotimes =  1000.*[fmap_metadata.EchoTime1 ...
@@ -402,14 +405,22 @@ if isempty(options.VDM)
     % file out of realign will be
     [filepath,filename,ext] = fileparts(st_files{1});
     mean_realigned_file     = [filepath filesep 'mean' filename ext];
+    realign_done            = zeros(size(st_files,1),1);
     for frun = size(st_files,1):-1:1
         realigned_files{frun,1}    = st_files{frun}; % because we don't reslice, simple encode the linear transform in the header
         [filepath,filename]        = fileparts(st_files{frun});
         subject.motionfile{frun,1} = [filepath filesep 'rp_' filename '.txt'];
+        [filepath,filename]        = fileparts(subject.func{frun});
+        if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+        end
+        realign_done(frun) = isfield(meta,'realign');
     end
     
     if strcmp(options.overwrite_data,'on') || ...
-            (strcmp(options.overwrite_data,'off') && ~isfield(meta,'realign'))
+            (strcmp(options.overwrite_data,'off') && sum(realign_done)==0)
         
         fprintf('Starting realignment \n')
         for frun = size(st_files,1):-1:1
@@ -437,19 +448,27 @@ else % --------------------------------------------------------------------
     % file out of realign will be
     [filepath,filename,ext] = fileparts(st_files{1});
     mean_realigned_file     = [filepath filesep 'meanur' filename ext];
+    realign_done            = zeros(size(st_files,1),1);
     for frun = size(st_files,1):-1:1
         [filepath,filename,ext]    = fileparts(st_files{frun});
         realigned_files{frun,1}    = [filepath filesep 'ur' filename ext]; % because we have the reslice here (not linear)
         subject.motionfile{frun,1} = [filepath filesep 'rp_' filename '.txt'];
+        [filepath,filename]        = fileparts(subject.func{frun});
+        if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+        end
+        realign_done(frun) = isfield(meta,'realign');
     end
     
     if strcmp(options.overwrite_data,'on') || ...
-            (strcmp(options.overwrite_data,'off') && ~isfield(meta,'realign'))
+            (strcmp(options.overwrite_data,'off') && sum(realign_done)==0)
         
         fprintf('subject %g: starting realignment and unwarping \n',s)
         for frun = size(st_files,1):-1:1
             matlabbatch{1}.spm.spatial.realignunwarp.data(frun).scans = {st_files{frun}}; %#ok<CCAT1>
-            if ~isempty(options.VDM) 
+            if ~isempty(options.VDM)
                 matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {options.VDM{which_fmap(frun)}}; %#ok<CCAT1>
             else
                 matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {''};
@@ -481,8 +500,49 @@ else % --------------------------------------------------------------------
     end
 end
 
-% update the metadata and do motion QC
+
+% -----------------------------------------------------------------------
+% despiking after rather than before realign using adaptive median filter
+% -----------------------------------------------------------------------
+
+if strcmp(options.despike,'after')
+    for frun = size(st_files,1):-1:1
+        [filepath,filename] = fileparts(subject.func{frun});
+        if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+        end
+        
+        if strcmp(options.overwrite_data,'on') || ...
+                (strcmp(options.overwrite_data,'off') && ~isfield(meta,'despike'))
+            realigned = dir(fullfile(filepath,['urst_' filename(1:end-5) '*bold.nii']));
+            if isempty(realigned)
+                realigned = dir(fullfile(filepath,['st_' filename(1:end-5) '*bold.nii']));
+            end
+            if ~isempty(realigned)
+                realigned = fullfile(realigned.folder,realigned.name);
+                flags              = struct('auto_mask','on', 'method','median', 'window', [],'skip',0, 'savelog', 'off');
+                [~,~,loginfo]      = spmup_despike(fullfile(realigned.folder,realigned.name),[],flags);
+                meta.Despiked      = 'after realignemnt using spmup_despike';
+                meta.despike.param = 'median filter based on the autocorrelation function';
+                meta.despike.RMS   = loginfo.RMS;
+                spm_jsonwrite([subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json'],meta,opts)
+            end
+        end
+    end
+end
+
+% update the metadata and do QC
+% -----------------------------
 for frun = 1:size(subject.func,1)
+    
+    [filepath,filename] = fileparts(subject.func{frun});
+    if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+    elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+    end
     
     if strcmp(options.QC,'on')
         if exist('out','var')
@@ -561,7 +621,7 @@ if strcmp(options.overwrite_data,'on') || ...
     matlabbatch{end}.spm.spatial.coreg.write.roptions.prefix = 'space-EPI';
     spm_jobman('run',matlabbatch); clear matlabbatch;
     
-    anatinfo.coregistration.ref    = mean_realigned_file; 
+    anatinfo.coregistration.ref    = mean_realigned_file;
     anatinfo.coregistration.source = subject.anat;
     spm_jsonwrite(fullfile(filepath,[filename(1:end-4) '_desc-preprocessed_anat.json']),anatinfo,opts)
 end
@@ -582,13 +642,13 @@ Normalized_class{3}     = [filepath filesep 'wc3' filename ext];
 for frun = 1:size(subject.func,1)
     [filepath,filename,ext]  = fileparts(realigned_files{frun});
     Normalized_files{frun,1} = [filepath filesep 'w' filename ext];
-
+    
     if any(strcmpi(options.norm_res ,{'EPI','EPI-iso'})) && frun == 1 ...
             && ~isfield(meta,'normalise')
         % now of course we assume all runs have the same resolution
         hdr           = spm_vol(realigned_files{frun});
         norm_res      = abs(round(diag(hdr(1).mat)));
-        norm_res(end) = []; 
+        norm_res(end) = [];
         if strcmpi(options.norm_res ,'EPI-iso') && length(unique(norm_res)) ~= 1 % i.e. it is not isoptropic
             if length(unique(norm_res)) == 3 % all difference, oh boy - round to smallest
                 norm_res = repmat(min(unique(norm_res)),[3 1]);
@@ -659,7 +719,7 @@ if strcmp(options.overwrite_data,'on') || ...
             substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','fordef', '()',{':'}));
         matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(1) = {spaceEPI_T1w};
-
+        
         % normalize bias corrected T1 and tissue classes
         matlabbatch{end}.spm.spatial.normalise.write.subj(2).def(1) = ...
             cfg_dep('Segment: Forward Deformations', ...
@@ -681,7 +741,7 @@ if strcmp(options.overwrite_data,'on') || ...
             cfg_dep('Segment: c3 Images', ...
             substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
             substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
-
+        
         % normalize EPI
         matlabbatch{end}.spm.spatial.normalise.write.subj(3).def(1) = ...
             cfg_dep('Segment: Forward Deformations', ...
@@ -717,14 +777,19 @@ if strcmp(options.overwrite_data,'on') || ...
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.vox                  = norm_res;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.interp               = 4;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.wrap                 = [0 0 0];
-        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.prefix               = 'w';       
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.prefix               = 'w';
     end
     spm_jobman('run',matlabbatch); clear matlabbatch;
     
     % update json files
     for frun = 1:size(subject.func,1)
         [filepath,filename] = fileparts(subject.func{frun});
-        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+        if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+        end
+        
         if strcmpi(options.norm,'T1norm')
             meta.segment        = subject.anat;
             meta.normalise.from = 'segment';
@@ -735,9 +800,9 @@ if strcmp(options.overwrite_data,'on') || ...
         spm_jsonwrite(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),meta,opts)
     end
 end
-    
+
 % QC original data
-if strcmp(options.QC,'on') && ~isfield(subject,'anat_qa') && exist(subject.anat{1},'file')
+if strcmp(options.QC,'on') && ~isfield(subject,'anat_qa') && ~isfield(anatinfo,'QA')
     [anat_dir,filename] = fileparts(subject.anat{1});
     subject.anat_qa     = spmup_anatQA(subject.anat{1},class{1},class{2});
     anatinfo.QA         = subject.anat_qa;
@@ -753,14 +818,20 @@ for frun = 1:size(subject.func,1)
     stats_ready{frun,1}     = [filepath filesep 's' filename ext];
     
     if strcmp(options.overwrite_data,'on') || ...
-        (strcmp(options.overwrite_data,'off') && ~isfield(meta,'smoothingkernel'))
-
+            (strcmp(options.overwrite_data,'off') && ~isfield(meta,'smoothingkernel'))
+        
         fprintf(' smoothing run %g \n',frun);
-        V       = spm_vol(Normalized_files{frun});
-        skernel = abs(diag(V(1).mat)); clear V
+        
+        V                       = spm_vol(Normalized_files{frun});
+        skernel                 = abs(diag(V(1).mat)); clear V
         [filepath,filename,ext] = fileparts(subject.func{frun});
-        meta    = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
-        if strcmp(options.derivatives,'off') 
+        if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+        end
+        
+        if strcmp(options.derivatives,'off')
             if isempty(options.skernel)
                 options.skernel = 3;
             end
@@ -778,137 +849,166 @@ end
 %% update the subject structure, add fMRI QC from ready files and clean-up
 % ------------------------------------------------------------------------
 
-if strcmp(options.QC,'on') %
-    
-    % sanity check that all images are in the same space.
-    V_to_check        = stats_ready;
-    V_to_check{end+1} = Normalized_class{1};
-    V_to_check{end+1} = Normalized_class{2};
-    V_to_check{end+1} = Normalized_class{3};
-    V_to_check{end+1} = NormalizedAnat_file;
-    if all(cellfun(@(x) exist(x,'file'), V_to_check))
+% sanity check that all images are in the same space.
+V_to_check        = stats_ready;
+V_to_check{end+1} = Normalized_class{1};
+V_to_check{end+1} = Normalized_class{2};
+V_to_check{end+1} = Normalized_class{3};
+V_to_check{end+1} = NormalizedAnat_file;
+if all(cellfun(@(x) exist(x,'file'), V_to_check))
+    try
         spm_check_orientations(spm_vol(char(V_to_check)));
+    catch
+        error('while the spmup_BIDS_preprocess ran and created files, they are oriented differently!! no idea how this happened')
     end
-    clear V_to_check
-        
-    % since it's all good update file names and the subject structure
-    % include clean-up as we iterate through files and get QC metrics
-    for frun = 1:size(subject.func, 1)
-        if bold_include(frun) 
-            if strcmpi(options.keep_data,'off')
-                [filepath,filename,ext] = fileparts(subject.func{frun});
-                if ~strcmp(options.despike,'off')
-                    delete(fullfile(filepath,[filename(1:end-5) '_rec-despiked_bold' ext])); % despiked
-                end
-                st = dir(fullfile(filepath,['st_*' ext]));
-                if ~isempty(st)
-                    delete(fullfile(st.folder,st.name))
-                end
-                ur = dir(fullfile(filepath,['ur_*' ext]));
-                if ~isempty(ur)
-                    delete(fullfile(ur.folder,ur.name))
-                end
-                wst = dir(fullfile(filepath,['wst_*' ext]));
-                if ~isempty(wst)
-                    delete(fullfile(wst.folder,wst.name))
-                end
-                wur = dir(fullfile(filepath,['wur_*' ext]));
-                if ~isempty(wur)
-                    delete(fullfile(wur.folder,wur.name))
-                end
-                avg = dir(fullfile(filepath,['mean*' ext]));
-                if ~isempty(avg)
-                    delete(fullfile(avg.folder,avg.name))
-                end
-                wavg = dir(fullfile(filepath,['wmean*' ext]));
-                if ~isempty(wavg)
-                    newname = fullfile(wavg.folder,[filename(1:end-5) '_space-MNI152NLin2009_desc-meannormalized_bold' ext]);
-                    copyfile(fullfile(wavg.folder,wavg.name),newname)
-                    delete(fullfile(wavg.folder,wavg.name))
-                end
-            end
+end
+clear V_to_check
+
+% since it's all good update file names and the subject structure
+% include clean-up as we iterate through files and get QC metrics
+
+% deal with anat
+for f = 1:size(subject.anat,1)
+    % rename T1w adding space
+    if contains(subject.anat{f},'_T1w.nii')
+        [filepath,filename,ext] = fileparts(subject.anat{f});
+        partA   = filename(1:max(strfind(filename,'_')));
+        partB   = filename(max(strfind(filename,'_'))+1:end);
+        newname = fullfile(filepath,[partA 'space-MNI152NLin2009_' partB ext]);
+        if exist(NormalizedAnat_file,'file')
+            movefile(NormalizedAnat_file,newname);
+            subject.anat{f} = newname;
+        elseif exist(newname,'file')
+            subject.anat{f} = newname;
+        else % rename adding space and coreg
+            disp('change other anat file names')
         end
+    end
+end
+
+labels = {'GM','WM','CSF'};
+subject.tissues = Normalized_class';
+% indicate in name the prob. segmentation and tissue type
+for tissue = 1:3
+    if exist(class{tissue},'file')
+        [filepath,filename,ext] = fileparts(class{tissue});
+        partA = filename(strfind(filename,'sub-'):min(strfind(filename,'_')));
+        partB = ['label-' labels{tissue} '_probseg' ext];
+        movefile(class{tissue},fullfile(filepath,[partA partB]));
     end
     
-    for frun = 1:size(stats_ready,1)
-        if exist(stats_ready{frun},'file')
-            [filepath,filename,ext] = fileparts(subject.func{frun});
-            newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold' ext]);
-            copyfile(stats_ready{frun},newname);
-            subject.func{frun} = newname;
-            delete(stats_ready{frun})
-            
-            if ~isfield(subject.func_qa{frun},'preproc_outliers')
-                [~,subject.func_qa{frun}.preproc_outliers] = spmup_volumecorr(newname);
-            end
-            if ~isfield(subject.func_qa{frun},'preproc_tSNR')
-                subject.func_qa{frun}.preproc_tSNR = spmup_temporalSNR(newname,Normalized_class);
-            end
-            
-            json = dir(fullfile(filepath,[filename(1:end-5) '*.json']));
-            if ~isempty(json)
-                newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']);
-                copyfile(fullfile(json.folder,json.name),newname);
-                delete(fullfile(json.folder,json.name))
-            end
-        end
+    [filepath,filename,ext] = fileparts(Normalized_class{tissue});
+    partA = filename(strfind(filename,'sub-'):min(strfind(filename,'_')));
+    partB = ['space-MNI152NLin2009_label-' labels{tissue} '_probseg' ext];
+    if exist(Normalized_class{tissue},'file')
+        movefile(Normalized_class{tissue},fullfile(filepath,[partA partB]));
+        subject.tissues{tissue} = fullfile(filepath,[partA partB]);
+    elseif exist(fullfile(filepath,[partA partB]),'file')
+        subject.tissues{tissue} = fullfile(filepath,[partA partB]);
     end
-    
-    % deal with anat
-    for f = 1:size(subject.anat,1)
-        if contains(subject.anat{f},'_T1w,nii')
-            if exist(NormalizedAnat_file,'file')
-                [filepath,filename,ext] = fileparts(subject.anat{f});
-                partA   = filename(1:max(strfind(filename,'_')));
-                partB   = filename(max(strfind(filename,'_'))+1:end);
-                newname = fullfile(filepath,[partA '_space-MNI152NLin2009_' partB ext]);
-                copyfile(NormalizedAnat_file,newname);
-                subject.anat{f} = newname;
-            end
-        end
-    end
-    
-    labels = {'GM','WM','CSF'};
-    subject.tissues = Normalized_class';
-    for tissue = 1:3
-        if exist(class{tissue},'file')
-            [filepath,filename,ext] = fileparts(class{tissue});
-            partA = filename(strfind(filename,'sub-'):min(strfind(filename,'_')));
-            partB = ['label-' labels{tissue} '_probseg' ext];
-            copyfile(class{tissue},fullfile(filepath,[partA partB]));
-            delete(class{tissue})
-        end
-        
-        if exist(Normalized_class{tissue},'file')
-            [filepath,filename,ext] = fileparts(Normalized_class{tissue});
-            partA = filename(strfind(filename,'sub-'):min(strfind(filename,'_')));
-            partB = ['space-MNI152NLin2009_label-' labels{tissue} '_probseg' ext];
-            copyfile(Normalized_class{tissue},fullfile(filepath,[partA partB]));
-            subject.tissues{tissue} = fullfile(filepath,[partA partB]);
-            delete(Normalized_class{tissue})
-        end
-    end
-    
+end
+
+% remove bias corrected in T1w space
+if strcmpi(options.keep_data,'off')
     msub = dir(fullfile(fileparts(subject.anat{1}),'msub*.nii'));
     if ~isempty(msub)
         delete(fullfile(msub.folder,msub.name))
     end
-    wmsub = dir(fullfile(fileparts(subject.anat{1}),'wmsub*.nii'));
-    if ~isempty(msub)
-        partA = filename(strfind(wmsub.name,'sub-')+1:min(strfind(wmsub.name,'_')));
-        partB = ['_space-MNI152NLin2009_desc-biascorrected' ext];
-        copyfile(fullfile(wmsub.folder,wmsub.name),fullfile(fileparts(subject.anat{1}),[partA partB]))
-        delete(fullfile(wmsub.folder,wmsub.name))
-    end
-    spaceEPI = dir(fullfile(fileparts(subject.anat{1}),'space-EPI*.nii'));
-    if ~isempty(spaceEPI)
-        delete(fullfile(spaceEPI.folder,spaceEPI.name))
-    end
-    wspaceEPI = dir(fullfile(fileparts(subject.anat{1}),'wspace-EPI*.nii'));
-    if ~isempty(wspaceEPI)
-        partA = filename(strfind(wmsub.name,'sub-')+1:min(strfind(wmsub.name,'_')));
-        partB = ['_space-MNI152NLin2009_desc-epiresliced' ext];
-        copyfile(fullfile(wspaceEPI.folder,wspaceEPI.name),fullfile(fileparts(subject.anat{1}),[partA partB]))
-        delete(fullfile(wspaceEPI.folder,wspaceEPI.name))
+end
+
+% delete the anat registered to EPI
+spaceEPI = dir(fullfile(fileparts(subject.anat{1}),'space-EPI*.nii'));
+if ~isempty(spaceEPI)
+    delete(fullfile(spaceEPI.folder,spaceEPI.name))
+end
+
+% rename the normalized anat registered to EPI (the 'true' anat under EPI)
+wspaceEPI = dir(fullfile(fileparts(subject.anat{1}),'wspace-EPI*.nii'));
+if ~isempty(wspaceEPI)
+    partA = filename(strfind(wmsub.name,'sub-')+1:min(strfind(wmsub.name,'_')));
+    partB = ['_space-MNI152NLin2009_desc-epiresliced' ext];
+    movefile(fullfile(wspaceEPI.folder,wspaceEPI.name),fullfile(fileparts(subject.anat{1}),[partA partB]))
+end
+
+for frun = 1:size(subject.func,1)
+    if exist(stats_ready{frun},'file')
+        [filepath,filename,ext] = fileparts(subject.func{frun});
+        newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold' ext]);
+        movefile(stats_ready{frun},newname);
+        subject.func{frun} = newname;
+        
+        json = dir(fullfile(filepath,[filename(1:end-5) '*desc-preprocessed_bold.json']));
+        if ~isempty(json)
+            newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']);
+            movefile(fullfile(json.folder,json.name),newname);
+        end
+        
+        if strcmp(options.QC,'on')
+            if ~isfield(subject.func_qa{frun},'preproc_outliers')
+                [~,subject.func_qa{frun}.preproc_outliers] = spmup_volumecorr(newname);
+            end
+            if ~isfield(subject.func_qa{frun},'preproc_tSNR')
+                subject.func_qa{frun}.preproc_tSNR = spmup_temporalSNR(newname,subject.tissues);
+            end
+        end
+        
+    else % it could be it was done and just need updated
+        
+        [filepath,filename,ext] = fileparts(subject.func{frun});
+        newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold' ext]);
+        if exist(newname,'file')
+            subject.func{frun} = newname;
+            
+            if ~isfield(subject,'func_qa')
+                subject.func_qa = cell(size(subject.func,1),1);
+            end
+            
+            if strcmp(options.QC,'on') && isempty(subject.func_qa{frun})
+                if ~isfield(subject.func_qa{frun},'preproc_outliers')
+                    [~,subject.func_qa{frun}.preproc_outliers] = spmup_volumecorr(newname);
+                end
+                if ~isfield(subject.func_qa{frun},'preproc_tSNR')
+                    subject.func_qa{frun}.preproc_tSNR = spmup_temporalSNR(newname,subject.tissues);
+                end
+            end
+        end
     end
 end
+
+% clean-up intermediate fmri files
+if strcmpi(options.keep_data,'off')
+    for frun = 1:size(subject.func, 1)
+        if bold_include(frun)
+            [filepath,filename,ext] = fileparts(subject.func{frun});
+            if ~strcmp(options.despike,'off')
+                delete(fullfile(filepath,[filename(1:end-5) '_rec-despiked_bold' ext])); % despiked
+            end
+            st = dir(fullfile(filepath,['st_*' ext]));
+            if ~isempty(st)
+                delete(fullfile(st.folder,st.name))
+            end
+            ur = dir(fullfile(filepath,['ur_*' ext]));
+            if ~isempty(ur)
+                delete(fullfile(ur.folder,ur.name))
+            end
+            wst = dir(fullfile(filepath,['wst_*' ext]));
+            if ~isempty(wst)
+                delete(fullfile(wst.folder,wst.name))
+            end
+            wur = dir(fullfile(filepath,['wur_*' ext]));
+            if ~isempty(wur)
+                delete(fullfile(wur.folder,wur.name))
+            end
+            avg = dir(fullfile(filepath,['mean*' ext]));
+            if ~isempty(avg)
+                delete(fullfile(avg.folder,avg.name))
+            end
+            wavg = dir(fullfile(filepath,['wmean*' ext]));
+            if ~isempty(wavg)
+                delete(fullfile(wavg.folder,wavg.name))
+            end
+        end
+    end
+end
+
+
