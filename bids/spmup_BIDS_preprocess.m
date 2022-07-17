@@ -925,7 +925,7 @@ end
 % rename the normalized anat registered to EPI (the 'true' anat under EPI)
 wspaceEPI = dir(fullfile(fileparts(subject.anat{1}),'wspace-EPI*.nii'));
 if ~isempty(wspaceEPI)
-    partA = filename(strfind(wmsub.name,'sub-')+1:min(strfind(wmsub.name,'_')));
+    partA = filename(strfind(wspaceEPI.name,'sub-')+1:min(strfind(wspaceEPI.name,'_')));
     partB = ['_space-MNI152NLin2009_desc-epiresliced' ext];
     movefile(fullfile(wspaceEPI.folder,wspaceEPI.name),fullfile(fileparts(subject.anat{1}),[partA partB]))
 end
