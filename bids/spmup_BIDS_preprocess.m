@@ -115,7 +115,9 @@ for frun = 1:size(subject.func, 1) % each run
     
     filesin                 = subject.func{frun};
     [filepath,filename,ext] = fileparts(filesin);
-    if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+    if exist(fullfile(filepath,[filename '.json']),'file')
+        meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+    elseif exist(fullfile(filepath,[filename '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
         meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
     elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
         meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
@@ -411,7 +413,9 @@ if isempty(options.VDM)
         [filepath,filename]        = fileparts(st_files{frun});
         subject.motionfile{frun,1} = [filepath filesep 'rp_' filename '.txt'];
         [filepath,filename]        = fileparts(subject.func{frun});
-        if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+        if exist(fullfile(filepath,[filename '.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
@@ -454,7 +458,9 @@ else % --------------------------------------------------------------------
         realigned_files{frun,1}    = [filepath filesep 'ur' filename ext]; % because we have the reslice here (not linear)
         subject.motionfile{frun,1} = [filepath filesep 'rp_' filename '.txt'];
         [filepath,filename]        = fileparts(subject.func{frun});
-        if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+        if exist(fullfile(filepath,[filename '.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
@@ -508,7 +514,9 @@ end
 if strcmp(options.despike,'after')
     for frun = size(st_files,1):-1:1
         [filepath,filename] = fileparts(subject.func{frun});
-        if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+        if exist(fullfile(filepath,[filename '.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
@@ -538,7 +546,9 @@ end
 for frun = 1:size(subject.func,1)
     
     [filepath,filename] = fileparts(subject.func{frun});
-    if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+    if exist(fullfile(filepath,[filename '.json']),'file')
+        meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+    elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
         meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
     elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
         meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
@@ -567,10 +577,13 @@ for frun = 1:size(subject.func,1)
                 subject.func_qa = cell(size(subject.func));
             end
             
-            if ~isfield(subject.func_qa{frun},'volume_outliers')
+            if ~isfield(meta,'QA')
                 [subject.func_qa{frun}.volume_outliers, subject.func_qa{frun}.slice_outliers] = spmup_spatialcorr(realigned);
                 meta.QA.spatialcorr.volume_outliers = subject.func_qa{frun}.volume_outliers;
                 meta.QA.spatialcorr.slice_outliers  = subject.func_qa{frun}.slice_outliers;
+            elseif isfield(meta,'QA') && ~isfield(subject.func_qa{frun},'volume_outliers')
+                subject.func_qa{frun}.volume_outliers = meta.QA.spatialcorr.volume_outliers;
+                subject.func_qa{frun}.slice_outliers  = meta.QA.spatialcorr.slice_outliers;
             end
         end
     end
@@ -784,7 +797,9 @@ if strcmp(options.overwrite_data,'on') || ...
     % update json files
     for frun = 1:size(subject.func,1)
         [filepath,filename] = fileparts(subject.func{frun});
-        if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+        if exist(fullfile(filepath,[filename '.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
@@ -804,7 +819,13 @@ end
 % QC original data
 if strcmp(options.QC,'on') && ~isfield(subject,'anat_qa') && ~isfield(anatinfo,'QA')
     [anat_dir,filename] = fileparts(subject.anat{1});
-    subject.anat_qa     = spmup_anatQA(subject.anat{1},class{1},class{2});
+    if contains(filename,'space-MNI152NLin2009')
+        subject.anat_qa = spmup_anatQA(subject.anat{1},...
+            fullfile(anat_dir,[filename(1:end-3) 'label-GM_probseg.nii']),...
+            fullfile(anat_dir,[filename(1:end-3) 'label-WM_probseg.nii']));
+    else
+        subject.anat_qa = spmup_anatQA(subject.anat{1},class{1},class{2});
+    end
     anatinfo.QA         = subject.anat_qa;
     spm_jsonwrite(fullfile(anat_dir,[filename(1:end-4) '_desc-preprocessed_anat.json']),anatinfo,opts)
 end
@@ -825,7 +846,9 @@ for frun = 1:size(subject.func,1)
         V                       = spm_vol(Normalized_files{frun});
         skernel                 = abs(diag(V(1).mat)); clear V
         [filepath,filename,ext] = fileparts(subject.func{frun});
-        if exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+        if exist(fullfile(filepath,[filename '.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
@@ -883,6 +906,13 @@ for f = 1:size(subject.anat,1)
         else % rename adding space and coreg
             disp('change other anat file names')
         end
+        
+        % also rename the json file
+        json = dir(fullfile(filepath,[partA '*desc-preprocessed_anat.json']));
+        if ~isempty(json)
+            newname = fullfile(filepath,[partA 'space-MNI152NLin2009_desc-preprocessed_anat.json']);
+            movefile(fullfile(json.folder,json.name),newname);
+        end
     end
 end
 
@@ -925,54 +955,9 @@ end
 % rename the normalized anat registered to EPI (the 'true' anat under EPI)
 wspaceEPI = dir(fullfile(fileparts(subject.anat{1}),'wspace-EPI*.nii'));
 if ~isempty(wspaceEPI)
-    partA = filename(strfind(wspaceEPI.name,'sub-')+1:min(strfind(wspaceEPI.name,'_')));
-    partB = ['_space-MNI152NLin2009_desc-epiresliced' ext];
+    partA = wspaceEPI.name(strfind(wspaceEPI.name,'sub-'):min(strfind(wspaceEPI.name,'_')));
+    partB = ['space-MNI152NLin2009_desc-epiresliced' ext];
     movefile(fullfile(wspaceEPI.folder,wspaceEPI.name),fullfile(fileparts(subject.anat{1}),[partA partB]))
-end
-
-for frun = 1:size(subject.func,1)
-    if exist(stats_ready{frun},'file')
-        [filepath,filename,ext] = fileparts(subject.func{frun});
-        newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold' ext]);
-        movefile(stats_ready{frun},newname);
-        subject.func{frun} = newname;
-        
-        json = dir(fullfile(filepath,[filename(1:end-5) '*desc-preprocessed_bold.json']));
-        if ~isempty(json)
-            newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']);
-            movefile(fullfile(json.folder,json.name),newname);
-        end
-        
-        if strcmp(options.QC,'on')
-            if ~isfield(subject.func_qa{frun},'preproc_outliers')
-                [~,subject.func_qa{frun}.preproc_outliers] = spmup_volumecorr(newname);
-            end
-            if ~isfield(subject.func_qa{frun},'preproc_tSNR')
-                subject.func_qa{frun}.preproc_tSNR = spmup_temporalSNR(newname,subject.tissues);
-            end
-        end
-        
-    else % it could be it was done and just need updated
-        
-        [filepath,filename,ext] = fileparts(subject.func{frun});
-        newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold' ext]);
-        if exist(newname,'file')
-            subject.func{frun} = newname;
-            
-            if ~isfield(subject,'func_qa')
-                subject.func_qa = cell(size(subject.func,1),1);
-            end
-            
-            if strcmp(options.QC,'on') && isempty(subject.func_qa{frun})
-                if ~isfield(subject.func_qa{frun},'preproc_outliers')
-                    [~,subject.func_qa{frun}.preproc_outliers] = spmup_volumecorr(newname);
-                end
-                if ~isfield(subject.func_qa{frun},'preproc_tSNR')
-                    subject.func_qa{frun}.preproc_tSNR = spmup_temporalSNR(newname,subject.tissues);
-                end
-            end
-        end
-    end
 end
 
 % clean-up intermediate fmri files
@@ -1010,5 +995,85 @@ if strcmpi(options.keep_data,'off')
         end
     end
 end
+
+% rename files and last QC
+for frun = 1:size(subject.func,1)
+    if exist(stats_ready{frun},'file')
+        [filepath,filename,ext] = fileparts(subject.func{frun});
+        newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold' ext]);
+        movefile(stats_ready{frun},newname);
+        subject.func{frun} = newname;
+        
+        if strcmp(options.QC,'on')
+            if exist(fullfile(filepath,[filename '.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+            elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+            elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json']));
+            end
+            
+            if ~isfield(subject.func_qa{frun},'preproc_outliers')
+                [~,subject.func_qa{frun}.preproc_outliers] = spmup_volumecorr(newname);
+                meta.QA.correlation_outliers = subject.func_qa{frun}.preproc_outliers;
+            end
+            if ~isfield(subject.func_qa{frun},'preproc_tSNR')
+                subject.func_qa{frun}.preproc_tSNR = spmup_temporalSNR(newname,subject.tissues);
+                meta.QA.tSNR = subject.func_qa{frun}.preproc_tSNR;
+            end
+            spm_jsonwrite([subject.func{frun}(1:end-9) '.json'],meta,opts)
+            oldjson = dir(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+            if ~isempty(oldjson)
+                delete(fullfile(oldjson.folder,oldjson.name))
+            end
+        else
+            json = dir(fullfile(filepath,[filename(1:end-5) '*desc-preprocessed_bold.json']));
+            if ~isempty(json)
+                newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']);
+                movefile(fullfile(json.folder,json.name),newname);
+            end
+        end    
+        
+    else % it could be it was done and just need updated
+        
+        [filepath,filename,ext] = fileparts(subject.func{frun});
+        newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold' ext]);
+        if exist(newname,'file')
+            subject.func{frun} = newname;
+            
+            if ~isfield(subject,'func_qa')
+                subject.func_qa = cell(size(subject.func,1),1);
+            end
+            
+            if strcmp(options.QC,'on') && isempty(subject.func_qa{frun})
+                
+                if exist(fullfile(filepath,[filename '.json']),'file')
+                    meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+                elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
+                    meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+                else
+                    meta.QA = [];
+                end
+                
+                if ~isfield(subject.func_qa{frun},'preproc_outliers')
+                    if isfield(meta.QA,'correlation_outliers')
+                        subject.func_qa{frun}.preproc_outliers  = meta.QA.correlation_outliers;
+                    else
+                        [~,subject.func_qa{frun}.preproc_outliers] = spmup_volumecorr(newname);
+                    end
+                end
+                
+                if ~isfield(subject.func_qa{frun},'preproc_tSNR')
+                    if isfield(meta.QA,'tSNR')
+                        subject.func_qa{frun}.preproc_tSNR = meta.QA.tSNR;
+                    else
+                        subject.func_qa{frun}.preproc_tSNR = spmup_temporalSNR(newname,subject.tissues);
+                    end
+                end
+            end
+        end
+    end
+end
+
 
 
