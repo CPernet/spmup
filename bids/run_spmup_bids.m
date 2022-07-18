@@ -29,29 +29,6 @@ function subjects = run_spmup_bids(subjects, varargin)
 
 %% Set options, matlab path and get data
 
-% check data are there
-% for s = 1:length(subjects)
-%     for f = 1:size(subjects{s}.anat,1)
-%         if ~exist(subjects{s}.anat{f},'file')
-%             error(' %s file is missing',subjects{s}.anat{f})
-%         end
-%     end
-%     
-%     for f = 1:size(subjects{s}.func,1)
-%         if ~exist(subjects{s}.func{f},'file')
-%             error(' %s file is missing',subjects{s}.func{f})
-%         end
-%     end
-%     
-%     if isfield(subjects{s},'fmap')
-%         for f = 1:size(subjects{s}.fmap,1)
-%             if ~exist(subjects{s}.fmap{f},'file')
-%             error(' %s file is missing',subjects{s}.fmap{f})
-%             end
-%         end
-%     end
-% end
-
 % make sure all folders are in the path 
 addpath(genpath(fullfile(fileparts(which('spm.m')),['toolbox' filesep 'spmup'])));
 
@@ -68,7 +45,7 @@ if nargin >= 2
     end
 end
 
-%% preprocess
+%% process
 try
     parpool(feature('numCores')-1); % use all available cores -1
 catch no_parpool
@@ -76,10 +53,37 @@ catch no_parpool
 end
 
 parfor s =1: numel(subjects)
-    subject{s} = spmup_BIDS_preprocess(subjects{s}, options)
+    subjects{s} = spmup_BIDS_preprocess(subjects{s}, options);
     if strcmpi(options.GLM,'on')
-        subject{s} = spmup_BIDS_1rstlevel(subjects{s}, options)
+        subjects{s} = spmup_BIDS_1rstlevel(subjects{s}, options);
     end
+    disp('-----------------------')
+    fprintf('subject %g finished!',s)
+    disp('-----------------------')    
 end
-save subjects subjects
+save([options.outdir filesep 'subjects.mat'],'subjects');
+
+%% save and report QC
+AnatQA = table(cellfun(@(x) x.anat_qa.SNR, subjects)',...
+    cellfun(@(x) x.anat_qa.CNR, subjects)',...
+    cellfun(@(x) x.anat_qa.FBER, subjects)',...
+    cellfun(@(x) x.anat_qa.EFC, subjects)',...
+    'VariableNames',{'SNR','CNR','FBER','EFC'});
+AnatQA.Properties.Description = 'spmup AnatQC';
+writetable(AnatQA,[options.outdir filesep 'AnatQC.tsv'],...
+    'Delimiter','\t','FileType','text')
+spmup_plotqc(AnatQA,'new')
+
+fMRIQA = table(cellfun(@(x) x.func_qa{1}.preproc_tSNR.GM, subjects)',...
+    cellfun(@(x) x.func_qa{1}.preproc_tSNR.WM, subjects)',...
+    cellfun(@(x) x.func_qa{1}.preproc_tSNR.CSF, subjects)',...
+    cellfun(@(x) x.func_qa{1}.preproc_tSNR.average, subjects)',...
+    'VariableNames',{'tSNR GM','tSNR WM','tSNR CSF','tSNR average'});
+fMRIQA.Properties.Description = 'spmup tSNR';
+writetable(AnatQA,[options.outdir filesep 'fMRIQC.tsv'],...
+    'Delimiter','\t','FileType','text')
+spmup_plotqc(fMRIQA,'new')
+
+
+
 
