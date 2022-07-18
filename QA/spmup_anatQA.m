@@ -190,9 +190,9 @@ data(isnan(data)) = [];
 Bmax = sqrt(sum(data(:).^2));
 try
     % should work most of the time, possibly throwing warnings (cf Joost Kuijer)
-    anatQA.EFC = nansum((data(:)./Bmax).*log((data(:)./Bmax)));
+    anatQA.EFC = real(nansum((data(:)./Bmax).*log((data(:)./Bmax))));
 catch
-    anatQA.EFC = nansum((data(:)./Bmax).*abs(log((data(:)./Bmax))));
+    anatQA.EFC = real(nansum((data(:)./Bmax).*abs(log((data(:)./Bmax)))));
 end
 
 %% outpouts for unit test
