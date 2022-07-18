@@ -115,17 +115,18 @@ if strcmp(options.overwrite_data,'on') || ...
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).pmod     = struct('name', {}, 'param', {}, 'poly', {});
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).orth =    1;
         end
-        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi     = {''};
-        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).regress   = struct('name', {}, 'val', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi         = {''};
+        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).regress       = struct('name', {}, 'val', {});
         if strcmpi(options.scrubbing,'off')
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi_reg = {subject.motionfile{frun}};
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi_reg = {subject.motionfile{frun}}; %#ok<CCAT1>
         else
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi_reg = {QAjobs{frun}.design};
         end
-        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf       = 128;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf           = 128;
     end
     
-    matlabbatch{1}.spm.stats.fmri_spec.fact = struct('name', {}, 'levels', {});
+    % convolution
+    matlabbatch{1}.spm.stats.fmri_spec.fact                = struct('name', {}, 'levels', {});
     if options.derivatives == 1 || strcmp(options.derivatives, '1')
         matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [1 0];
     elseif options.derivatives == 2 || strcmp(options.derivatives, '2')
@@ -133,6 +134,8 @@ if strcmp(options.overwrite_data,'on') || ...
     else
         matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [0 0];
     end
+    
+    % filters, etc .. 
     matlabbatch{1}.spm.stats.fmri_spec.volt     = 1;
     matlabbatch{1}.spm.stats.fmri_spec.global   = 'None';
     matlabbatch{1}.spm.stats.fmri_spec.mthresh  = 0.8;
@@ -142,6 +145,8 @@ if strcmp(options.overwrite_data,'on') || ...
     else
         matlabbatch{1}.spm.stats.fmri_spec.cvi  = 'FAST';
     end
+    
+    % estimate
     matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = cfg_dep('fMRI model specification: SPM.mat File', ...
         substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
         substruct('.','spmmat'));
@@ -161,7 +166,6 @@ end
 % seveal runs, simply match condition labels - and do it for each
 % derivatives if any
 if size(subject.func,1) > 1
-    cond = cellfun(@(x) x{1}, all_cond, 'UniformOutput', false);
     con_file1 = [Statspath filesep 'con_0001.nii'];
     
     if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
@@ -184,19 +188,19 @@ if size(subject.func,1) > 1
             test = cell2mat(arrayfun(@(x) contains(x.name,SPMnames{n}),SPM.xX,'UniformOutput',false));
             if sum(test) ~= 0
                 cname{cindex} = SPMnames{n}; %#ok<AGROW>
-                c(cindex,:)  = test; %#ok<AGROW>
-                cindex       = cindex +1;
+                c(cindex,:)   = test; %#ok<AGROW>
+                cindex        = cindex +1;
             end
         end
         
         if ~isempty(c)
-            matlabbatch{1}.spm.stats.con.spmmat                      = {SPMmat_file};
+            matlabbatch{1}.spm.stats.con.spmmat                             = {SPMmat_file};
             for contrast = size(c,1):-1:1
                 matlabbatch{1}.spm.stats.con.consess{contrast}.tcon.name    = cname{contrast};
                 matlabbatch{1}.spm.stats.con.consess{contrast}.tcon.weights = c(contrast,:);
                 matlabbatch{1}.spm.stats.con.consess{contrast}.tcon.sessrep = 'none';
             end
-            matlabbatch{1}.spm.stats.con.delete                      = 1;
+            matlabbatch{1}.spm.stats.con.delete                             = 1;
             spm_jobman('run',matlabbatch); clear matlabbatch;
         end
     end
