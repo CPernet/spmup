@@ -9,7 +9,7 @@ function jobs = spmup_first_level_qa(varargin)
 %       options define various choices to be used:
 %       'Motion Parameters': 'on' (default) or 'off'
 %              --> plots motion parameters and 1st derivatives
-%       'Radius': 50 (default)
+%       'Radius': 57 (default)
 %              --> the average head size to compute rotation displacement
 %       'Framewise displacement': 'on' (default) or 'off'
 %              --> plots displacement (FD and RMS)                   
@@ -35,7 +35,6 @@ function jobs = spmup_first_level_qa(varargin)
 
 % defaults
 spm('defaults','FMRI');
-current = pwd;
 
 %% check inputs
 if nargin == 0    
@@ -51,7 +50,7 @@ end
 
 %% options
 MotionParameters      = 'on';
-Radius                = 50;
+Radius                = 57;
 FramewiseDisplacement = 'on';
 Voltera               = 'off';
 Globals               = 'on'; 
