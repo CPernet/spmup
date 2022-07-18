@@ -1,19 +1,20 @@
-function spmup_plotmotion(file)
+function spmup_plotmotion(motion_file,radius)
 
 % simple routine to plot motion parameters in mm and degrees
-% also added is the total displacement
+% also added is the root mean square displacement
 %
-% FORMAT: spmup_plotmotion(file)
+% FORMAT: spmup_plotmotion(motion_param,radius)
 %
-% INPUT: the file in which the motion paramters are
+% INPUT: motion_param is the file in which the motion paramters are
+%        radius the head size (useful to compute displacement) if empty use 57 mm
 %
 % OUTPUT: a figure 
 %
-% ------------------------------
-% Copyright (C) spmup team 2019
+% Cyril Pernet
+% --------------------------
+%  Copyright (C) SPMUP Team 
 
 %% get the data
-current = pwd;
 if nargin == 0
     motion_file = uigetfile(pwd,'select realignemt parameter file');
     if filepath == 0
@@ -21,16 +22,18 @@ if nargin == 0
     else
         cd(filepath);
     end
+end
 
+if ~exist('radius','var')
+    radius = 180/pi; % ~57mm head size
 end
 
 %% compute
 motion_param       = load(motion_file.name);
-[n,~]              = size(motion_param);
 temp_motion        = motion_param; 
-temp_motion(:,4:6) = temp_motion(:,4:6)*180/pi; % ~57mm head size
+temp_motion(:,4:6) = temp_motion(:,4:6)*radius; 
 derivatives        = [0 0 0 0 0 0 ; diff(temp_motion)];
-RMS                = sqrt(sum(derivatives.^2,2);  % Mean square displacement 
+RMS                = sqrt(sum(derivatives.^2,2));  % Mean square displacement 
 
 %% plot
 figure('Name','Motion','Visible','On');
@@ -44,7 +47,4 @@ xlabel('scans'); ylabel('degrees');
 subplot(2,2,3:4); plot(delta,'LineWidth',3); hold on;
 axis tight; grid on; title(['Mean square displacement ' num2str(mean(RMS)) ' std ' num2str(std(RMS))],'FontSize',14);
 xlabel('scans'); ylabel('displacement');
-saveas(gcf, 'motion plots.fig','fig');
-print (gcf,'-dpsc2', '-bestfit', [pwd filesep 'motion plots.ps']);
-close(gcf)
-cd(current)
+
