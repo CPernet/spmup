@@ -29,3 +29,4 @@ for file = size(P,1):-1:1
     V          = spm_write_vol(V(2),data);
     out{file} = V.fname;
 end
+out = out';
