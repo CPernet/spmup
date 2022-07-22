@@ -21,10 +21,8 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 %        - FBER: Foreground to Background Energy Ratio, i.e. the variance of voxels in grey and white matter 
 %                divided by the variance of voxels outside the brain*. Higher values are better.
 %
-%        --> if 'no background' is true, std_WM is used 
-%
 %        - EFC : Entropy Focus Criterion, i.e. the entropy of voxel intensities proportional to the maximum 
-%                possibly entropy for a similarly sized image. Indicates ghosting and head motion-induced blurring. 
+%                possible entropy for a similarly sized image. Indicates ghosting and head motion-induced blurring. 
 %                Lower values are better. See <http://ieeexplore.ieee.org/document/650886/>
 %
 % * when the background has 0 variance (e.g. a sequence with noise suppression like FLAIR) then the standard 
@@ -38,8 +36,8 @@ function [anatQA,int_data] = spmup_anatQA(varargin)
 % --------------------------------------------------------------------------
 % Copyright (C) spmup team 2017
 
-% 2nd input int_data is used for unit testing, this retuns intermediate
-% values computed here in a structure 
+% 2nd output int_data is used for unit testing, this retuns in a structure
+% intermediate values   
 
 %% input data
 if nargin == 0
