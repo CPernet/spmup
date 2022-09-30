@@ -70,9 +70,9 @@ R    = ifft(fft(Data,nfft).*conj(fft(Data,nfft)));
 R    = R(1:p,:)'; % [R(end-p+2:end,:) ; R(1:p,:)]'; for a full window
 
 %% now the slow part
+spmup_setparallel
 autocorrelation_window = NaN(n,1);
-
-for v=1:n
+parfor v=1:n
     if sum(R(v,:)) == 0
         autocorrelation_window(v) = 0;
     else

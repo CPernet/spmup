@@ -15,8 +15,8 @@ function jobs = spmup_first_level_qa(varargin)
 %              --> plots displacement (FD and RMS)                   
 %              --> generates/appends new design.txt file with displacement outliers
 %       'Voltera': 'off' (default) or 'on'
-%              --> clompute the motion parameter expansion
-%              --> generates/appends new design.txt file with displacement outliers
+%              --> compute the motion parameter expansion
+%              --> generates/appends new design.txt file with motion derivatives and squares
 %       'Globals': 'on' (default) or 'off'
 %              --> computes and plot globals (see spm_globals)
 %              --> generates/appends new design.txt file with global outliers

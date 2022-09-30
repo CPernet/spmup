@@ -79,7 +79,7 @@ end
 Y(:,:,:,1:skipped) = [];
 
 %% save
-derivatives = 'on';
+derivatives = 'off';
 newname     = [];
 
 if nargin > 2

@@ -254,7 +254,7 @@ if any(Vroi.dim ~= Vfmri(1).dim) % maybe we need to resize the ROI image
     reslice_atlas = true;
     if exist(roi2, 'file')
         Vroi2 = spm_vol(roi2);
-        if Vroi2.dim ~= Vfmri(1).dim
+        if all(Vroi2.dim == Vfmri(1).dim)
             Vroi = Vroi2;
             reslice_atlas = false;
         end
