@@ -7,7 +7,7 @@ function spmup_setparallel
 %  Copyright (C) SPMUP Team 
 
 
-N      = 10;
+N      = [];
 addons = ver;
 if any(strcmpi('Parallel Computing Toolbox',arrayfun(@(x) x.Name, addons, "UniformOutput",false)))
     p = gcp('nocreate');
