@@ -1,6 +1,7 @@
 function spmup_setparallel
 
 % simple routine to set the up the parallel processing
+% set N if you want to use a specific number of processors (useful on servers with dynamic attribution to limit oneself)
 %
 % Cyril Pernet & Remi Gau
 % --------------------------
