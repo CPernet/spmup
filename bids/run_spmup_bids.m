@@ -109,7 +109,7 @@ for task = 1:Ntask
                     if sess_anat == 1 && session > 1 % only one anat for multiple sesions
                         subjects{s}.anat{session,:} = subjects{s}.anat{1,:}; % replicate
                     end
-                    subject_sess.anat               = subjects{s}.anat(session,:)';
+                    subject_sess.anat               = subjects{s}.anat(session,cellfun(@(x) ~isempty(x), subjects{s}.anat(session,:)))';
                     if ~iscell(subject_sess.anat)
                         subject_sess.anat           = {subject_sess.anat};
                     end
