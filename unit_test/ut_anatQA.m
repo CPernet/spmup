@@ -63,7 +63,7 @@ W.descrip = 'fake brain for QA'; spm_write_vol(W,I_brain);
 % see what values we get using spmup_anatQA
 [anatQA,int_data] = spmup_anatQA(W.fname,P(1,:),P(2,:));
 
-% compute from simulated data, except noise because it's compute differently 
+% compute from simulated data, except noise because it's computed differently 
 SNR  = ((mean(GM)+mean(WM))/2) / int_data.std_nonbrain;
 CNR  = (mean(WM)-mean(GM)) / int_data.std_nonbrain;
 FBER = var([GM ;WM]) / int_data.std_nonbrain^2;
