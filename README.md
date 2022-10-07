@@ -2,6 +2,11 @@
 
 SPM utlities plus are tools designed to get the best of mass univariate analyses.
 
+## Installation
+
+This acts as a toolbox - place it in /spm12/toolbox/ and run spmup.m which will add all the other paths, copy gp_event_plot.m to appear in the spm toolbox tab, and save this.
+
+
 ## QA
 
 The QA folder contains a series of tools to check the quality of your images. Some metrics can be used at the group level as covariates, which can be important when comparing different group of subjects, if their quality metrics are different. The intented usage is to run fMRI data preprocessing and then call spmup_anatQA.m on the coregistered T1 image (i.e. the one used to derive normalization parameters), spmup_temporalSNR.m and spmup_fisrt_level_qa.m on the smoothed normalized realigned the slice timed fMRI data (i.e. the data used for your GLM). Post GLM estimation, spmup_glmQA is called. At the group level, call spmup_second_level_qa.m.
