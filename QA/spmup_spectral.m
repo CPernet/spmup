@@ -16,7 +16,7 @@ function [f,outliers] = spmup_spectral(varargin)
 %
 % Compute the spatial power spectrum (i.e. abs(fft)^2) per slice using a
 % zero-padded 256-by-256 element matrix and then average power values
-% of all the same freqencies, returning f. Outliers are computed after 
+% of all the same frequencies, returning f. Outliers are computed after 
 % averaging all frequencies, computing S-outliers among volumes, for each
 % slice.
 %
@@ -113,9 +113,11 @@ disp('-------------------------------------')
 fprintf(' Computing slice-wise spectrum for %s\n',filename)
 disp('-------------------------------------')
 
-for j=1:nbimage
-    for i=1:V(1).dim(3)-1 % for each slice
-        im          = squeeze(Image(:,:,i,j)); im(isnan(im)) = 0;
+z = V(1).dim(3)-1;
+parfor j=1:nbimage
+    Im = squeeze(Image(:,:,:,j));
+    for i=1:z % for each slice
+        im          = squeeze(Im(:,:,i)); im(isnan(im)) = 0;
         % figure; subplot(1,3,1); imagesc(im); title('Observed slice')
         N           = min(size(im));
         index       = (max(size(im)) - N) / 2;
@@ -127,9 +129,7 @@ for j=1:nbimage
         [X,Y]       = meshgrid(freq,freq); % get coordinates of the power spectrum image
         [~,rho]     = cart2pol(X,Y); % equivalent in polar coordinates
         rho         = round(rho);
-        for r =(256/2):-1:0
-            f(j,i,r+1) = mean(impf(rho==r)); % average power values of all the same freq
-        end
+        f(j,i,:)    = arrayfun(@(x) mean(impf(rho==x)),0:(256/2));
         % subplot(1,3,3); freq2=0:256/2; loglog(freq2,squeeze(f(j,i,:))); title('frequency spectrum','Fontsize',14); axis tight
     end
 end
@@ -151,7 +151,7 @@ if ~strcmpi(fig,'off')
     subplot(1,2,1); loglog(0:256/2,avgf);
     title('Slices power spectrum averaged over volumes','LineWidth',2);
     axis tight; grid on;  xlabel('freq'); ylabel('power')
-    subplot(1,2,2); semilogy(1:size(avgv,1),avgv); 
+    subplot(1,2,2); semilogy(1:size(avgv,1),avgv); hold on
     semilogy(1:size(avgv,1),avgv.*outliers,'ro');
     title('Avg power spectra per slice','LineWidth',2);
     axis tight; grid on;  xlabel('volumes'); ylabel('power'); hold on; 

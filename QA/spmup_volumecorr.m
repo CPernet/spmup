@@ -138,7 +138,7 @@ end
 r_course = [r_course(sub2ind(size(r_course),diag,(diag+1))) r_course(1,size(r_course,2))];
 
 %% get the outliers from the r_course
-r_outliers = spmup_comp_robust_outliers(r_course,'Carling');
+r_outliers = double(spmup_comp_robust_outliers(r_course,'Carling'));
 if strcmpi(fig,'on') || strcmpi(fig,'save')
     subplot(2,1,2); 
     plot(r_course,'LineWidth',2); grid on; title(sprintf('Volume to volume correlation \n%s', filename));
@@ -161,3 +161,6 @@ if sum(r_outliers ~= 0)
         fprintf(['correlation between volumes ' repmat('%g ', [1 sum(r_outliers)]) ' are potiential outliers\n'],find(r_outliers));
     end
 end
+
+r_outliers = r_outliers';
+r_course   = r_course';

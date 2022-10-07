@@ -89,12 +89,12 @@ else
     disp   ('-------------------------')
 end
 filename(strfind(filename,'_')) = ' ';
-
+spmup_setparallel
 
 %% correlations between slices for each volume
 % -----------------------------------------------
 n = size(Y,3);
-for i = size(Y,4):-1:1
+parfor i = 1:size(Y,4)
     S      = squeeze(Y(:,:,:,i));                % take one volume  
     vols   = reshape(S,[size(Y,1)*size(Y,2),n]); % reshape each slice as vectors
     all_r  = corr(vols);                         % all correlations between slices
@@ -114,7 +114,7 @@ if strcmpi(fig,'on') || strcmpi(fig,'save')
 end
 
 r = nanmean(r,2); % average over slices
-volume_outliers = spmup_comp_robust_outliers(r);
+volume_outliers = double(spmup_comp_robust_outliers(r));
 if sum(volume_outliers ~= 0)
     if sum(volume_outliers) == 1
         fprintf('volume %g is a potiential outlier\n',find(volume_outliers));
@@ -135,7 +135,7 @@ clear S vols all_r idx r
 % -----------------------------------------------
 
 n = size(Y,4);
-for i = size(Y,3):-1:1
+parfor i = 1:size(Y,3)
     S      = squeeze(Y(:,:,i,:));                % take one slice all volumes
     vols   = reshape(S,[size(Y,1)*size(Y,2),n]); % reshape slices as vectors
     all_r  = corr(vols);                         % all correlations between volumes
