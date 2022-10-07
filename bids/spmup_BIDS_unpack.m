@@ -182,7 +182,7 @@ end % for each subject
 % if more than 2 functional run, try to unpack data using multiple cores
 % ----------------------------------------------------------------------
 if size(spm_BIDS(BIDS, 'runs', 'sub', subjs_ls{s}),2) >= 2 %#ok<*UNRCH>
-    spmup_setparallel
+    spmup_setparallel(options.Ncores)
 end
 
 % unpack functional and field maps (still need to work out sessions here)
