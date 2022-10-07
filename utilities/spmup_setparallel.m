@@ -1,14 +1,21 @@
-function spmup_setparallel
+function spmup_setparallel(varargin)
 
 % simple routine to set the up the parallel processing
-% set N if you want to use a specific number of processors (useful on servers with dynamic attribution to limit oneself)
+%
+% FORMAT spmup_setparallel(N)
+% set N if you want to use a specific number of processors 
+% useful on servers with dynamic attribution to limit oneself
 %
 % Cyril Pernet & Remi Gau
 % --------------------------
 %  Copyright (C) SPMUP Team 
 
+if nargin == 0
+    N = [];
+else
+    N = varargin{1};
+end
 
-N      = [];
 addons = ver;
 if any(strcmpi('Parallel Computing Toolbox',arrayfun(@(x) x.Name, addons, "UniformOutput",false)))
     p = gcp('nocreate');
@@ -34,7 +41,13 @@ if any(strcmpi('Parallel Computing Toolbox',arrayfun(@(x) x.Name, addons, "Unifo
             
             % go
             % --
-            parpool(N-1);
+            try
+                parpool(N-1);
+            catch flasestart %#ok<NASGU> 
+                delete(c.Jobs)
+                parcluster('local')
+                parpool(N-1);
+            end
         else
             parpool(N);
         end
