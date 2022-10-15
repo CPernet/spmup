@@ -18,7 +18,7 @@ function [subjects,opt] = run_spmup_bids(BIDS, subjects, varargin)
 %
 % OUTPUT the preprocessed and analyzed data are written on disk
 %        subjects is the updated structure with processed file names, QC, etc
-%        opt is a strcuture of options per subject 
+%        opt is a strcuture of options per subject
 %        (subjects and opt are also saved on disk)
 %
 % Example usage       BIDS_dir        = '/data1/cpernet/ds000117';
@@ -136,7 +136,7 @@ for task = 1:Ntask
                         metadata{r}   = cell2mat(subjects{s}.func_metadata(session,run_index)); % and thus metadata
                     end
                 end
-                                
+                
                 subject_sess.func          = run_ls;
                 subject_sess.func_metadata = metadata;
                 subject_sess.fieldmap      = subjects{s}.fieldmap(session);
@@ -175,44 +175,44 @@ for task = 1:Ntask
                 clear run_index event_index subject_sess
             end
         end
-    end
-    
-    disp('---------------------------------------')
-    fprintf('session %s finished!\n',sess_names{session})
-    disp('---------------------------------------')
-    save([options.outdir filesep 'spmup_subjects_task-' options.task{task} '_session-' sess_names{session}  '.mat'],'subjects');
-    save([options.outdir filesep 'spmup_options_task-' options.task{task} '_session-' sess_names{session}  '.mat'],'opt'); %#ok<USENS>
-    
-    %% reinitialize opt for the next session
-    opt = get_subject_options(options,subjects);
-
-    %% save and report QC
-    AnatQA = table(cellfun(@(x) x.anat_qa{session}.SNR, subjects)',...
-        cellfun(@(x) x.anat_qa{session}.CNR, subjects)',...
-        cellfun(@(x) x.anat_qa{session}.FBER, subjects)',...
-        cellfun(@(x) x.anat_qa{session}.EFC, subjects)',...
-        'VariableNames',{'SNR','CNR','FBER','EFC'});
-    AnatQA.Properties.Description = 'spmup AnatQC';
-    writetable(AnatQA,[options.outdir filesep 'AnatQC_task-' options.task{task} '_session-' sess_names{session} '.tsv'],...
-        'Delimiter','\t','FileType','text')
-    spmup_plotqc(AnatQA,'new')
-    
-    for run = 1:size(subjects{1}.func_qa{session},1)
-        fMRIQA = table(cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.GM, subjects)',...
-            cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.WM, subjects)',...
-            cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.CSF, subjects)',...
-            cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.average, subjects)',...
-            'VariableNames',{['tSNR GM run ' num2str(run)],['tSNR WM run ' num2str(run)],...
-            ['tSNR CSF run ' num2str(run)],['tSNR average run ' num2str(run)]});
-        fMRIQA.Properties.Description = 'spmup tSNR';
-        if size(subjects{1}.func_qa{session},1) == 1
-            writetable(AnatQA,[options.outdir filesep 'fMRIQC_task-' options.task{task} '_session-' sess_names{session}  '.tsv'],...
-                'Delimiter','\t','FileType','text')
-        else
-            writetable(AnatQA,[options.outdir filesep 'fMRIQC_task-' options.task{task} '_session-' sess_names{session}  '_run-' num2str(run) '.tsv'],...
-                'Delimiter','\t','FileType','text')
+        
+        disp('---------------------------------------')
+        fprintf('session %s finished!\n',sess_names{session})
+        disp('---------------------------------------')
+        save([options.outdir filesep 'spmup_subjects_task-' options.task{task} '.mat'],'subjects');
+        save([options.outdir filesep 'spmup_options_task-'  options.task{task} '.mat'],'opt'); 
+        
+        %% reinitialize opt for the next session
+        opt = get_subject_options(options,subjects);
+        
+        %% save and report QC
+        AnatQA = table(cellfun(@(x) x.anat_qa{session}.SNR, subjects)',...
+            cellfun(@(x) x.anat_qa{session}.CNR, subjects)',...
+            cellfun(@(x) x.anat_qa{session}.FBER, subjects)',...
+            cellfun(@(x) x.anat_qa{session}.EFC, subjects)',...
+            'VariableNames',{'SNR','CNR','FBER','EFC'});
+        AnatQA.Properties.Description = 'spmup AnatQC';
+        writetable(AnatQA,[options.outdir filesep 'AnatQC_task-' options.task{task} '_session-' sess_names{session} '.tsv'],...
+            'Delimiter','\t','FileType','text')
+        spmup_plotqc(AnatQA,'new')
+        
+        for run = 1:size(subjects{1}.func_qa{session},1)
+            fMRIQA = table(cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.GM, subjects)',...
+                cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.WM, subjects)',...
+                cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.CSF, subjects)',...
+                cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.average, subjects)',...
+                'VariableNames',{['tSNR GM run ' num2str(run)],['tSNR WM run ' num2str(run)],...
+                ['tSNR CSF run ' num2str(run)],['tSNR average run ' num2str(run)]});
+            fMRIQA.Properties.Description = 'spmup tSNR';
+            if size(subjects{1}.func_qa{session},1) == 1
+                writetable(AnatQA,[options.outdir filesep 'fMRIQC_task-' options.task{task} '_session-' sess_names{session}  '.tsv'],...
+                    'Delimiter','\t','FileType','text')
+            else
+                writetable(AnatQA,[options.outdir filesep 'fMRIQC_task-' options.task{task} '_session-' sess_names{session}  '_run-' num2str(run) '.tsv'],...
+                    'Delimiter','\t','FileType','text')
+            end
+            spmup_plotqc(fMRIQA,'new')
         end
-        spmup_plotqc(fMRIQA,'new')
     end
     
     disp('---------------------------------------')
