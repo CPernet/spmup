@@ -1,16 +1,17 @@
-function design = spmup_censoring(varargin)
+function [design,censoring_regressors] = spmup_censoring(varargin)
 
 % routine that computes robust outliers for each column of the data in
 % and return a matrix of censsoring regressors (0s and a 1 per column)
 %
-% FORMAT censoring_regressors = spmup_censoring(realignemt.txt,data)
-%        censoring_regressors = spmup_censoring(realignemt.txt,data,'Voltera','on/off')
+% FORMAT [design,censoring_regressors] = spmup_censoring(realignemt.txt,data)
+%        [design,censoring_regressors] = spmup_censoring(realignemt.txt,data,'Voltera','on/off')
 %
 % INPUT  realignment.txt is a motion parameter file 
 %        data is a n volumes * m matrix to censor column wise
 %        Voltera indicate to expand the motion parameters
 %
-% OUTPUT censoring_regressors matrix with ones in each column for
+% OUTPUT design is the augmented design matrix of regressors
+%        censoring_regressors matrix with ones in each column for
 %        outliers found in coumns of data 
 %        if no output specified saves it as design.txt
 % 
@@ -64,7 +65,7 @@ if ~isempty(data)
         end
     end
     censoring_regressors(:,sum(censoring_regressors,1)==0) = [];
-    design = [motion data censoring_regressors];
+    design = [motion censoring_regressors];
 else
     design = motion;
 end

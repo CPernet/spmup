@@ -274,15 +274,7 @@ function headers = column_headers(options)
               'rot_y_derivative1_power2'; ...
               'rot_z_derivative1_power2'};
   end
-  
-  if strcmp(options.FramewiseDisplacement, 'on')
-    headers{end + 1, 1} = 'framewise_displacement';
-  end
-  
-  if strcmp(options.Globals, 'on')
-    headers{end + 1, 1} = 'global_signal';
-  end
-  
+    
 end
 
 
