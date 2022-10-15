@@ -16,6 +16,11 @@ else
     N = varargin{1};
 end
 
+if evalin( 'base', 'exist(''options'',''var'') == 1' )
+    options = evalin('base','options');
+    N       = options.Ncores;
+end
+
 addons = ver;
 if any(strcmpi('Parallel Computing Toolbox',arrayfun(@(x) x.Name, addons, "UniformOutput",false)))
     p = gcp('nocreate');
@@ -37,7 +42,7 @@ if any(strcmpi('Parallel Computing Toolbox',arrayfun(@(x) x.Name, addons, "Unifo
             % ----------------------------------
             c            = parcluster;
             c.NumWorkers = N;
-            % saveProfile(c);
+            saveProfile(c);
             
             % go
             % --
