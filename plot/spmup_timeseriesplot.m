@@ -1,4 +1,4 @@
-function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
+function spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
 % routine to produce plots a la Jonathan Power
 %
@@ -42,10 +42,14 @@ function M = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 %       of two time series is provided, it assumes the same motion and nuisance
 %       apply, taking data from the 1st set eg data before and after denoising
 %
-% OUTPUT a figure (voxplot) showing all grey and white matter voxels
-%        in time, associated to the traces in options
-%        M is the matrix of voxel by time
-%        the figure and M are (for GM) organized according to Yeo's network
+% OUTPUT 2 figures
+%        - a voxplot showing all grey and white matter voxels
+%          in time, associated to the traces in options
+%        - corrrelations matrices as per Yeo 7 parcellation
+%
+% Example from subjects structure: 
+%         spmup_timeseriesplot(subjects{1}.func{1},subjects{1}.tissues{1}{1},...
+%              subjects{1}.tissues{1}{2},subjects{1}.tissues{1}{3},'figure', 'on')
 %
 % Reference: Power, J.D. (2016). A simple but useful way to assess fMRI
 % scan qualities. NeuroImage
@@ -267,26 +271,39 @@ if any(Vroi.dim ~= Vfmri(1).dim) % maybe we need to resize the ROI image
         matlabbatch{1}.spm.util.bbox.image = {Vfmri(1).fname};
         matlabbatch{1}.spm.util.bbox.bbdef.fov = 'fv';
         bb = spm_jobman('run', matlabbatch);
+        copyfile(roi,fullfile(fileparts(Vfmri(1).fname), atlas_filename));
+        roi = fullfile(fileparts(Vfmri(1).fname), atlas_filename);
         Vroi = spm_vol(cell2mat( ...
             spmup_resize(roi, bb{1}.bb, ...
             abs(diag(Vfmri(1).mat(1:3, 1:3)))')));
+        delete(roi)
     end
 end
 
 % for each network, take gray matter voxels
-M          = [];
 ROIdata    = spm_read_vols(Vroi);
 ROIdata    = round(ROIdata);
 roi_values = unique(ROIdata);
 roi_values(roi_values == 0) = [];
 
-for r = 1:length(roi_values)
+M = []; N = [];
+for r = length(roi_values):-1:1
     [x, y, z]                        = ind2sub(size(ROIdata), intersect(find(ROIdata == r), find(c1)));
     tmp                              = spm_get_data(Vfmri, [x y z]')';
     tmp(find(sum(isnan(tmp), 2)), :) = []; %#ok<FNDSB> % removes rows of NaN;
     tmp(sum(tmp, 2) == 0, :)         = []; % remove 0
-    M                                = [M; tmp];  %#ok<AGROW>
+    M                                = [M; tmp];  
+    N                                = [N; mean(tmp,1)];  % average of the ROI
+    tmp                              = corr(tmp);  
+    WM(r)                            = median(tmp(triu(true(size(tmp)),1))); % median upper triangle
+    clear tmp
 end
+MG = M;
+
+if exist(fullfile(fileparts(Vfmri(1).fname), ['r' atlas_filename]),'file')
+    delete(fullfile(fileparts(Vfmri(1).fname), ['r' atlas_filename]))
+end
+
 line_index = size(M, 1);
 NGM        = size(M, 1);
 
@@ -417,9 +434,28 @@ if ~strcmpi(makefig, 'off')
         else
             print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,'spmup_QC.ps'));
         end
-        saveas(gcf, fullfile(filepath,'spmup_QC.fig'), 'fig');
     end
-    close(gcf);
+    
+    if ~strcmpi(makefig,'on')
+        close(gcf);
+    end
+    
+    % ----------------2nd figure for correlations only when explicit ----------------
+    if strcmpi(makefig,'on')
+        figure('Name','Correlation matrices')
+        if strcmpi(makefig,'on')
+            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+        else
+            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
+        end
+        subplot(1,2,1); imagesc(corr(MG')); caxis([-1 1]); title('Correlations among all Gray Matter voxel time series')
+        xlabel('Voxels'); ylabel('Voxels');
+        subplot(1,2,2);  N = corr(N');
+        N = N - eye(size(N)) + diag(WM); imagesc(N);
+        caxis([-1 1]); title('Median corr within and corr between mean network time series')
+        xlabel('Networks'); ylabel('Networks'); colorbar
+    end
+    
 end
 
 end
