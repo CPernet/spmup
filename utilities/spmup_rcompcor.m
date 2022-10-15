@@ -1,9 +1,10 @@
-function [anoise,tnoise,qc] = spmup_rcompcor(fmridata,brainmask,whitematter,csf,graymatter)
+function [anoise,tnoise,QC] = spmup_rcompcor(fmridata,brainmask,whitematter,csf,graymatter)
 
 % This function compute the 'compcor' regressors of Behzadi et al. 2007
 % <http://www.ncbi.nlm.nih.gov/pmc/articles/PMC2214855/>
 % One difference from the original paper is that we use more robusts 
-% estimates for ROI selection
+% estimates for ROI selection based on median and MAD - the PCA retains
+% components above 1% chance under the null
 %
 % FORMAT: [anoise,tnoise]=rcompcor(fmridata,brainmask,whitematter,csf)
 %
@@ -24,6 +25,8 @@ function [anoise,tnoise,qc] = spmup_rcompcor(fmridata,brainmask,whitematter,csf,
 % Cyril Pernet 10 May 2016
 % -------------------------------------------------------------------------
 
+fig = 0; % set to one to visually check what is going on
+
 %% Check data input
 
 if nargin == 0
@@ -39,6 +42,7 @@ if nargin == 0
         if sts == 0; disp('selection aborded'); return; end
         [graymatter,sts]= spm_select(1,'image','Select gray matter tissue image');
     end
+    if sts == 0; disp('selection aborded'); return; end
 end
 
 % check fmridata is 4D
@@ -48,28 +52,34 @@ if size(Vfmri,1) == 1
 end
     
 % check dimensions
-Vbrainmask = spm_vol(brainmask); brainmask = spm_read_vols(Vbrainmask);
-if ~any(Vfmri(1).dim == Vbrainmask.dim)
+if ischar(brainmask)
+    Vbrainmask = spm_vol(brainmask); 
+    brainmask = spm_read_vols(Vbrainmask);
+end
+
+if ~any(Vfmri(1).dim == size(brainmask))
     error('Dimension issue between mask and fMRI data')
 end
 
-% figure; hold on
-% for z=1:Vbrainmask.dim(3)
-%     imagesc(brainmask(:,:,z)); pause(0.2)
-% end
-    
+if fig == 1
+    figure; hold on; title('brain mask')
+    for z=1:size(brainmask,3)
+        imagesc(brainmask(:,:,z)); pause(0.2)
+    end
+end
+
 Vgraymatter = spm_vol(graymatter); graymatter = spm_read_vols(Vgraymatter);
-if ~any(Vgraymatter.dim == Vbrainmask.dim)
+if ~any(Vgraymatter.dim == size(brainmask))
     error('Dimension issue between mask and gray matter')
 end
 
 Vwhitematter = spm_vol(whitematter); whitematter = spm_read_vols(Vwhitematter);
-if ~any(Vwhitematter.dim == Vbrainmask.dim)
+if ~any(Vwhitematter.dim == size(brainmask))
     error('Dimension issue between mask and white matter')
 end
 
 Vcsf = spm_vol(csf); csf = spm_read_vols(Vcsf);
-if ~any(Vcsf.dim == Vbrainmask.dim)
+if ~any(Vcsf.dim == size(brainmask))
     error('Dimension issue between mask and CSF')
 end
     
@@ -120,9 +130,9 @@ if length(nargout) == 3
 end
 
 %%
-% get regressors
-anoise = decompose(timeseries,0);
-
+% get regressors from WM and CSF
+disp('getting WM and CSF components')
+anoise = decompose(timeseries,fig);
 
 %% tnoise
 % Following Lund et al. 2006 <http://www.ncbi.nlm.nih.gov/pubmed/16099175>
@@ -153,20 +163,26 @@ end
 %%
 % if QC then output an tSNR image
 if length(nargout) == 3
-    [fpath,fname,fext] = fileparts(Vbrainmask.fname);
-    Vbrainmask.fname   = [fpath filesep 'tSRN' fext];
-    Vbrainmask.descrip = 'robust temporal SNR image';
-    QC.SNR.V           = Vbrainmask;
-    QC.SNR.img         = SNRimg;    
+    fpath            = fileparts(Vfmri(1).fname);
+    Vfmri(1).fname   = [fpath filesep 'tSRN' fext];
+    Vfmri(1).descrip = 'robust temporal SNR image';
+    QC.SNR.V         = Vfmri(1);
+    QC.SNR.img       = SNRimg;    
 end
 
 %%
 % sort voxels, keep top 2% in each slice
-figure; hold on
 for zz = min(z):max(z)
-    vox            = SNRimg(:,:,zz); 
-    SNRimg(:,:,zz) = (vox >= prctile(vox(:),98));
+    vox            = SNRimg(:,:,zz);
+    SNRimg(:,:,zz) = vox.*((vox >= prctile(vox(:),98)));
+    if fig == 1
+        if zz == min(z)
+            figure; hold on; title('high SNR voxels')
+        end
+        imagesc(brainmask(:,:,zz).*SNRimg(:,:,zz)); pause(0.2)
+    end
 end
+    
 
 %%
 % if QC then output an image of selected voxels
@@ -179,6 +195,7 @@ end
 index      = find(SNRimg);
 [x,y,z]    = ind2sub(size(SNRimg),index);
 timeseries = spm_get_data(Vfmri,[x y z]');
+disp('getting high temporal noise components')
 tnoise     = decompose(timeseries,0);
 
 end
@@ -212,17 +229,18 @@ end
 % values under the null to threshold the observed data
 R  = rank(timeseries);
 SS = NaN(R,1000);
+spmup_setparallel
 parfor MC=1:1000
     SS(:,MC) = sort(abs(eig(randn(R))));
 end
 PP      = SS./ repmat(sum(SS),[R,1]);
 PP      = sort(PP,2); 
-H       = sort(PP(:,975),1,'descend');
+H       = sort(PP(:,999),1,'descend'); % keep 1%
 keep    = propvar > max(H);
 compout = V(:,keep);
 if fig == 1
-    plot(H.*100,'r','LineWidth',3)
-    plot(propvar(keep).*100,'ro','LineWidth',3);
+    plot(H.*100,'g','LineWidth',2)
+    plot(propvar(keep).*100,'go','LineWidth',3);
 end
 
 end
