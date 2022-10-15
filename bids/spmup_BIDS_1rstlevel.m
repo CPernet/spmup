@@ -67,18 +67,37 @@ end
 for frun = size(subject.func, 1):-1:1
     if strcmpi(options.scrubbing,'on')
         QAjobs{frun} = spmup_first_level_qa(subject.func{frun}, 'Radius',davg, ...
-            'Movie','off','Voltera',options.motionexp);
+            'Movie','off','Voltera',options.motionexp,...
+            'Framewise displacement','on','Globals','on');
     else
         QAjobs{frun} = spmup_first_level_qa(subject.func{frun}, 'Radius',davg, ...
             'Movie','off','Voltera',options.motionexp,...
             'Framewise displacement','off','Globals','off');
     end
     
-    if ~contains(subject.func{frun},'task-rest','IgnoreCase',true)
-        QAjobs{frun}.nuisance = spmup_nuisance(subject.func{frun},subject.tissues{2},subject.tissues{3});
+    if contains(subject.func{frun},'task-rest','IgnoreCase',true)
         design = load(QAjobs{frun}.design);
-        design = [QAjobs{frun}.nuisance.WM QAjobs{frun}.nuisance.CSF design];
-        save(QAjobs{frun}.design,'design','-ascii');
+        json   = jsondecode(fileread([QAjobs{frun}.design(1:end-4) '.json']));
+        
+        if strcmpi(options.nuisance,'WMCSF')
+            QAjobs{frun}.nuisance = spmup_nuisance(subject.func{frun},subject.tissues{2},subject.tissues{3});
+            design = [design QAjobs{frun}.nuisance.WM QAjobs{frun}.nuisance.CSF]; %#ok<AGROW>
+            json.Columns{end+1} = 'WM';
+            json.Columns{end+1} = 'CSF';
+        elseif strcmpi(options.nuisance,'compcor')
+            brainmask             = spmup_auto_mask(spm_vol(subject.func{frun}));
+            [anoise,tnoise]       = spmup_rcompcor(subject.func{frun},brainmask,subject.tissues{2},...
+                subject.tissues{3},subject.tissues{1});
+            QAjobs{frun}.nuisance.anoise = anoise;
+            QAjobs{frun}.nuisance.tnoise = tnoise;
+            design = [design QAjobs{frun}.nuisance.anoise QAjobs{frun}.nuisance.tnoise]; %#ok<AGROW>
+            json.Columns{end+size(QAjobs{frun}.nuisance.anoise,2)} = 'anoise';
+            json.Columns{end+size(QAjobs{frun}.nuisance.tnoise,2)} = 'tnoise';
+        else
+           error('unknown nuisance to clean resting state data') 
+        end
+        save(QAjobs{frun}.design,'design','-ascii'); clear design
+        jsonwrite([QAjobs{frun}.design(1:end-4) '.json'],json); clear json
     end
     
     if ~isfield(subject.func_qa{frun},'FramewiseDisplacement') && isfield(QAjobs{frun},'FD')
@@ -216,7 +235,8 @@ if strcmp(options.overwrite_data,'on') || ...
         subject.func{1} = VfMRI(1).fname;
         spmup_timeseriesplot(VfMRI(1).fname, ...
             subject.tissues{1}, subject.tissues{2}, subject.tissues{3}, ...
-            'motion','on','nuisances','on','correlation','off','figure','save');
+            'motion','on','nuisances','on','correlation','off',...
+            'clean','off','figure','save');
         
         if strcmpi(options.keep_data,'off')
             rmdir(Statspath,'s');
@@ -227,7 +247,7 @@ if strcmp(options.overwrite_data,'on') || ...
                 movefile(Statspath,fullfile(fileparts(Statspath),'GLMdenoise'));
             end
         end
-        clear matlabbatch; resting_state = 'done';
+        clear matlabbatch; resting_state = 'done'; %#ok<NASGU>
     else
         subject.stats = spm_jobman('run',matlabbatch); clear matlabbatch;
     end
