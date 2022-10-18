@@ -1,4 +1,4 @@
-function timeseries = spmup_extract(fmridata,graymatter,atlas,LowPass,FreqSampling)
+function timeseries = spmup_extract(fmridata,graymatter,atlas,varargin)
 
 % routine to extract timeseries data as per atlas
 %
@@ -127,6 +127,11 @@ if exist(fullfile(fileparts(Vfmri(1).fname), ['r' atlas_filename ext]),'file')
 end
 
 %% possibly low-pass filter data now
+if nargin == 4
+    lowpass = varargin{4};
+    FreqSampling = varargin{5};
+end
+
 if exist('lowpass','var')
     for r = length(labels):-1:1
         timeseries{r} = lowpass(timeseries{r},LowPass,FreqSampling);
