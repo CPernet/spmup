@@ -1,13 +1,23 @@
-function timeseries = spmup_extract(fmridata,gaymatter,atlas)
+function timeseries = spmup_extract(fmridata,graymatter,atlas,LowPass,FreqSampling)
 
 % routine to extract timeseries data as per atlas
 %
 % FORMAT timeseries = spmup_extract(fmridata,gaymatter,atlas)
+%        timeseries = spmup_extract(fmridata,gaymatter,atlas,LowPass,FreqSampling)
 %
-% INPUT
+% INPUT fmridata file name of the fMRI time series volume m
+%       gaymatter file name of a graymatter mask to use (must be same dimension as fMRI)
+%       atlas filenale of an atlas to use (will be resampled if different size)
+%       Optional LowPass: the bandpass boundary,FreqSampling = 1/TR 
+%                if those parameters are guven, the matlab 'lowpass'
+%                function is applied on extracted time series
 %
 % OUTPUT timeseries is a cell array of voxels for each ROI of the atlas intersecting
-%                   with gray matter, dimensionis X voxels * Y volumes
+%                   with gray matter, dimension is X voxels * Y volumes
+%
+%        from there get correlations, means, etc, as needed, for instance:
+%        avg = cellfun(@(x) mean(x), timeseries, 'UniformOutput', false)
+%        con = corr(cell2mat(timeseries)');
 %
 % Cyril Pernet 
 % --------------------------
@@ -24,13 +34,13 @@ if nargin == 0
         fmridata = fmridata(1:length(fmridata) - 2); % in case picked 4D put left ,1
     end
     
-    [cn1, sts] = spm_select(1, 'image', 'Select grey matter tissue image');
+    [graymatter, sts] = spm_select(1, 'image', 'Select grey matter tissue image');
     if sts == 0
         disp('selection aborted');
         return
     end
     
-    [cn2, sts] = spm_select(1, 'image', 'Select atlas image image');
+    [atlas, sts] = spm_select(1, 'image', 'Select atlas image image');
     if sts == 0
         disp('selection aborted');
         return
@@ -58,43 +68,68 @@ else % not a cell array
     Vfmri = spm_vol(fmridata(1, :));
 end
 
-filepath = fileparts(Vfmri(1).fname);
 disp   ('------------------------------')
-fprintf(' running spmup_extract on %s\n',Vfmri(1).fname)
+fprintf(' running spmup_extract on \n%s\n',Vfmri(1).fname)
 disp   ('------------------------------')
 
 %% deal with the masks
-if iscell(cn1)
-    cn1 = cell2mat(cn1);
+if iscell(graymatter)
+    graymatter = cell2mat(graymatter);
 end
 
-greymatter = spm_vol(cn1);
-if any(greymatter.dim ~= Vfmri(1).dim)
+graymatter = spm_vol(graymatter);
+if any(graymatter.dim ~= Vfmri(1).dim)
     error('Dimension issue between data and grey matter');
 end
 
-c1 = spm_read_vols(spm_vol(greymatter));
-if min(c1(:)) < 0.5
-    warning('the grey matter mask has values as low as %g, you may consider thresholding it',min(c1(:)))
+graymatter = spm_read_vols(spm_vol(graymatter));
+if min(graymatter(graymatter~=0)) < 0.5
+    warning('the grey matter mask has values as low as %g, you may consider thresholding it',min(graymatter(graymatter~=0)))
 end
 
-if iscell(cn2)
-    cn2 = cell2mat(cn2);
+if iscell(atlas)
+    atlas = cell2mat(atlas);
 end
 
-if any(cn2.dim ~= Vfmri(1).dim)
+atlas = spm_vol(atlas);
+if any(atlas.dim ~= Vfmri(1).dim)
     warning('Dimension issue between data and atlas - interpolating the atlas');
     
     clear matlabbatch;
     matlabbatch{1}.spm.util.bbox.image = {Vfmri(1).fname};
     matlabbatch{1}.spm.util.bbox.bbdef.fov = 'fv';
     bb = spm_jobman('run', matlabbatch);
-    copyfile(cn2.fname,fullfile(fileparts(Vfmri(1).fname), atlas_filename));
-    roi = fullfile(fileparts(Vfmri(1).fname), atlas_filename);
-    Vroi = spm_vol(cell2mat( ...
+    [~,atlas_filename,ext] = fileparts(atlas.fname);
+    copyfile(atlas.fname,fullfile(fileparts(Vfmri(1).fname), [atlas_filename ext]));
+    roi = fullfile(fileparts(Vfmri(1).fname), [atlas_filename ext]);
+    atlas = spm_vol(cell2mat( ...
         spmup_resize(roi, bb{1}.bb, ...
         abs(diag(Vfmri(1).mat(1:3, 1:3)))')));
+    delete(roi)
 end
-atlas = spm_read_vols(spm_vol(c2));
+atlas = spm_read_vols(atlas);
 
+labels = unique(uint8(atlas(uint8(atlas)~=0)));
+warning('%g labels found, returning a cell array of the same size',length(labels));
+timeseries = cell(length(labels),1);
+
+for r = length(labels):-1:1
+    [x, y, z]                        = ind2sub(size(atlas), intersect(find(atlas == r), find(graymatter)));
+    tmp                              = spm_get_data(Vfmri, [x y z]')';
+    tmp(find(sum(isnan(tmp), 2)), :) = []; %#ok<FNDSB> % removes rows of NaN;
+    tmp(sum(tmp, 2) == 0, :)         = []; % remove 0
+    timeseries{r}                    = tmp;
+    clear tmp
+end
+
+if exist(fullfile(fileparts(Vfmri(1).fname), ['r' atlas_filename ext]),'file')
+    delete(fullfile(fileparts(Vfmri(1).fname), ['r' atlas_filename ext]))
+end
+
+%% possibly low-pass filter data now
+if exist('lowpass','var')
+    for r = length(labels):-1:1
+        timeseries{r} = lowpass(timeseries{r},LowPass,FreqSampling);
+    end
+end
 
