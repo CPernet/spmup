@@ -199,7 +199,7 @@ elseif get_mask == 0 && strcmp(flags.auto_mask,'off')
     end
 else
     disp('generating a mask')
-    Mask = spmup_auto_mask(V());
+    Mask = spmup_auto_mask(V);
 end
 
 %% now do the despiking
