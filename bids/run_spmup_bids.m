@@ -169,7 +169,7 @@ for task = 1:Ntask
                     subjects{s}.stats{session}  = subject_sess.stats;
                 end
                 if isfield(subject_sess,'boostedcontrast')
-                    subjects{s}.boostedcontrast = subject.boostedcontrast;
+                    subjects{s}.boostedcontrast = subject_sess.boostedcontrast;
                 end
                 
                 clear run_index event_index subject_sess
