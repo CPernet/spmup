@@ -89,7 +89,7 @@ for task = 1:Ntask
         sess_anat   = size(subjects{s}.anat,1);
         sess_names  = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
         if isempty(sess_names)
-            sess_names = '1';
+            sess_names = {'1'};
         end
         
         for session = 1:sess_func
