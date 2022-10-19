@@ -88,6 +88,9 @@ for task = 1:Ntask
         sess_func   = size(subjects{s}.func,1);
         sess_anat   = size(subjects{s}.anat,1);
         sess_names  = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
+        if isempty(sess_names)
+            sess_names = '1';
+        end
         
         for session = 1:sess_func
             
@@ -187,38 +190,26 @@ for task = 1:Ntask
     end
     
     %% save and report QC
-%     for session = 1:size(subjects.anat_qa,2)
-%         
-%         
-%         AnatQA = table(cellfun(@(x) x.anat_qa{session}.SNR, subjects)',...
-%             cellfun(@(x) x.anat_qa{session}.CNR, subjects)',...
-%             cellfun(@(x) x.anat_qa{session}.FBER, subjects)',...
-%             cellfun(@(x) x.anat_qa{session}.EFC, subjects)',...
-%             'VariableNames',{'SNR','CNR','FBER','EFC'});
-%         AnatQA.Properties.Description = 'spmup AnatQC';
-%         writetable(AnatQA,[options.outdir filesep 'AnatQC_task-' options.task{task} '_session-' sess_names{session} '.tsv'],...
-%             'Delimiter','\t','FileType','text')
-%         spmup_plotqc(AnatQA,'new')
-%         
-%         for run = 1:size(subjects{1}.func_qa{session},1)
-%             fMRIQA = table(cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.GM, subjects)',...
-%                 cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.WM, subjects)',...
-%                 cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.CSF, subjects)',...
-%                 cellfun(@(x) x.func_qa{session}{run}.preproc_tSNR.average, subjects)',...
-%                 'VariableNames',{['tSNR GM run ' num2str(run)],['tSNR WM run ' num2str(run)],...
-%                 ['tSNR CSF run ' num2str(run)],['tSNR average run ' num2str(run)]});
-%             fMRIQA.Properties.Description = 'spmup tSNR';
-%             if size(subjects{1}.func_qa{session},1) == 1
-%                 writetable(AnatQA,[options.outdir filesep 'fMRIQC_task-' options.task{task} '_session-' sess_names{session}  '.tsv'],...
-%                     'Delimiter','\t','FileType','text')
-%             else
-%                 writetable(AnatQA,[options.outdir filesep 'fMRIQC_task-' options.task{task} '_session-' sess_names{session}  '_run-' num2str(run) '.tsv'],...
-%                     'Delimiter','\t','FileType','text')
-%             end
-%             spmup_plotqc(fMRIQA,'new')
-%         end
-%         
-%     end
+    table_name  = spmup_BIDS_QCtables(subjects, 'anat');
+    for t=1:size(table_name,2)
+        session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
+        destination = [options.outdir filesep 'AnatQC_session-' sess_names{session} '_task-' options.task{task} '.tsv'];
+        movefile(table_name{t},destination);
+    end
+    
+    table_name  = spmup_BIDS_QCtables(subjects, 'fMRI');
+    for t=1:size(table_name,2)
+        if isempty(strfind(table_name{t},'run'))
+            session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
+            destination = [options.outdir filesep 'fMRIQC_session-' sess_names{session} '_task-' options.task{task} '.tsv'];
+        else
+            run         = table_name{t}(strfind(table_name{t},'run')+4:end-4);
+            session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:strfind(table_name{t},'run')-2));
+            destination = [options.outdir filesep 'fMRIQC_session-' sess_names{session} '_task-' options.task{task} '_run-' run '.tsv'];
+       end
+        movefile(table_name{t},destination);
+    end
+    
     disp('---------------------------------------')
     fprintf('task %s finished!\n',options.task{task})
     disp('---------------------------------------')
@@ -241,5 +232,3 @@ else
         opt(s) = options; % .VDM needs updated if empty anyway
     end
 end
-
-
