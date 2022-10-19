@@ -14,9 +14,9 @@ There is an automated pipeline that makes the most of SPMUP. Assuming your data 
 BIDS_dir        = 'mybidsdatasetpath';
 options         = spmup_getoptions(BIDS_dir);
 options.Ncores  = N; % set how many cores to use or don't and it uses N-1;
-options.anat    = {'T1w','T2w'}; % depends what you have, used for multisprectral segmentation 
+options.anat    = {'T1w','T2w'}; % depends what you have, used for multispectral segmentation 
 [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options);
-system(['chmod -Rf 755 ' options.outdir]) % on servers you often need to do that as matlab screw up permissions
+system(['chmod -Rf 755 ' options.outdir]) % on servers you often need to do that as matlab screws up permissions
 [subjects,opt]  = run_spmup_bids(BIDS,subjects,options); % that's the magic bit
 ```
 
