@@ -12,12 +12,10 @@ addpath(fullfile(location, 'adaptative_threshold'), ...
         fullfile(location, 'QA'), ...
         fullfile(location, 'utilities'));
 
-
 BIDS_dir = fullfile(pwd, 'ds000117');
 
 %%
 options = spmup_getoptions(BIDS_dir);
-
 
 % set how many cores to use or don't and it uses N-1;
 options.Ncores = 6;
@@ -27,7 +25,6 @@ options.anat = {'T1w'};
 options.task = {'facerecognition'};
 options.subjects = {'sub-01', 'sub-02', 'sub-03'};
 options.outdir = fullfile(options.outdir, 'spmup');
-
 
 [BIDS, subjects] = spmup_BIDS_unpack(BIDS_dir, options);
 
