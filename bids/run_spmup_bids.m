@@ -88,9 +88,6 @@ for task = 1:Ntask
         sess_func   = size(subjects{s}.func,1);
         sess_anat   = size(subjects{s}.anat,1);
         sess_names  = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
-        if isempty(sess_names)
-            sess_names = '1';
-        end
         
         for session = 1:sess_func
             
@@ -192,21 +189,33 @@ for task = 1:Ntask
     %% save and report QC
     table_name  = spmup_BIDS_QCtables(subjects, 'anat');
     for t=1:size(table_name,2)
-        session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
-        destination = [options.outdir filesep 'AnatQC_session-' sess_names{session} '_task-' options.task{task} '.tsv'];
+        if isempty(sess_names)
+            destination = [options.outdir filesep 'AnatQC_task-' options.task{task} '.tsv'];
+        else
+            session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
+            destination = [options.outdir filesep 'AnatQC_session-' sess_names{session} '_task-' options.task{task} '.tsv'];
+        end
         movefile(table_name{t},destination);
     end
     
     table_name  = spmup_BIDS_QCtables(subjects, 'fMRI');
     for t=1:size(table_name,2)
         if isempty(strfind(table_name{t},'run'))
-            session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
-            destination = [options.outdir filesep 'fMRIQC_session-' sess_names{session} '_task-' options.task{task} '.tsv'];
+            if isempty(sess_names)
+                destination = [options.outdir filesep 'fMRIQC_task-' options.task{task} '.tsv'];
+            else
+                session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
+                destination = [options.outdir filesep 'fMRIQC_session-' sess_names{session} '_task-' options.task{task} '.tsv'];
+            end
         else
             run         = table_name{t}(strfind(table_name{t},'run')+4:end-4);
-            session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:strfind(table_name{t},'run')-2));
-            destination = [options.outdir filesep 'fMRIQC_session-' sess_names{session} '_task-' options.task{task} '_run-' run '.tsv'];
-       end
+            if isempty(sess_names)
+                destination = [options.outdir filesep 'fMRIQC_task-' options.task{task} '_run-' run '.tsv'];
+            else
+                session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:strfind(table_name{t},'run')-2));
+                destination = [options.outdir filesep 'fMRIQC_session-' sess_names{session} '_task-' options.task{task} '_run-' run '.tsv'];
+            end
+        end
         movefile(table_name{t},destination);
     end
     
