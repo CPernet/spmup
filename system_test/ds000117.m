@@ -24,7 +24,6 @@ options.Ncores = 6;
 options.anat = {'T1w'};
 options.task = {'facerecognition'};
 options.subjects = {'sub-01', 'sub-02', 'sub-03'};
-options.outdir = fullfile(options.outdir, 'spmup');
 
 [BIDS, subjects] = spmup_BIDS_unpack(BIDS_dir, options);
 
