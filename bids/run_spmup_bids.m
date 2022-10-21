@@ -115,13 +115,19 @@ for task = 1:Ntask
                     end
                     
                     % fmri
-                    [~,BIDS_name] = fileparts(run_ls{r}); % e.g. 'sub-53888_ses-02_acq-ep2d_task-rest_bold'
+                    % BIDS_name: % e.g. 'sub-53888_ses-02_acq-ep2d_task-rest_bold'
+                    [~,BIDS_name, ext] = fileparts(run_ls{r}); 
+                    if strcmp(ext, '.gz')
+                        [~,BIDS_name] = fileparts(BIDS_name);
+                    end
                     % sub_names : e.g. {'sub-53888_ses-02_acq-ep2d_task-faces_bold'}    {'sub-53888_ses-02_acq-ep2d_task-rest_bold'}
                     tmp = subjects{s}.func(session,:)';
                     for f = numel(tmp):-1:1
                         [~,sub_names{f,1}] = fileparts(tmp{f});
                     end
-                    run_index     = find(strcmpi(sub_names,BIDS_name)); % match BIDS_name with the right run in the subjects structure
+                    
+                    % match BIDS_name with the right run in the subjects structure
+                    run_index     = find(strcmpi(sub_names,BIDS_name)); 
                     if isempty(run_index) % because shit happens
                         try
                             for subr = 1:size(sub_names,2)
