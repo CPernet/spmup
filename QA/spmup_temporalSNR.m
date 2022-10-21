@@ -237,7 +237,8 @@ if sum(isnan(data(:))) ~= numel(data) && stdBackground ~= 0 && ...
     for z=1:floor(V(1).dim(3)./16)+1:V(1).dim(3)-1
         subplot(4,9,figindex(index));
         imagesc((squeeze(SNRimage(:,:,z))'));
-        index = index+1; colormap(cubehelix(32,[1.15,0.1,4,1], [0,1], [0,0.85]))
+        index = index+1; 
+        % FIXME colormap(cubehelix(32,[1.15,0.1,4,1], [0,1], [0,0.85]))
         try caxis([mymin, nanmedian(data)+3*iqr(data)]); end
         set(gca,'XtickLabel',[],'YtickLabel',[])
         xlabel(['slice ' num2str(z)]);
@@ -361,7 +362,8 @@ if strcmpi(snr0,'on') && stdBackground ~= 0
             imagesc(flipud(R)); if index ==2; title('SNR0/tSNR image'); end
             try caxis([min(R(:)), max(R(:))]); end
             set(gca,'XtickLabel',[],'YtickLabel',[]); xlabel(['slice ' num2str(z)]);
-            index = index+1; colormap(cubehelix(32,[3,1.9,1.5,1], [0,1], [0.2,0.8]))
+            index = index+1; 
+            % FIXME colormap(cubehelix(32,[3,1.9,1.5,1], [0,1], [0.2,0.8]))
         end
         drawnow
         if exist(fullfile(filepath,'spmup_QC.ps'),'file')
