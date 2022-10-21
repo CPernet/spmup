@@ -135,7 +135,7 @@ if strcmp(options.overwrite_data,'on') || ...
     for frun = size(subject.func,1):-1:1
         if ~contains(subject.func{frun},'task-rest','IgnoreCase',true)
             
-            events = readtable(subject.event{frun},'FileType','delimitedtext');
+            events = readtable(subject.event{frun},'Delimiter','\t');
             if contains('stim_type',events.Properties.VariableNames)
                 cond = unique(events.stim_type);
             elseif contains('trial_type',events.Properties.VariableNames)

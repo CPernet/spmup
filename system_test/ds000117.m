@@ -23,7 +23,7 @@ options.Ncores = 6;
 % depends what you have, used for multispectral segmentation
 options.anat = {'T1w'};
 options.task = {'facerecognition'};
-options.subjects = {'sub-01', 'sub-02', 'sub-03'};
+options.subjects = {'sub-01', 'sub-02'};
 
 [BIDS, subjects] = spmup_BIDS_unpack(BIDS_dir, options);
 
