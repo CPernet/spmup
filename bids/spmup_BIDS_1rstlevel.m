@@ -97,7 +97,7 @@ for frun = size(subject.func, 1):-1:1
            error('unknown nuisance to clean resting state data') 
         end
         save(QAjobs{frun}.design,'design','-ascii'); clear design
-        jsonwrite([QAjobs{frun}.design(1:end-4) '.json'],json); clear json
+        spm_jsonwrite([QAjobs{frun}.design(1:end-4) '.json'],json,opts); clear json
     end
     
     if ~isfield(subject.func_qa{frun},'FramewiseDisplacement') && isfield(QAjobs{frun},'FD')
