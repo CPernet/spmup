@@ -1,0 +1,66 @@
+name: system tests with matlab
+
+# Uses the cron schedule for github actions
+#
+# https://docs.github.com/en/free-pro-team@latest/actions/reference/events-that-trigger-workflows#scheduled-events
+#
+# ┌───────────── minute (0 - 59)
+# │ ┌───────────── hour (0 - 23)
+# │ │ ┌───────────── day of the month (1 - 31)
+# │ │ │ ┌───────────── month (1 - 12 or JAN-DEC)
+# │ │ │ │ ┌───────────── day of the week (0 - 6 or SUN-SAT)
+# │ │ │ │ │
+# │ │ │ │ │
+# │ │ │ │ │
+# * * * * *
+
+on:
+
+  push:
+    branches:
+      - master
+    paths:
+      - '**.m'
+      - '.github/workflows/*system*'
+
+  pull_request:
+    branches:
+      - master
+    paths:
+      - '**.m'
+      - '.github/workflows/*system*'
+
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+
+  system_tests_matlab:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+
+      - name: Install MATLAB
+        uses: matlab-actions/setup-matlab@v1.2.1
+        with:
+          # MATLAB release to set up R2020a
+          release: R2020a
+
+      - name: Clone spmup
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Install SPM abd bids-matlab
+        run: |
+          git clone --depth 1 https://github.com/spm/spm12.git 
+          cd system_test
+          git clone --branch dev --detph 1 https://github.com/bids-standard/bids-matlab.git
+
+      - name: Run facerep
+        uses: matlab-actions/run-command@v1.1.0
+        with:
+          command: cd(fullfile(getenv('GITHUB_WORKSPACE'), '.github', 'workflows')); run system_tests_facerep;

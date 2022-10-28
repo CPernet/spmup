@@ -17,9 +17,10 @@ addpath(fullfile(location, 'adaptative_threshold'), ...
 bids_matlab_path = which('bids.layout');
 if isempty(bids_matlab_path)
     if ~isfolder(fullfile(pwd, 'bids-matlab)'))
-        system('git clone --branch dev https://github.com/bids-standard/bids-matlab.git');
+        system('git clone --branch dev --detph 1 https://github.com/bids-standard/bids-matlab.git');
     end
     bids_matlab_path = fullfile(pwd, 'bids-matlab');
+    addpath(bids_matlab_path);
 else
     bids_matlab_path = fileparts(fileparts(bids_matlab_path));
 end
@@ -38,6 +39,8 @@ BIDS_dir = convert_facerep_ds(fullfile(pwd, 'facerep', 'source'), ...
                               fullfile(pwd, 'facerep', 'raw'));
 
 %%
+BIDS_dir = fullfile(pwd, 'facerep', 'raw');
+
 options = spmup_getoptions(BIDS_dir);
 
 % set how many cores to use or don't and it uses N-1;
