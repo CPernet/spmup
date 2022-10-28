@@ -58,11 +58,11 @@ if ismember('Parallel Computing Toolbox', {addons.Name}')
                 parpool(N);
             catch
                 disp(['Parallel computing could not be set up.', ...
-                      'Nothing to worry about (except slower computation in some cases)']);
+                      ' Nothing to worry about (except slower computation in some cases)']);
             end
         end
     end
 else
     disp(['Parallel computing could not be set up.', ...
-          'Nothing to worry about (except slower computation in some cases)']);
+          ' Nothing to worry about (except slower computation in some cases)']);
 end

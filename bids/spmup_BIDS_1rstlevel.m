@@ -275,9 +275,17 @@ if ~exist('resting_state','var')
             
             SPM        = load([Statspath filesep 'SPM.mat']);
             SPM        = SPM.SPM;
-            otherreg   = arrayfun(@(x) matches(x.name ,"Sn(" + digitsPattern + ") R" + digitsPattern), SPM.xX, 'UniformOutput', false);
-            constant   = arrayfun(@(x) matches(x.name ,"Sn(" + digitsPattern + ") constant"), SPM.xX, 'UniformOutput', false);
-            conditions = find((cell2mat(constant)==0).*(cell2mat(otherreg)==0));
+            
+            pattern =  'Sn\([0-9]*\) R[0-9]*';
+            otherreg   = ~cellfun('isempty', regexp(SPM.xX.name, pattern, 'match'));
+
+            pattern =  'Sn\([0-9]*\) constant*';
+            constant   = ~cellfun('isempty', regexp(SPM.xX.name, pattern, 'match'));
+
+            conditions = true(numel(SPM.xX.name), 1);
+            conditions(otherreg) = 0;
+            conditions(constant) = 0;
+            
             SPMnames   = unique(SPM.xX.name(conditions));
             for n=1:length(SPMnames)
                 SPMnames{n} = SPMnames{n}(strfind(SPMnames{n},' ')+1:end);
