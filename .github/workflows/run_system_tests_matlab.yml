@@ -61,4 +61,6 @@ jobs:
       - name: Run facerep
         uses: matlab-actions/run-command@v1.1.0
         with:
-          command: cd(fullfile(getenv('GITHUB_WORKSPACE'), '.github', 'workflows')); run system_tests_facerep;
+          command:  |
+            cd(fullfile(getenv('GITHUB_WORKSPACE'), '.github', 'workflows')); 
+            run system_tests_facerep;
