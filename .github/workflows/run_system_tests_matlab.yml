@@ -17,15 +17,13 @@ name: system tests with matlab
 on:
 
   push:
-    branches:
-      - master
+    branches: ["*"]
     paths:
       - '**.m'
       - '.github/workflows/*system*'
 
   pull_request:
-    branches:
-      - master
+    branches: ["*"]
     paths:
       - '**.m'
       - '.github/workflows/*system*'
