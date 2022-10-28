@@ -17,7 +17,7 @@ addpath(fullfile(location, 'adaptative_threshold'), ...
 bids_matlab_path = which('bids.layout');
 if isempty(bids_matlab_path)
     if ~isfolder(fullfile(pwd, 'bids-matlab)'))
-        system('git clone --branch dev --detph 1 https://github.com/bids-standard/bids-matlab.git');
+        system('git clone --branch dev --depth 1 https://github.com/bids-standard/bids-matlab.git');
     end
     bids_matlab_path = fullfile(pwd, 'bids-matlab');
     addpath(bids_matlab_path);
