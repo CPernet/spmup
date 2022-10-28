@@ -56,7 +56,7 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/spm/spm12.git 
           cd system_test
-          git clone --branch dev --detph 1 https://github.com/bids-standard/bids-matlab.git
+          git clone --branch dev --depth 1 https://github.com/bids-standard/bids-matlab.git
 
       - name: Run facerep
         uses: matlab-actions/run-command@v1.1.0

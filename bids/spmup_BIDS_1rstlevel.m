@@ -135,7 +135,11 @@ if strcmp(options.overwrite_data,'on') || ...
     for frun = size(subject.func,1):-1:1
         if ~contains(subject.func{frun},'task-rest','IgnoreCase',true)
             
-            events = readtable(subject.event{frun},'Delimiter','\t');
+            events = readtable(subject.event{frun}, ...
+                                'FileType', 'text', ...
+                                'Delimiter', '\t', ...
+                                'TreatAsEmpty', {'N/A','n/a'});
+            
             if contains('stim_type',events.Properties.VariableNames)
                 cond = unique(events.stim_type);
             elseif contains('trial_type',events.Properties.VariableNames)
@@ -148,7 +152,7 @@ if strcmp(options.overwrite_data,'on') || ...
                 end
             end
             N_cond = length(cond);
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {subject.func{frun}}; %#ok<CCAT1>
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {subject.func{frun}}; 
             for C = 1:N_cond
                 if contains('stim_type',events.Properties.VariableNames)
                     trial_index = cellfun(@(x) strcmp(cond{C},x), events.stim_type);
