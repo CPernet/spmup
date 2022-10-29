@@ -24,7 +24,7 @@ end
 if ischar(subjects)
     filepath = fileparts(subjects);
     subjects = load(subjects);
-    subjects = subjects.fieldnames(subjects);
+    subjects = subjects.subjects;
 else
     filepath = pwd;
 end
