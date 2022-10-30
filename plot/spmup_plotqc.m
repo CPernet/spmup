@@ -14,6 +14,10 @@ function spmup_plotqc(tablein,fighandle)
 % --------------------------
 %  Copyright (C) SPMUP Team 
 
+if spmup_check_matlab_version()
+    return
+end
+
 %% datain
 if nargin == 1
     fighandle = 'new';
