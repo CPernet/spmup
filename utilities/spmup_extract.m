@@ -2,8 +2,8 @@ function timeseries = spmup_extract(fmridata,graymatter,atlas,varargin)
 
 % routine to extract timeseries data as per atlas
 %
-% FORMAT timeseries = spmup_extract(fmridata,gaymatter,atlas)
-%        timeseries = spmup_extract(fmridata,gaymatter,atlas,LowPass,FreqSampling)
+% FORMAT timeseries = spmup_extract(fmridata,graymatter,atlas)
+%        timeseries = spmup_extract(fmridata,graymatter,atlas,LowPass,FreqSampling)
 %
 % INPUT fmridata file name of the fMRI time series volume m
 %       gaymatter file name of a graymatter mask to use (must be same dimension as fMRI)
@@ -16,7 +16,7 @@ function timeseries = spmup_extract(fmridata,graymatter,atlas,varargin)
 %                   with gray matter, dimension is X voxels * Y volumes
 %
 %        from there get correlations, means, etc, as needed, for instance:
-%        avg = cellfun(@(x) mean(x), timeseries, 'UniformOutput', false)
+%        avg = cell2mat(cellfun(@(x) mean(x), timeseries, 'UniformOutput',false))
 %        con = corr(cell2mat(timeseries)');
 %
 % Cyril Pernet 
