@@ -50,7 +50,7 @@ if isempty(surface_file)
         davg = 50; % we give it a default value if anything fails
     else
         spm_surf(files, 2);
-        surface_file = spm_select('FPList', spath, '.*\.surf\.gii$');
+        surface_file = spm_select('FPList', path, '.*\.surf\.gii$');
     end    
 end
 
