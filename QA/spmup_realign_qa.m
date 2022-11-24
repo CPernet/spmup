@@ -141,10 +141,14 @@ findex              = 1; % index for the new_files variables
 [filepath,filename] = fileparts(V(1).fname);
 motion_file         = dir(fullfile(filepath,'rp*.txt'));
 if size(motion_file,1)>1
-    motion_file = motion_file(arrayfun(@(x) contains(x.name,filename), motion_file)).name;
-    motion_file = fullfile(filepath,motion_file);
+    % remove eventual prefix in case we need to match 
+    % the realignement parameters with a realigned file
+    % that was prefixed
+    unprefixed_filename = filename(3:end);
+    motion_file = motion_file(arrayfun(@(x) contains(x.name, unprefixed_filename), motion_file)).name;
+    motion_file = fullfile(filepath, motion_file);
 else
-    motion_file = fullfile(filepath,motion_file.name);
+    motion_file = fullfile(filepath, motion_file.name);
 end
 
 if strcmpi(FramewiseDisplacement,'on')
