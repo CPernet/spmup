@@ -22,7 +22,7 @@ if evalin( 'base', 'exist(''options'',''var'') == 1' )
 end
 
 addons = ver;
-if any(any(contains(struct2cell(addons), 'Parallel Computing Toolbox')))
+if any(ismember('Parallel Computing Toolbox', {addons.Name}))
     p = gcp('nocreate');
     if isempty(p) % i.e. the parallel toolbox is not already on
         if isempty(N)
