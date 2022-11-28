@@ -291,7 +291,11 @@ if isfield(subject, 'fieldmap') && strcmpi(options.fmap,'on')
         % index which fieldmap goes to which bold run and vice versa
         if length(subject.fieldmap) == 1 % 1 field map for all
             if isfield(subject.fieldmap(ifmap).metadata,'IntendedFor')
-                [~, filename]                                      = spm_fileparts(subject.fieldmap(ifmap).metadata.IntendedFor(ifmap));
+                file_to_parse = subject.fieldmap(ifmap).metadata.IntendedFor(ifmap);
+                if iscell(file_to_parse)
+                    file_to_parse = file_to_parse{1};
+                end
+                [~, filename]                                      = spm_fileparts(file_to_parse);
                 which_func_file                                    = contains(subject.func, filename);
                 subject.fieldmap(ifmap).metadata.which_func(ifmap) = find(which_func_file); % to know which func files needs this fmap
                 subject.which_fmap(find(which_func_file))          = ifmap; % to know which fmap is needed by which func files
@@ -302,7 +306,11 @@ if isfield(subject, 'fieldmap') && strcmpi(options.fmap,'on')
             end
         else
             if isfield(subject.fieldmap(ifmap).metadata,'IntendedFor')
-                [~, filename]                                  = spm_fileparts(subject.fieldmap(ifmap).metadata.IntendedFor);
+                file_to_parse = subject.fieldmap(ifmap).metadata.IntendedFor(ifmap);
+                if iscell(file_to_parse)
+                    file_to_parse = file_to_parse{1};
+                end
+                [~, filename]                                      = spm_fileparts(file_to_parse);
                 which_func_file                                = contains(subject.func, filename);
                 subject.fieldmap(ifmap).metadata.which_func    = find(which_func_file);
                 subject.which_fmap(find(which_func_file))      = ifmap;

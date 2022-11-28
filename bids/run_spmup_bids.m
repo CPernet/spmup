@@ -88,6 +88,9 @@ for task = 1:Ntask
         sess_func   = size(subjects{s}.func,1);
         sess_anat   = size(subjects{s}.anat,1);
         sess_names  = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
+        if isempty(sess_names)
+            sess_names = {''};
+        end
         
         for session = 1:sess_func
             
@@ -115,9 +118,19 @@ for task = 1:Ntask
                     end
                     
                     % fmri
-                    [~,BIDS_name] = fileparts(run_ls{r}); % e.g. 'sub-53888_ses-02_acq-ep2d_task-rest_bold'
-                    [~,sub_names] = fileparts(subjects{s}.func(session,:)); % e.g. {'sub-53888_ses-02_acq-ep2d_task-faces_bold'}    {'sub-53888_ses-02_acq-ep2d_task-rest_bold'}
-                    run_index     = find(strcmpi(sub_names,BIDS_name)); % match BIDS_name with the right run in the subjects structure
+                    % BIDS_name: % e.g. 'sub-53888_ses-02_acq-ep2d_task-rest_bold'
+                    [~,BIDS_name, ext] = fileparts(run_ls{r}); 
+                    if strcmp(ext, '.gz')
+                        [~,BIDS_name] = fileparts(BIDS_name);
+                    end
+                    % sub_names : e.g. {'sub-53888_ses-02_acq-ep2d_task-faces_bold'}    {'sub-53888_ses-02_acq-ep2d_task-rest_bold'}
+                    tmp = subjects{s}.func(session,:)';
+                    for f = numel(tmp):-1:1
+                        [~,sub_names{f,1}] = fileparts(tmp{f});
+                    end
+                    
+                    % match BIDS_name with the right run in the subjects structure
+                    run_index     = find(strcmpi(sub_names,BIDS_name)); 
                     if isempty(run_index) % because shit happens
                         try
                             for subr = 1:size(sub_names,2)
@@ -139,7 +152,10 @@ for task = 1:Ntask
                 
                 subject_sess.func          = run_ls;
                 subject_sess.func_metadata = metadata;
-                subject_sess.fieldmap      = subjects{s}.fieldmap(session);
+                subject_sess.fieldmap      = {};
+                if isfield(subjects{s}, 'fieldmap')
+                    subject_sess.fieldmap  = subjects{s}.fieldmap(session);
+                end
                 if isfield(subjects{s},'event')
                     event_index            = contains(subjects{s}.event(session,:),opt(s).task);
                     subject_sess.event     = subjects{s}.event(session,event_index)';

@@ -14,6 +14,10 @@ function spmup_plotqc(tablein,fighandle)
 % --------------------------
 %  Copyright (C) SPMUP Team 
 
+if spmup_check_matlab_version()
+    return
+end
+
 %% datain
 if nargin == 1
     fighandle = 'new';
@@ -44,7 +48,7 @@ gp_dispersion = 0.25;
 grouping      = length(tablein.Properties.VariableNames);
 gp_index      = linspace(1,1+gp_dispersion*grouping,grouping);
 gp_index      = [gp_index max(gp_index)+0.5];
-color_scheme  = parula;
+color_scheme  = parula(256);
 color_scheme  = color_scheme(round(linspace(1,256,grouping+1)),:);
 
 tiledlayout('flow')

@@ -22,7 +22,7 @@ if evalin( 'base', 'exist(''options'',''var'') == 1' )
 end
 
 addons = ver;
-if any(strcmpi('Parallel Computing Toolbox',arrayfun(@(x) x.Name, addons, "UniformOutput",false)))
+if any(ismember('Parallel Computing Toolbox', {addons.Name}))
     p = gcp('nocreate');
     if isempty(p) % i.e. the parallel toolbox is not already on
         if isempty(N)
@@ -54,9 +54,15 @@ if any(strcmpi('Parallel Computing Toolbox',arrayfun(@(x) x.Name, addons, "Unifo
                 parpool(N-1);
             end
         else
-            parpool(N);
+            try
+                parpool(N);
+            catch
+                disp(['Parallel computing could not be set up.', ...
+                      ' Nothing to worry about (except slower computation in some cases)']);
+            end
         end
     end
 else
-    disp('Parallel toolbox not found - nothing to worry about (except slower computation in some cases)');
+    disp(['Parallel computing could not be set up.', ...
+          ' Nothing to worry about (except slower computation in some cases)']);
 end

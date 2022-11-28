@@ -135,7 +135,11 @@ if strcmp(options.overwrite_data,'on') || ...
     for frun = size(subject.func,1):-1:1
         if ~contains(subject.func{frun},'task-rest','IgnoreCase',true)
             
-            events = readtable(subject.event{frun},'FileType','delimitedtext');
+            events = readtable(subject.event{frun}, ...
+                                'FileType', 'text', ...
+                                'Delimiter', '\t', ...
+                                'TreatAsEmpty', {'N/A','n/a'});
+            
             if contains('stim_type',events.Properties.VariableNames)
                 cond = unique(events.stim_type);
             elseif contains('trial_type',events.Properties.VariableNames)
@@ -148,7 +152,7 @@ if strcmp(options.overwrite_data,'on') || ...
                 end
             end
             N_cond = length(cond);
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {subject.func{frun}}; %#ok<CCAT1>
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {subject.func{frun}}; 
             for C = 1:N_cond
                 if contains('stim_type',events.Properties.VariableNames)
                     trial_index = cellfun(@(x) strcmp(cond{C},x), events.stim_type);
@@ -271,9 +275,17 @@ if ~exist('resting_state','var')
             
             SPM        = load([Statspath filesep 'SPM.mat']);
             SPM        = SPM.SPM;
-            otherreg   = arrayfun(@(x) matches(x.name ,"Sn(" + digitsPattern + ") R" + digitsPattern), SPM.xX, 'UniformOutput', false);
-            constant   = arrayfun(@(x) matches(x.name ,"Sn(" + digitsPattern + ") constant"), SPM.xX, 'UniformOutput', false);
-            conditions = find((cell2mat(constant)==0).*(cell2mat(otherreg)==0));
+            
+            pattern =  'Sn\([0-9]*\) R[0-9]*';
+            otherreg   = ~cellfun('isempty', regexp(SPM.xX.name, pattern, 'match'));
+
+            pattern =  'Sn\([0-9]*\) constant*';
+            constant   = ~cellfun('isempty', regexp(SPM.xX.name, pattern, 'match'));
+
+            conditions = true(numel(SPM.xX.name), 1);
+            conditions(otherreg) = 0;
+            conditions(constant) = 0;
+            
             SPMnames   = unique(SPM.xX.name(conditions));
             for n=1:length(SPMnames)
                 SPMnames{n} = SPMnames{n}(strfind(SPMnames{n},' ')+1:end);
