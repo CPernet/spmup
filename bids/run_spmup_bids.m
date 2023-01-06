@@ -172,8 +172,11 @@ for task = 1:Ntask
                 for run = 1:size(subjects{s}.func,2)
                     [~,tmp] = fileparts(subjects{s}.func{session,run});
                     if contains(tmp,opt(s).task)
+                        current_run_task = tmp(strfind(tmp,'run-'):strfind(tmp,'_bold')-1);
                         for srun = 1:max(size(subject_sess.func))
-                            subjects{s}.func{session,run} = subject_sess.func{srun};
+                            if contains(subject_sess.func{srun},current_run_task)
+                                subjects{s}.func{session,run} = subject_sess.func{srun};
+                            end
                         end
                     end
                 end
@@ -189,14 +192,14 @@ for task = 1:Ntask
                 end
                 
                 clear run_index event_index subject_sess
+                save([options.outdir filesep 'spmup_subjects_task-' options.task{task} '.mat'],'subjects');
+                save([options.outdir filesep 'spmup_options_task-'  options.task{task} '.mat'],'opt');
             end
         end
         
         disp('---------------------------------------')
         fprintf('session %s finished!\n',sess_names{session})
         disp('---------------------------------------')
-        save([options.outdir filesep 'spmup_subjects_task-' options.task{task} '.mat'],'subjects');
-        save([options.outdir filesep 'spmup_options_task-'  options.task{task} '.mat'],'opt'); 
         
         %% reinitialize opt for the next session
         opt = get_subject_options(options,subjects);
