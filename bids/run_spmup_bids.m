@@ -80,6 +80,8 @@ opt = get_subject_options(options,subjects);
 
 %% process
 
+spmup_setparallel(options.Ncores)
+
 for task = 1:Ntask
     for s = 1:numel(subjects)
         if ~isempty(options.task)
