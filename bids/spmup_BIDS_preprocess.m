@@ -676,10 +676,10 @@ for frun = 1:size(subject.func,1)
     
     if strcmp(options.QC,'on')
         if exist('out','var')
-            if isfield(out{1}.sess(frun),'rfiles') % write realign images
-                realigned = out{1}.sess(frun).rfiles{1};
-            elseif isfield(out{1}.sess(frun),'uwrfiles') % write unwrap realign images
+            if isfield(out{1}.sess(frun),'uwrfiles') % write unwrap realign images
                 realigned = out{1}.sess(frun).uwrfiles{1};
+            elseif exist(cell2mat(out{1}.sess(frun).rfiles),'file') % write realign images
+                realigned = out{1}.sess(frun).rfiles{1};
             else
                 realigned = out{1}.sess(frun).cfiles{1}; % realign no writing (not needed = st files)
             end
