@@ -108,15 +108,20 @@ if strcmp(options.overwrite_data,'on') || ...
             Data = [Data ; options.VDM{v}];
         end
     end
-    RM = spmup_auto_reorient(Data,1);
-    disp(' Data reoriented');
+    
+    if ~RMexist
+        RM = spmup_auto_reorient(Data,1);
+        disp(' Data reoriented');
+    else
+        warning('options.overwrite_data is %s,\nbut data are already reoriented = skipping this step',options.overwrite_data)
+    end
     
     % update info about all those files
     func_index = 0;
     fmap_index = 0;
     for f=1:size(Data,1)
         [filepath,filename] = fileparts(Data{f});
-        if f==1
+        if f==1 && ~RMexist
             anatinfo.reoriented           = '(0,0,0) set with spmup_auto_reorient';
             anatinfo.reorientation_matrix = RM;
             spm_jsonwrite(fullfile(filepath,[filename(1:end-4) '_desc-preprocessed_anat.json']),anatinfo,opts)
@@ -836,8 +841,8 @@ for frun = size(subject.func,1):-1:1
     end
 end
 all_res(sum(all_res,2)==0,:) = [];
-[~,p]    = min(sum(all_res,2));
-norm_res = all_res(p,:);
+[~,p]                        = min(sum(all_res,2));
+norm_res                     = all_res(p,:);
 
 if strcmp(options.overwrite_data,'on') || ...
         (strcmp(options.overwrite_data,'off') && ~isfield(meta,'normalise'))
