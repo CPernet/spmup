@@ -146,19 +146,24 @@ if strcmp(options.overwrite_data,'on') || ...
                 warning('%s not find in events.tsv turning back to defaults trial_type',options.conditions)
                 if contains('trial_type',events.Properties.VariableNames)
                     cond = unique(events.trial_type);
+                    options.conditions = 'trial_type';
                     if size(cond,1)==1 && contains('event_type',events.Properties.VariableNames)
                         warning('number of unique condition found = 1, using stim_type instead') 
                         cond = unique(events.event_type);
+                        options.conditions = 'event_type';
                     elseif size(cond,1)==1 && contains('stim_type',events.Properties.VariableNames)
                         warning('number of unique condition found = 1, using stim_type instead') 
                         cond = unique(events.stim_type);
+                        options.conditions = 'stim_type';
                     end
                 elseif contains('event_type',events.Properties.VariableNames)
                     warning('trial_type not find in events.tsv using event_type instead') 
                     cond = unique(events.event_type);
+                    options.conditions = 'event_type';
                 elseif contains('stim_type',events.Properties.VariableNames)
                     warning('trial_type not find in events.tsv using stim_type instead') 
                     cond = unique(events.stim_type);
+                    options.conditions = 'stim_type';
                 end
             end
             % make sure no empty
@@ -176,11 +181,7 @@ if strcmp(options.overwrite_data,'on') || ...
             
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {subject.func{frun}}; 
             for C = 1:N_cond
-                if contains('stim_type',events.Properties.VariableNames)
-                    trial_index = cellfun(@(x) strcmp(cond{C},x), events.stim_type);
-                else
-                    trial_index = cellfun(@(x) strcmp(cond{C},x), events.trial_type);
-                end
+                trial_index = cellfun(@(x) strcmp(cond{C},x), events.(options.conditions));
                 onsets      = events.onset(trial_index);
                 durations   = events.duration(trial_index);
                 matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond(C).name     = cond{C};
