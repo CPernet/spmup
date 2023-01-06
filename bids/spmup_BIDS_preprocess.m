@@ -821,23 +821,33 @@ Normalized_class{3}     = [filepath filesep 'wc3' filename ext];
 for frun = size(subject.func,1):-1:1
     [filepath,filename,ext]  = fileparts(realigned_files{frun});
     Normalized_files{frun,1} = [filepath filesep 'w' filename ext];
-    hdr                      = spm_vol(realigned_files{frun});
-    norm_res                 = abs(round(diag(hdr(1).mat)));
-    norm_res(end)            = [];
-    if any(strcmpi(options.norm_res ,{'EPI','EPI-iso'})) && ~isfield(meta,'normalise')
-        if strcmpi(options.norm_res ,'EPI-iso') && length(unique(norm_res)) ~= 1 % i.e. it is not isotropic
-            if length(unique(norm_res)) == 3 % all difference, oh boy - round to smallest
-                all_res(frun,:) = repmat(min(unique(norm_res)),[3 1]);
-            else
-                iso = cell2mat(arrayfun(@(x) norm_res == x, unique(norm_res), 'UniformOutput', false)');
-                [~,position] = max(sum(iso)); % pick resolution that is square already
-                all_res(frun,:) = repmat(unique(norm_res(iso(:,position))),[3 1]);
+    if any(strcmpi(options.norm_res ,{'EPI','EPI-iso'}))
+        hdr                      = spm_vol(realigned_files{frun});
+        norm_res                 = abs(round(diag(hdr(1).mat)));
+        norm_res(end)            = [];
+        if ~isfield(meta,'normalise')
+            if strcmpi(options.norm_res ,'EPI-iso') && length(unique(norm_res)) ~= 1 % i.e. it is not isotropic
+                if length(unique(norm_res)) == 3 % all different, oh boy - round to smallest
+                    all_res(frun,:) = repmat(min(unique(norm_res)),[3 1]);
+                else
+                    iso = cell2mat(arrayfun(@(x) norm_res == x, unique(norm_res), 'UniformOutput', false)');
+                    [~,position] = max(sum(iso)); % pick resolution that is square already
+                    all_res(frun,:) = repmat(unique(norm_res(iso(:,position))),[3 1]);
+                end
+            else % EPI
+                all_res(frun,:) = norm_res;
             end
         else
-            all_res(frun,:) = norm_res;
+            all_res(frun,:) = meta.normalise.resolution;
         end
-    else
-        all_res(frun,:) = norm_res;
+    else % actual value requested
+        if ischar(options.norm_res)
+            options.norm_res = str2double(options.norm_res);
+        end
+        if length(options.norm_res) == 1
+            options.norm_res = repmat(options.norm_res,[1 3]);
+        end
+        all_res(frun,:) = options.norm_res;
     end
 end
 all_res(sum(all_res,2)==0,:) = [];
