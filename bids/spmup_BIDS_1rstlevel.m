@@ -146,11 +146,14 @@ if strcmp(options.overwrite_data,'on') || ...
                 cond = unique(events.trial_type);
             end
             
-            for n=1:length(cond)
-                if strcmpi(cond{n},'n/a')
-                    cond(n) = [];
+            % make sure no empty
+            rm_cond = zeros(1,length(cond));
+            for n=length(cond):-1:1
+                if strcmpi(cond{n},'n/a') || isempty(cond{n})
+                    rm_cond(n) = 1;
                 end
             end
+            cond(find(rm_cond)) = []; %#ok<FNDSB>
             N_cond = length(cond);
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {subject.func{frun}}; 
             for C = 1:N_cond
