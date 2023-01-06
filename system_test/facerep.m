@@ -49,7 +49,6 @@ try
             'verbose', true, ...
             'delete_previous', true);
     end
-    
     BIDS_dir = convert_facerep_ds(fullfile(pwd, 'facerep', 'source'), ...
         fullfile(pwd, 'facerep', 'raw'));
     
@@ -67,18 +66,11 @@ catch downloaderr
 end
 
 
-%%
-BIDS_dir = fullfile(pwd, 'facerep', 'raw');
+%% now run spmup on the face_rep data
 
-options = spmup_getoptions(BIDS_dir);
-
-% set how many cores to use or don't and it uses N-1;
-options.Ncores = 1;
-
-% depends what you have, used for multispectral segmentation
-options.anat = {'T1w'};
-options.task = {'facerepetition'};
-
+options          = spmup_getoptions(BIDS_dir);
+options.Ncores   = 1;% set how many cores to use or don't and it uses N-1;
+options.anat     = {'T1w'};
+options.task     = {'facerepetition'};
 [BIDS, subjects] = spmup_BIDS_unpack(BIDS_dir, options);
-
-[subjects, opt] = run_spmup_bids(BIDS, subjects, options);
+[subjects, opt]  = run_spmup_bids(BIDS, subjects, options);
