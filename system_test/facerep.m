@@ -1,7 +1,7 @@
 % test bids processing pipeline on SPM's face repetition single subject dataset
 
 %% update path
-local_test_dir = '/indirect/data1/cpernet/';
+local_test_dir = '';
 
 % in case spmup was not added to the path
 location = fullfile(pwd, '..');
