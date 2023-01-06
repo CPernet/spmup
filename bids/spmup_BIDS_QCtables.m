@@ -52,7 +52,9 @@ switch lower(type)
                 table_name{session} = [filepath filesep 'AnatQC_session-' num2str(session) '.tsv']; %#ok<*AGROW>
                 writetable(AnatQA,table_name{session},...
                     'Delimiter','\t','FileType','text')
-                spmup_plotqc(AnatQA,'new')
+                if size(AnatQA,1) > 2
+                    spmup_plotqc(AnatQA,'new')
+                end
             end
         end
 
@@ -92,7 +94,9 @@ switch lower(type)
                     end
                     writetable(fMRIQA,table_name{table_index},'Delimiter','\t','FileType','text')
                     table_index = table_index+1;
-                    spmup_plotqc(fMRIQA,'new');
+                    if size(fMRIQA,1) > 2
+                        spmup_plotqc(fMRIQA,'new');
+                    end
                 end
             end
         end
