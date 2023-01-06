@@ -68,9 +68,10 @@ end
 
 %% now run spmup on the face_rep data
 
-options          = spmup_getoptions(BIDS_dir);
-options.Ncores   = 1;% set how many cores to use or don't and it uses N-1;
-options.anat     = {'T1w'};
-options.task     = {'facerepetition'};
-[BIDS, subjects] = spmup_BIDS_unpack(BIDS_dir, options);
-[subjects, opt]  = run_spmup_bids(BIDS, subjects, options);
+options            = spmup_getoptions(BIDS_dir);
+options.Ncores     = 1;% set how many cores to use or don't and it uses N-1;
+options.anat       = {'T1w'};
+options.task       = {'facerepetition'};
+options.conditions = 'face_type'; % that's the conditions to model
+[BIDS, subjects]   = spmup_BIDS_unpack(BIDS_dir, options);
+[subjects, opt]    = run_spmup_bids(BIDS, subjects, options);
