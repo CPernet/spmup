@@ -227,7 +227,7 @@ for task = 1:Ntask
     
     table_name  = spmup_BIDS_QCtables(subjects, 'fMRI');
     for t=1:size(table_name,2)
-        has_run = ~isempty(strfind(table_name{t},'run'))
+        has_run = ~isempty(strfind(table_name{t},'run'));
         if has_run
             run = table_name{t}(strfind(table_name{t},'run')+4:end-4);
         end
@@ -239,12 +239,15 @@ for task = 1:Ntask
             end
         end
 
-        destination = 'fMRIQC'
+        destination = 'fMRIQC';
         if has_session
+            sess_names{session}
             destination = [destination '_session-' sess_names{session}];
         end
+        options.task{task}
         destination = [destination '_task-' options.task{task}]; 
         if has_run
+            run
             destination = [destination '_run-' run];
         end
         destination = fullfile(options.outdir, [destination, '.tsv']);
