@@ -243,6 +243,9 @@ for task = 1:Ntask
                 destination = [options.outdir filesep 'fMRIQC_session-' sess_names{session} '_task-' options.task{task} '_run-' run '.tsv'];
             end
         end
+        fprintf('Moving QC results\n\tfrom:%s\n\tto:%s', table_name{t}, destination);
+        assert(exist(table_name{t}, 'file'));
+        assert(isdir(fileparts(destination)));
         movefile(table_name{t},destination);
     end
     
