@@ -208,15 +208,15 @@ for task = 1:Ntask
     end
     
     %% save and report QC
+    if iscell(sess_names)
+        has_session = ~isempty(sess_names{1});
+    else
+        has_session = ~isempty(sess_names);
+    end
     table_name  = spmup_BIDS_QCtables(subjects, 'anat');
     for t=1:size(table_name,2)
-        if iscell(sess_names)
-            test = isempty(sess_names{1});
-        else
-            test = isempty(sess_names);
-        end
         
-        if test
+        if has_session
             destination = [options.outdir filesep 'AnatQC_task-' options.task{task} '.tsv'];
         else
             session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
@@ -227,22 +227,27 @@ for task = 1:Ntask
     
     table_name  = spmup_BIDS_QCtables(subjects, 'fMRI');
     for t=1:size(table_name,2)
-        if isempty(strfind(table_name{t},'run'))
-            if test
-                destination = [options.outdir filesep 'fMRIQC_task-' options.task{task} '.tsv'];
+        has_run = ~isempty(strfind(table_name{t},'run'))
+        if has_run
+            run = table_name{t}(strfind(table_name{t},'run')+4:end-4);
+        end
+        if has_session
+            if ~has_run
+                session = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
             else
-                session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
-                destination = [options.outdir filesep 'fMRIQC_session-' sess_names{session} '_task-' options.task{task} '.tsv'];
-            end
-        else
-            run         = table_name{t}(strfind(table_name{t},'run')+4:end-4);
-            if test
-                destination = [options.outdir filesep 'fMRIQC_task-' options.task{task} '_run-' run '.tsv'];
-            else
-                session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:strfind(table_name{t},'run')-2));
-                destination = [options.outdir filesep 'fMRIQC_session-' sess_names{session} '_task-' options.task{task} '_run-' run '.tsv'];
+                session = str2double(table_name{t}(strfind(table_name{t},'session')+8:strfind(table_name{t},'run')-2));
             end
         end
+
+        destination = 'fMRIQC'
+        if has_session
+            destination = [destination '_session-' sess_names{session}];
+        end
+        destination = [destination '_task-' options.task{task}]; 
+        if has_run
+            destination = [destination '_run-' run];
+        end
+        destination = fullfile(options.outdir, [destination, '.tsv']);
         fprintf('\nMoving QC results\n\tfrom:%s\n\tto:%s', table_name{t}, destination);
         assert(exist(table_name{t}, 'file')==2);
         assert(isdir(fileparts(destination)));
