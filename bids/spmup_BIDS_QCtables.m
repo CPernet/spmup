@@ -52,7 +52,7 @@ switch lower(type)
                 table_name{session} = [filepath filesep 'AnatQC_session-' num2str(session) '.tsv']; %#ok<*AGROW>
                 writetable(AnatQA,table_name{session},...
                     'Delimiter','\t','FileType','text')
-                fprint('anat QC results saved at:\n\t%s:', table_name{session});
+                fprintf('anat QC results saved at:\n\t%s:', table_name{session});
                 if size(AnatQA,1) > 2
                     spmup_plotqc(AnatQA,'new')
                 end
@@ -94,7 +94,7 @@ switch lower(type)
                         table_name{table_index} = [filepath filesep 'fMRIQC_session-' num2str(session) '_run-' num2str(run) '.tsv'];
                     end
                     writetable(fMRIQA,table_name{table_index},'Delimiter','\t','FileType','text')
-                    fprint('func QC results saved at:\n\t%s:', table_name{table_index});
+                    fprintf('func QC results saved at:\n\t%s:', table_name{table_index});
                     table_index = table_index+1;
                     if size(fMRIQA,1) > 2
                         spmup_plotqc(fMRIQA,'new');
