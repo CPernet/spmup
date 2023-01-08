@@ -228,13 +228,13 @@ for task = 1:Ntask
         fprintf('\nMoving QC results\n\tfrom:%s\n\tto:%s', table_name{t}, destination);
         movefile(table_name{t},destination);
     end
+    fprintf('\n');
     
     table_name  = spmup_BIDS_QCtables(subjects, 'fMRI');
     for t=1:size(table_name,2)
         basename = spm_file(table_name{t}, 'basename');
         has_run = ~isempty(strfind(basename,'run')); %#ok<*STREMP>
         if has_run
-            table_name{t}
             run = table_name{t}(strfind(basename,'run')+4:end-4);
         end
         if has_session
@@ -247,13 +247,10 @@ for task = 1:Ntask
 
         destination = 'fMRIQC';
         if has_session
-            sess_names{session}
             destination = [destination '_session-' sess_names{session}]; %#ok<*AGROW>
         end
-        options.task{task}
         destination = [destination '_task-' options.task{task}]; 
         if has_run
-            run
             destination = [destination '_run-' run];
         end
         destination = fullfile(options.outdir, [destination, '.tsv']);
