@@ -182,6 +182,7 @@ for task = 1:Ntask
                         end
                     end
                 end
+                clear run
                 subjects{s}.motionfile{session} = subject_sess.motionfile;
                 subjects{s}.tissues{session}    = subject_sess.tissues;
                 subjects{s}.func_qa{session}    = subject_sess.func_qa;
@@ -217,7 +218,7 @@ for task = 1:Ntask
     table_name  = spmup_BIDS_QCtables(subjects, 'anat');
     for t=1:size(table_name,2)
         basename = spm_file(table_name{t}, 'basename');
-        if has_session
+        if ~has_session
             destination = 'AnatQC';
         else
             session     = str2double(basename(strfind(basename,'session')+8:end-4));
