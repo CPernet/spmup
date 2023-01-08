@@ -213,36 +213,41 @@ for task = 1:Ntask
     else
         has_session = ~isempty(sess_names);
     end
+    
     table_name  = spmup_BIDS_QCtables(subjects, 'anat');
     for t=1:size(table_name,2)
-        
+        basename = spm_file(table_name{t}, 'basename');
         if has_session
-            destination = [options.outdir filesep 'AnatQC_task-' options.task{task} '.tsv'];
+            destination = 'AnatQC';
         else
-            session     = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
-            destination = [options.outdir filesep 'AnatQC_session-' sess_names{session} '_task-' options.task{task} '.tsv'];
+            session     = str2double(basename(strfind(basename,'session')+8:end-4));
+            destination = ['AnatQC_session-' sess_names{session}];
         end
+        destination = fullfile(options.outdir, [destination, '_task-' options.task{task}, '.tsv']);
+        fprintf('\nMoving QC results\n\tfrom:%s\n\tto:%s', table_name{t}, destination);
         movefile(table_name{t},destination);
     end
     
     table_name  = spmup_BIDS_QCtables(subjects, 'fMRI');
     for t=1:size(table_name,2)
-        has_run = ~isempty(strfind(table_name{t},'run'));
+        basename = spm_file(table_name{t}, 'basename');
+        has_run = ~isempty(strfind(basename,'run')); %#ok<*STREMP>
         if has_run
-            run = table_name{t}(strfind(table_name{t},'run')+4:end-4);
+            table_name{t}
+            run = table_name{t}(strfind(basename,'run')+4:end-4);
         end
         if has_session
             if ~has_run
-                session = str2double(table_name{t}(strfind(table_name{t},'session')+8:end-4));
+                session = str2double(basename(strfind(basename,'session')+8:end-4));
             else
-                session = str2double(table_name{t}(strfind(table_name{t},'session')+8:strfind(table_name{t},'run')-2));
+                session = str2double(basename(strfind(basename,'session')+8:strfind(basename,'run')-2));
             end
         end
 
         destination = 'fMRIQC';
         if has_session
             sess_names{session}
-            destination = [destination '_session-' sess_names{session}];
+            destination = [destination '_session-' sess_names{session}]; %#ok<*AGROW>
         end
         options.task{task}
         destination = [destination '_task-' options.task{task}]; 
@@ -253,7 +258,7 @@ for task = 1:Ntask
         destination = fullfile(options.outdir, [destination, '.tsv']);
         fprintf('\nMoving QC results\n\tfrom:%s\n\tto:%s', table_name{t}, destination);
         assert(exist(table_name{t}, 'file')==2);
-        assert(isdir(fileparts(destination)));
+        assert(isdir(fileparts(destination))); %#ok<*ISDIR>
         movefile(table_name{t},destination);
     end
     

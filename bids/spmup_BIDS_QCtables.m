@@ -106,4 +106,4 @@ end
 
 % clean-up empty cells
 table_name(cellfun(@(x) isempty(x), table_name)) = [];
-
+fprintf('\n')
