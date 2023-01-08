@@ -101,7 +101,7 @@ for d = 1:grouping
     fillhandle = fill(xpoints,filled,color_scheme(d,:));
     set(fillhandle,'LineWidth',2,'EdgeColor',color_scheme(d,:),'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
 
-    title(tablein.Properties.VariableNames{d})
+    title(strrep(tablein.Properties.VariableNames{d},'_', ' '))
     cst = max(abs(diff(tmp))) * 0.1;
     plot_min = min(tmp)-cst;
     plot_max = max(tmp)+cst;
