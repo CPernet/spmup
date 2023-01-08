@@ -1,6 +1,6 @@
 function spmup_plotqc(tablein,fighandle)
 
-% routine to plot data with kernel density
+% routine to plot data with non parametric kernel density
 %
 % FORMAT spmup_plotqc(tablein,fighandle)
 %
@@ -109,13 +109,12 @@ for d = 1:grouping
 end
 end
 
-function [bc,K]= ASH(varargin)
+function [bc,K] = ASH(varargin)
 
-% Computes the density estimate of data using ASH 
-% - Average Shifted Histogram is taken from Martinez and Martinez - Comp
-% statistics handbook with Matlab.
+% Computes the kernel density estimate of data using ASH 
+% - Average Shifted Histogram is adapted from Martinez and Martinez - Comp statistics handbook with Matlab.
 %
-% FORMAT [bc,K]=rst_RASH(data,m)
+% FORMAT [bc,K]=rst_ASH(data,m)
 %
 % INPUT  data is a vector
 %        m is how many histograms to compute (Default = 100);
@@ -142,7 +141,7 @@ clear varargin
 
 % a typical problem is with data that have a small range like
 % probabilities, the meash is not of the right size or contains
-% to few bins - the silution here is simply to scale the data
+% to few bins - the solution here is simply to scale the data
 if range(data) <= 1
     data = data.*10;
     scale = 1;
@@ -152,40 +151,45 @@ end
 
 % Average Shifted Histogram
 % ----------------------------------
-h = 2.15*sqrt(var(data))*n^(-1/5);
-delta = h/m;
+h       = 2.15*sqrt(var(data))*n^(-1/5);
+delta   = h/m;
+
 % 1 make a mesh with size delta
-offset = min(diff(data))/2;
+offset  = min(diff(data))/2;
 if abs(offset) > 1
     offset = 0.5;
 end
-t0 = min(data) - offset;
-tf = max(data) + offset;
-nbin = ceil((tf-t0)/delta);
+t0      = min(data) - offset;
+tf      = max(data) + offset;
+nbin    = ceil((tf-t0)/delta);
 binedge = t0:delta:(t0+delta*nbin);
-out = find(binedge>tf);
+out     = find(binedge>tf);
 if out == 1
-    binedge(out) = tf;
+    binedge(out)        = tf;
 else
-    binedge(out(1)) = tf;
+    binedge(out(1))     = tf;
     binedge(out(2:end)) = [];
 end
+
 % 2 bin count
-nu = histc(data,binedge);
-nu = [zeros(1,m-1) nu' zeros(1,m-1)];
+nu      = histc(data,binedge);
+nu      = [zeros(1,m-1) nu' zeros(1,m-1)];
+
 % 3 Get the weight vector.
-kern = inline('(15/16)*(1-x.^2).^2');
-ind = (1-m):(m-1);
-den = sum(kern(ind/m));% Get the denominator.
-wm = m*(kern(ind/m))/den;% Create the weight vector.
+kern    = inline('(15/16)*(1-x.^2).^2');
+ind     = (1-m):(m-1);
+den     = sum(kern(ind/m));% Get the denominator.
+wm      = m*(kern(ind/m))/den;% Create the weight vector.
+
 % 4 Get the bin heights over smaller bins.
-ASH=zeros(1,nbin);
-for k=1:nbin
-    ind=k:(2*m+k-2);
-    ASH(k)=sum(wm.*nu(ind));
+ASH     = zeros(1,nbin);
+for k = 1:nbin
+    ind    = k:(2*m+k-2);
+    ASH(k) = sum(wm.*nu(ind));
 end
-K = ASH/(n*h);
-bc = t0+((1:nbin)-0.5)*delta;
+K       = ASH/(n*h);
+bc      = t0+((1:nbin)-0.5)*delta;
+
 if scale == 1
     bc = bc./10;
 end
