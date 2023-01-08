@@ -259,6 +259,7 @@ for task = 1:Ntask
         assert(isdir(fileparts(destination))); %#ok<*ISDIR>
         movefile(table_name{t},destination);
     end
+    fprintf('\n');    
     
     disp('---------------------------------------')
     fprintf('task %s finished!\n',options.task{task})
