@@ -1,7 +1,7 @@
 % test bids processing pipeline on SPM's face repetition single subject dataset
 
 %% update path
-local_test_dir = '';
+local_test_dir = '/indirect/data1/cpernet/';
 
 % in case spmup was not added to the path
 location = fullfile(pwd, '..');
@@ -68,6 +68,7 @@ end
 
 %% now run spmup on the face_rep data
 
+cd(BIDS_dir)
 options            = spmup_getoptions(BIDS_dir);
 options.Ncores     = 1;% set how many cores to use or don't and it uses N-1;
 options.anat       = {'T1w'};
