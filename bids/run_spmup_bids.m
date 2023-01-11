@@ -233,6 +233,7 @@ for task = 1:Ntask
     table_name  = spmup_BIDS_QCtables(subjects, 'fMRI');
     for t=1:size(table_name,2)
         basename = spm_file(table_name{t}, 'basename');
+        has_run = ~isempty(strfind(basename,'run'));
         if ~has_session && ~has_run
             destination = 'fMRIQC';
         else
