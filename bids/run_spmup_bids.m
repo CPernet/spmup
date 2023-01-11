@@ -221,45 +221,29 @@ for task = 1:Ntask
         if ~has_session
             destination = 'AnatQC';
         else
-            session     = str2double(basename(strfind(basename,'session')+8:end-4));
-            destination = ['AnatQC_session-' sess_names{session}];
+            destination = basename;
         end
         destination = fullfile(options.outdir, [destination, '_task-' options.task{task}, '.tsv']);
-        fprintf('\nMoving QC results\n\tfrom:%s\n\tto:%s', table_name{t}, destination);
-        movefile(table_name{t},destination);
+        % fprintf('\nMoving QC results\n\tfrom:%s\n\tto:%s\n', table_name{t}, destination);
+        if exist(table_name{t}, 'file') && isfolder(fileparts(destination))
+            movefile(table_name{t},destination);
+        end
     end
-    fprintf('\n');
     
     table_name  = spmup_BIDS_QCtables(subjects, 'fMRI');
     for t=1:size(table_name,2)
         basename = spm_file(table_name{t}, 'basename');
-        has_run = ~isempty(strfind(basename,'run')); %#ok<*STREMP>
-        if has_run
-            run = table_name{t}(strfind(basename,'run')+4:end-4);
+        if ~has_session && ~has_run
+            destination = 'fMRIQC';
+        else
+            destination = basename;
         end
-        if has_session
-            if ~has_run
-                session = str2double(basename(strfind(basename,'session')+8:end-4));
-            else
-                session = str2double(basename(strfind(basename,'session')+8:strfind(basename,'run')-2));
-            end
+        destination = fullfile(options.outdir, [destination '_task-' options.task{task} '.tsv']);
+        % fprintf('\nMoving QC results\n\tfrom:%s\n\tto:%s', table_name{t}, destination);
+        if exist(table_name{t}, 'file') && isfolder(fileparts(destination))
+            movefile(table_name{t},destination);
         end
-
-        destination = 'fMRIQC';
-        if has_session
-            destination = [destination '_session-' sess_names{session}]; %#ok<*AGROW>
-        end
-        destination = [destination '_task-' options.task{task}]; 
-        if has_run
-            destination = [destination '_run-' run];
-        end
-        destination = fullfile(options.outdir, [destination, '.tsv']);
-        fprintf('\nMoving QC results\n\tfrom:%s\n\tto:%s', table_name{t}, destination);
-        assert(exist(table_name{t}, 'file')==2);
-        assert(isdir(fileparts(destination))); %#ok<*ISDIR>
-        movefile(table_name{t},destination);
     end
-    fprintf('\n');    
     
     disp('---------------------------------------')
     fprintf('task %s finished!\n',options.task{task})
