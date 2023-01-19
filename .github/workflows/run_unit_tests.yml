@@ -53,8 +53,10 @@ jobs:
       with:
         release: R2020a
 
-    - name: Run tests
-      uses: matlab-actions/run-tests@v1
+    - name: Run unit tests
+      uses: matlab-actions/run-command@v1.1.2
       with:
-        select-by-folder: unit_test
+        command: |
+          cd(fullfile(getenv('GITHUB_WORKSPACE'), '.github', 'workflows')); |
+          run tests_matlab;
 
