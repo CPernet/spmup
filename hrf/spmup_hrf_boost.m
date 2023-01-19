@@ -354,7 +354,9 @@ if isfield(SPM,'xCon')
 end
 
 files_out{1} = newbeta;
-files_out{2} = newcon;
+if ~isempty(newcon)
+    files_out{2} = newcon;
+end
 
 cd(current)
 disp('------------------')

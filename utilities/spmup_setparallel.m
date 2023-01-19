@@ -54,11 +54,13 @@ if any(ismember('Parallel Computing Toolbox', {addons.Name}))
                 parpool(N-1);
             end
         else
-            try
-                parpool(N);
-            catch
-                disp(['Parallel computing could not be set up.', ...
-                      ' Nothing to worry about (except slower computation in some cases)']);
+            if N > 1
+                try
+                    parpool(N);
+                catch
+                    disp(['Parallel computing could not be set up.', ...
+                        ' Nothing to worry about (except slower computation in some cases)']);
+                end
             end
         end
     end

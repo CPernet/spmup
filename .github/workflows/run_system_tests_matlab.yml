@@ -36,6 +36,16 @@ jobs:
 
   system_tests_matlab:
 
+    strategy:
+      fail-fast: false
+      matrix:
+        matlab_version:
+          [
+            "R2020a",
+            "R2021a",
+            "R2022a",
+          ]
+
     runs-on: ubuntu-22.04
 
     steps:
@@ -44,7 +54,7 @@ jobs:
         uses: matlab-actions/setup-matlab@v1.2.1
         with:
           # MATLAB release to set up R2020a
-          release: R2020a
+          release: ${{ matrix.matlab_version }}
 
       - name: Clone spmup
         uses: actions/checkout@v3

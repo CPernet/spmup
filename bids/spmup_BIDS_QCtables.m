@@ -52,7 +52,10 @@ switch lower(type)
                 table_name{session} = [filepath filesep 'AnatQC_session-' num2str(session) '.tsv']; %#ok<*AGROW>
                 writetable(AnatQA,table_name{session},...
                     'Delimiter','\t','FileType','text')
-                spmup_plotqc(AnatQA,'new')
+                % fprintf('\nanat QC results saved at:\n\t%s:', table_name{session});
+                if size(AnatQA,1) > 2
+                    spmup_plotqc(AnatQA,'new')
+                end
             end
         end
 
@@ -91,8 +94,11 @@ switch lower(type)
                         table_name{table_index} = [filepath filesep 'fMRIQC_session-' num2str(session) '_run-' num2str(run) '.tsv'];
                     end
                     writetable(fMRIQA,table_name{table_index},'Delimiter','\t','FileType','text')
+                    % fprintf('\nfunc QC results saved at:\n\t%s:', table_name{table_index});
                     table_index = table_index+1;
-                    spmup_plotqc(fMRIQA,'new');
+                    if size(fMRIQA,1) > 2
+                        spmup_plotqc(fMRIQA,'new');
+                    end
                 end
             end
         end
@@ -100,4 +106,4 @@ end
 
 % clean-up empty cells
 table_name(cellfun(@(x) isempty(x), table_name)) = [];
-
+fprintf('\n')

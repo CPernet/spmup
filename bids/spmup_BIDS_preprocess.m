@@ -108,15 +108,20 @@ if strcmp(options.overwrite_data,'on') || ...
             Data = [Data ; options.VDM{v}];
         end
     end
-    RM = spmup_auto_reorient(Data,1);
-    disp(' Data reoriented');
+    
+    if ~RMexist
+        RM = spmup_auto_reorient(Data,1);
+        disp(' Data reoriented');
+    else
+        warning('options.overwrite_data is %s,\nbut data are already reoriented = skipping this step',options.overwrite_data)
+    end
     
     % update info about all those files
     func_index = 0;
     fmap_index = 0;
     for f=1:size(Data,1)
         [filepath,filename] = fileparts(Data{f});
-        if f==1
+        if f==1 && ~RMexist
             anatinfo.reoriented           = '(0,0,0) set with spmup_auto_reorient';
             anatinfo.reorientation_matrix = RM;
             spm_jsonwrite(fullfile(filepath,[filename(1:end-4) '_desc-preprocessed_anat.json']),anatinfo,opts)
@@ -671,10 +676,10 @@ for frun = 1:size(subject.func,1)
     
     if strcmp(options.QC,'on')
         if exist('out','var')
-            if isfield(out{1}.sess(frun),'rfiles') % write realign images
-                realigned = out{1}.sess(frun).rfiles{1};
-            elseif isfield(out{1}.sess(frun),'uwrfiles') % write unwrap realign images
+            if isfield(out{1}.sess(frun),'uwrfiles') % write unwrap realign images
                 realigned = out{1}.sess(frun).uwrfiles{1};
+            elseif exist(cell2mat(out{1}.sess(frun).rfiles),'file') % write realign images
+                realigned = out{1}.sess(frun).rfiles{1};
             else
                 realigned = out{1}.sess(frun).cfiles{1}; % realign no writing (not needed = st files)
             end
@@ -816,28 +821,38 @@ Normalized_class{3}     = [filepath filesep 'wc3' filename ext];
 for frun = size(subject.func,1):-1:1
     [filepath,filename,ext]  = fileparts(realigned_files{frun});
     Normalized_files{frun,1} = [filepath filesep 'w' filename ext];
-    hdr                      = spm_vol(realigned_files{frun});
-    norm_res                 = abs(round(diag(hdr(1).mat)));
-    norm_res(end)            = [];
-    if any(strcmpi(options.norm_res ,{'EPI','EPI-iso'})) && ~isfield(meta,'normalise')
-        if strcmpi(options.norm_res ,'EPI-iso') && length(unique(norm_res)) ~= 1 % i.e. it is not isotropic
-            if length(unique(norm_res)) == 3 % all difference, oh boy - round to smallest
-                all_res(frun,:) = repmat(min(unique(norm_res)),[3 1]);
-            else
-                iso = cell2mat(arrayfun(@(x) norm_res == x, unique(norm_res), 'UniformOutput', false)');
-                [~,position] = max(sum(iso)); % pick resolution that is square already
-                all_res(frun,:) = repmat(unique(norm_res(iso(:,position))),[3 1]);
+    if any(strcmpi(options.norm_res ,{'EPI','EPI-iso'}))
+        hdr                      = spm_vol(realigned_files{frun});
+        norm_res                 = abs(round(diag(hdr(1).mat)));
+        norm_res(end)            = [];
+        if ~isfield(meta,'normalise')
+            if strcmpi(options.norm_res ,'EPI-iso') && length(unique(norm_res)) ~= 1 % i.e. it is not isotropic
+                if length(unique(norm_res)) == 3 % all different, oh boy - round to smallest
+                    all_res(frun,:) = repmat(min(unique(norm_res)),[3 1]);
+                else
+                    iso = cell2mat(arrayfun(@(x) norm_res == x, unique(norm_res), 'UniformOutput', false)');
+                    [~,position] = max(sum(iso)); % pick resolution that is square already
+                    all_res(frun,:) = repmat(unique(norm_res(iso(:,position))),[3 1]);
+                end
+            else % EPI
+                all_res(frun,:) = norm_res;
             end
         else
-            all_res(frun,:) = norm_res;
+            all_res(frun,:) = meta.normalise.resolution;
         end
-    else
-        all_res(frun,:) = norm_res;
+    else % actual value requested
+        if ischar(options.norm_res)
+            options.norm_res = str2double(options.norm_res);
+        end
+        if length(options.norm_res) == 1
+            options.norm_res = repmat(options.norm_res,[1 3]);
+        end
+        all_res(frun,:) = options.norm_res;
     end
 end
 all_res(sum(all_res,2)==0,:) = [];
-[~,p]    = min(sum(all_res,2));
-norm_res = all_res(p,:);
+[~,p]                        = min(sum(all_res,2));
+norm_res                     = all_res(p,:);
 
 if strcmp(options.overwrite_data,'on') || ...
         (strcmp(options.overwrite_data,'off') && ~isfield(meta,'normalise'))
