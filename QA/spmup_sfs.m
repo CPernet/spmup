@@ -62,7 +62,7 @@ csf(find(csf))=1;
 %% 1st data scrubbing without filtering
 spm('Defaults','fmri')
 spm_jobman('initcfg');
-out = spmup_realign_qa(fmridata,'Motion Parameters','on',...
+out = spmup_realign_qa(fmridata,...
     'Voltera','on','Framewise displacement','on','Globals','off','Movie','off');
 out = out{2}; % ie the augmented design matrix
 mkdir([fileparts(out) filesep 'tmp_sfs'])

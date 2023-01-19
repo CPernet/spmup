@@ -1,14 +1,12 @@
-function [design,censoring_regressors] = spmup_censoring(varargin)
+function [design,censoring_regressors] = spmup_censoring(data)
 
 % routine that computes robust outliers for each column of the data in
 % and return a matrix of censsoring regressors (0s and a 1 per column)
 %
-% FORMAT [design,censoring_regressors] = spmup_censoring(realignemt.txt,data)
-%        [design,censoring_regressors] = spmup_censoring(realignemt.txt,data,'Voltera','on/off')
+% FORMAT [design,censoring_regressors] = spmup_censoring(data)
+%        [design,censoring_regressors] = spmup_censoring(data)
 %
-% INPUT  realignment.txt is a motion parameter file 
-%        data is a n volumes * m matrix to censor column wise
-%        Voltera indicate to expand the motion parameters
+% INPUT  data is a n volumes * m matrix to censor column wise
 %
 % OUTPUT design is the augmented design matrix of regressors
 %        censoring_regressors matrix with ones in each column for
@@ -16,36 +14,16 @@ function [design,censoring_regressors] = spmup_censoring(varargin)
 %        if no output specified saves it as design.txt
 % 
 % Exemple of data matrix data = [outlying_voxels' r_course']
-% Volterra expansion of motion parameters 
 % Friston et al (1996) Magn Reson Med. 1996;35:346:355.
 %
 % Cyril Pernet
 % --------------------------
 %  Copyright (C) SPMUP Team 
 
-%% inputs
-
-Voltera = 'off';
-if nargin >2
-    for v=3:nargin
-        if strcmpi(varargin{v},'Voltera')
-            Voltera = varargin{v+1};
-        end
-    end
-end
-data = varargin{2};
-
-% motion
-[filepath,filename] = fileparts(varargin{1});
-motion              = load(varargin{1}); % load data
-   
-if strcmpi(Voltera,'on')
-    D      = diff(motion,1,1); % 1st order derivative
-    D      = [zeros(1,6); D];  % set first row to 0
-    motion = [motion D motion.^2 D.^2];
-end
 
 %% get outliers
+design = [];
+censoring_regressors = [];
 
 if ~isempty(data)
     outliers = spmup_comp_robust_outliers(data,'Carling');
@@ -54,7 +32,7 @@ if ~isempty(data)
     % columns and then removing empty columns
     censoring_regressors = [];
     for column = size(outliers,2):-1:1
-        censoring_regressors = [censoring_regressors diag(outliers(:,column))];
+        censoring_regressors = [censoring_regressors diag(outliers(:,column))]; %#ok<*AGROW>
     end
     censoring_regressors(:,sum(censoring_regressors,1)==0) = []; % remove empty columns
     % check a volume is not indexed twice
@@ -65,12 +43,10 @@ if ~isempty(data)
         end
     end
     censoring_regressors(:,sum(censoring_regressors,1)==0) = [];
-    design = [motion censoring_regressors];
-else
-    design = motion;
+    design = [data censoring_regressors];
 end
 
-if nargout == 0
+if nargout == 0 && ~isempty(design)
     save(fullfile(filepath,[filename(4:end) '_design.txt']),'design','-ascii')
 end
 

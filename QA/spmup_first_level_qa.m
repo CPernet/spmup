@@ -7,8 +7,6 @@ function jobs = spmup_first_level_qa(varargin)
 %
 %       time_series is the fMRI set to analyze
 %       options define various choices to be used:
-%       'Motion Parameters': 'on' (default) or 'off'
-%              --> plots motion parameters and 1st derivatives
 %       'Radius': 57 (default)
 %              --> the average head size to compute rotation displacement
 %       'Framewise displacement': 'on' (default) or 'off'
@@ -61,9 +59,7 @@ Figure                = 'save';
 if nargin >1
    time_series = varargin{1};
    for v=1:nargin
-      if strcmpi(varargin{v},'Motion Parameters')
-           MotionParameters = varargin{v+1};
-      elseif strcmpi(varargin{v},'Radius')
+      if strcmpi(varargin{v},'Radius')
            Radius = varargin{v+1};
       elseif strcmpi(varargin{v},'Framewise Displacement')
            FramewiseDisplacement = varargin{v+1};
@@ -102,7 +98,6 @@ if ~exist('Coordinate','var')
 end
 
 [realign_files,jobs.FD,jobs.glo] = spmup_realign_qa(time_series,...
-    'Motion Parameters', MotionParameters,...
     'Radius',Radius,...
     'Framewise Displacement', FramewiseDisplacement,...
     'Voltera', Voltera,...

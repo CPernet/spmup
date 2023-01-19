@@ -3,8 +3,8 @@ function [new_files,FD,glo] = spmup_realign_qa(P,varargin)
 % implement different quality control 'tools' for
 % fMRI realigned data using SPM
 %
-% FORMAT realign_qa ( = do it all)
-%        realign_qa(P,flags)
+% FORMAT spmup_realign_qa ( = do it all)
+%        spmup_realign_qa(P,flags)
 %
 % INPUT P indicate the timeseries to load. Can be 
 %         - path to a 4D nifti
@@ -13,8 +13,6 @@ function [new_files,FD,glo] = spmup_realign_qa(P,varargin)
 %
 %       Options are:
 %
-%       'Motion Parameters': 'on' (default) or 'off'
-%              --> plots motion parameters and 1st derivatives
 %       'Framewise displacement': 'on' (default) or 'off'
 %              --> plots displacement (FD and RMS)                   
 %              --> generates/appends new design.txt file with displacement outliers
@@ -37,10 +35,9 @@ function [new_files,FD,glo] = spmup_realign_qa(P,varargin)
 
 %% validate inputs
 spm('Defaults','fmri')
-opts.indent = ' '; % for spm_jsonwrite
+
 
 % check options
-MotionParameters      = 'on';
 FramewiseDisplacement = 'on';
 Radius                = 50;
 Voltera               = 'off';
@@ -51,9 +48,7 @@ fig                   = 'save';
 
 if nargin >1
    for v=1:(nargin-1)
-      if strcmpi(varargin{v},'Motion Parameters')
-           MotionParameters      = varargin{v+1};
-      elseif strcmpi(varargin{v},'Radius')
+      if strcmpi(varargin{v},'Radius')
            Radius                = varargin{v+1};
       elseif strcmpi(varargin{v},'Framewise Displacement')
            FramewiseDisplacement = varargin{v+1};
@@ -114,8 +109,11 @@ else
     else
         if numel(size(P)) == 4 % this is already data in
             Y = P;
-            MotionParameters = 'off'; FramewiseDisplacement = 'off';
-            Voltera = 'off'; Globals = 'on'; Movie = 'on';
+            MotionParameters = 'off'; 
+            FramewiseDisplacement = 'off';
+            Voltera = 'off'; 
+            Globals = 'on'; 
+            Movie = 'on';
             fig = 'save';
         else
             error('input data are not char nor 4D data matrix, please check inputs')
@@ -135,8 +133,6 @@ if strcmp(Movie,'on')
     end
 end
 
-%% look at motion parameters
-
 findex              = 1; % index for the new_files variables
 [filepath,filename] = fileparts(V(1).fname);
 motion_file         = dir(fullfile(filepath,'rp*.txt'));
@@ -151,88 +147,41 @@ else
     motion_file = fullfile(filepath, motion_file.name);
 end
 
+motion = load(motion_file);
+if strcmpi(Voltera,'on')
+    D      = diff(motion,1,1); % 1st order derivative
+    D      = [zeros(1,6); D];  % set first row to 0
+    motion = [motion D motion.^2 D.^2];
+end
+
+FD = [];
 if strcmpi(FramewiseDisplacement,'on')
-    MotionParameters = 'on';
-end
-
-if strcmpi(MotionParameters,'on')
     FD = spmup_FD(motion_file, 'Radius', Radius, 'Figure', fig);
-else
-    FD = [];
 end
 
-%% look at globals
-
+glo = [];
 if strcmpi(Globals,'on')   
-    glo = zeros(length(V),1);
-    for s=1:length(V)
-        glo(s) = spm_global(V(s));
-    end
-    glo        = spm_detrend(glo,1); % since in spm the data are detrended
-    g_outliers = spmup_comp_robust_outliers(glo, 'Carling');
-        
-    % figure
-    if ~strcmpi(fig,'off')
-        figure('Name','Globals outlier detection')
-        if strcmpi(fig,'on')
-            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-        else
-            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
-        end
-        plot(glo,'LineWidth',3); hold on;
-        tmp = g_outliers.*glo; tmp(tmp==0)=NaN;
-        plot(tmp,'or','LineWidth',3); grid on;
-        axis tight; xlabel('scans');
-        ylabel('mean intensity');
-        title('Global intensity');
-        
-        if strcmpi(fig,'save')
-            if exist(fullfile(filepath,'spmup_QC.ps'),'file')
-                print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
-            else
-                print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,'spmup_QC.ps'));
-            end
-            close(gcf)
-        end
-    end
-else
-    glo = [];
+    glo = compute_globals(V);
+    plot_globals(glo, fig);
 end
 
 %% make the design.txt file
 
-data = [];
-if strcmpi(FramewiseDisplacement,'on')
-    data = [data FD];
+design = motion; %#ok<*NASGU>
+if strcmpi(FramewiseDisplacement,'on') || strcmpi(Globals,'on')
+    % we do not censor the motion parameters 
+    % but we keep them for the design
+    data = [FD glo];
+    design = spmup_censoring(data);
+    design = [motion design];
 end
 
-if strcmpi(Globals,'on')
-    data = [data glo];
-end
+save(fullfile(filepath,[filename '_design.txt']), 'design','-ascii')
+new_files{findex} = fullfile(filepath,[filename '_design.txt']);
 
-if isempty(data) && strcmpi(Voltera,'off')
-    new_files = {};
-    disp('no design computed, no extra regressors selected')
-else
-    design = spmup_censoring(motion_file, data, 'Voltera', Voltera);
-    save(fullfile(filepath,[filename '_design.txt']), 'design','-ascii')
-    new_files{findex} = fullfile(filepath,[filename '_design.txt']);
-    
-    % save info about column headers
-    options = struct('Voltera', Voltera, ...
-                     'FramewiseDisplacement', FramewiseDisplacement, ...
-                     'Globals', Globals);
-    metadata.Columns = column_headers(options);
-    
-    all_regressors = spm_load(new_files{findex});
-    nb_censoring_regressors = size(all_regressors, 2) - numel(metadata.Columns);
-    
-    for i = 1:numel(1:nb_censoring_regressors)
-        metadata.Columns{end+1} = sprintf('outlier_%04.0f', i);
-    end
-    spm_jsonwrite(spm_file(new_files{findex}, 'ext', '.json'), metadata, opts)
-    findex = findex +1;
-end
+add_side_car(new_files{findex}, Voltera, FramewiseDisplacement, Globals);
+
+findex = findex +1;
 
 %% make movies
 if strcmpi(Movie, 'on')
@@ -240,6 +189,25 @@ if strcmpi(Movie, 'on')
         'filename', fullfile(filepath,filename), 'showfig', 'off');
 end
 
+end
+
+function add_side_car(new_file, Voltera, FramewiseDisplacement, Globals)
+
+    opts.indent = ' '; % for spm_jsonwrite
+
+    % save info about column headers
+    options = struct('Voltera', Voltera, ...
+                     'FramewiseDisplacement', FramewiseDisplacement, ...
+                     'Globals', Globals);
+    metadata.Columns = column_headers(options);
+    
+    all_regressors = spm_load(new_file);
+    nb_censoring_regressors = size(all_regressors, 2) - numel(metadata.Columns);
+    
+    for i = 1:numel(1:nb_censoring_regressors)
+        metadata.Columns{end+1} = sprintf('outlier_%04.0f', i);
+    end
+    spm_jsonwrite(spm_file(new_file, 'ext', '.json'), metadata, opts)
 end
 
 function headers = column_headers(options)
@@ -278,7 +246,57 @@ function headers = column_headers(options)
               'rot_y_derivative1_power2'; ...
               'rot_z_derivative1_power2'};
   end
+  
+  if strcmpi(options.FramewiseDisplacement, 'on')
+       headers{end+1} = 'FramewiseDisplacement';
+  end
+  if strcmpi(options.Globals, 'on')
+      headers{end+1} = 'Globals';
+  end
     
 end
 
+function glo = compute_globals(V)
+    glo = zeros(length(V),1);
+    for s=1:length(V)
+        glo(s) = spm_global(V(s));
+    end
+    glo        = spm_detrend(glo,1); % since in spm the data are detrended
+end
 
+function plot_globals(glo, fig)
+
+        if ~strcmpi(fig,'off')
+            return
+        end
+        
+        figure('Name','Globals outlier detection')
+        
+        if strcmpi(fig,'on')
+            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
+        else
+            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1], ...
+                    'visible','off')
+        end
+        
+        plot(glo,'LineWidth',3); 
+        hold on;
+        
+        g_outliers = spmup_comp_robust_outliers(glo, 'Carling');
+        tmp = g_outliers.*glo; tmp(tmp==0)=NaN;
+        plot(tmp,'or','LineWidth',3); 
+        
+        grid on;
+        axis tight; xlabel('scans');
+        ylabel('mean intensity');
+        title('Global intensity');
+        
+        if strcmpi(fig,'save')
+            if exist(fullfile(filepath,'spmup_QC.ps'),'file')
+                print (gcf,'-dpsc2', '-bestfit', '-append', fullfile(filepath,'spmup_QC.ps'));
+            else
+                print (gcf,'-dpsc2', '-bestfit', fullfile(filepath,'spmup_QC.ps'));
+            end
+            close(gcf)
+        end
+end
