@@ -51,4 +51,6 @@ jobs:
 
     - name: Run tests
       uses: matlab-actions/run-tests@v1
+      with:
+        select-by-folder: unit_test
 
