@@ -15,7 +15,6 @@ spmup;
 addpath('unit_test/utils')
 
 cd(root_dir);
-logger('INFO', sprintf('Home is "%s"\n', getenv('HOME')));
 
 spm('defaults', 'fMRI');
 
