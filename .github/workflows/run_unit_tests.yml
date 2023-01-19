@@ -33,6 +33,11 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Install Moxunit and MOcov
+      run: |
+        git clone https://github.com/MOxUnit/MOxUnit.git --depth 1
+        git clone https://github.com/MOcov/MOcov.git --depth 1        
+
     - name: Install SPM
       run: |
         git clone https://github.com/spm/spm12.git --depth 1
