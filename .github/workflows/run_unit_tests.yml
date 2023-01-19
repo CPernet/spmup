@@ -1,5 +1,5 @@
 ---
-name: tests
+name: unit tests
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -41,7 +41,7 @@ jobs:
       run: |
         mkdir -p unit_test/data
         cd unit_test/data
-        wget https://files.de-1.osf.io/v1/resources/3vufp/providers/osfstorage/62ab744a97edfb08e41a2a77/?zip=
+        wget -O sub-01.zip https://files.de-1.osf.io/v1/resources/3vufp/providers/osfstorage/62ab744a97edfb08e41a2a77/?zip=
         unzip sub-01.zip
 
     - name: Install MATLAB
@@ -49,22 +49,6 @@ jobs:
       with:
         release: R2020a
 
-    - name: Run unit tests MATLAB
-      uses: matlab-actions/run-command@v1.1.2
-      with:
-        command: cd(fullfile(getenv('GITHUB_WORKSPACE'), '.github', 'workflows')); run tests_matlab;
+    - name: Run tests
+      uses: matlab-actions/run-tests@v1
 
-    - name: Check unit tests
-      if: matrix.test_type == 'unit'
-      run: |
-        cat test_report.log | grep 0
-
-    - name: Code coverage ${{ matrix.platform }}
-      if: matrix.test_type == 'unit'
-      uses: codecov/codecov-action@v3
-      with:
-        file: coverage.xml
-        flags: ${{ matrix.platform }}
-        name: codecov-${{ matrix.platform }}
-        fail_ci_if_error: false
-      # token: ${{ secrets.CODECOV_TOKEN }}  # not required but might help API rate limits

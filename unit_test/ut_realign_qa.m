@@ -104,7 +104,18 @@ metadata = spm_load(spm_file(new_files{1}, 'ext', '.json'));
 assert(strcmp(metadata.Columns{end}, 'outlier_0003'));
 end
 
+
 %% Optional file fixtures  
+function setupOnce(testCase)  % do not change function name
+this_path = fileparts(mfilename('fullpath'));
+addpath(fullfile(this_path, 'utils'));
+if is_github_ci()
+    root_dir = getenv('GITHUB_WORKSPACE');
+    addpath(fullfile(root_dir, 'spm12'));
+    run(fullfile(this_path, '..'), spmup());
+end
+end
+
 function teardown(testCase)  % do not change function name
 delete(fullfile(test_folder(), 'data', 'sub-01', 'func', '*design.txt'));
 delete(fullfile(test_folder(), 'data', 'sub-01', 'func', '*.ps'));
