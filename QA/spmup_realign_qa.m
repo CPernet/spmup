@@ -148,6 +148,7 @@ else
 end
 
 motion = load(motion_file);
+
 if strcmpi(Voltera,'on')
     D      = diff(motion,1,1); % 1st order derivative
     D      = [zeros(1,6); D];  % set first row to 0
@@ -155,8 +156,9 @@ if strcmpi(Voltera,'on')
 end
 
 FD = [];
+RMS = [];
 if strcmpi(FramewiseDisplacement,'on')
-    FD = spmup_FD(motion_file, 'Radius', Radius, 'Figure', fig);
+    [FD, RMS] = spmup_FD(motion_file, 'Radius', Radius, 'Figure', fig);
 end
 
 glo = [];
@@ -168,18 +170,20 @@ end
 %% make the design.txt file
 
 design = motion; %#ok<*NASGU>
+nb_censoring_regressors = 0;
 if strcmpi(FramewiseDisplacement,'on') || strcmpi(Globals,'on')
     % we do not censor the motion parameters 
     % but we keep them for the design
-    data = [FD glo];
-    design = spmup_censoring(data);
-    design = [motion design];
+    data = [FD RMS glo];
+    censoring_regressors = spmup_censoring(data);
+    nb_censoring_regressors = size(censoring_regressors, 2);
+    design = [motion data censoring_regressors];
 end
 
 save(fullfile(filepath,[filename '_design.txt']), 'design','-ascii')
 new_files{findex} = fullfile(filepath,[filename '_design.txt']);
 
-add_side_car(new_files{findex}, Voltera, FramewiseDisplacement, Globals);
+add_side_car(new_files{findex}, Voltera, FramewiseDisplacement, Globals, nb_censoring_regressors);
 
 findex = findex +1;
 
@@ -191,7 +195,7 @@ end
 
 end
 
-function add_side_car(new_file, Voltera, FramewiseDisplacement, Globals)
+function add_side_car(new_file, Voltera, FramewiseDisplacement, Globals, nb_censoring_regressors)
 
     opts.indent = ' '; % for spm_jsonwrite
 
@@ -199,18 +203,17 @@ function add_side_car(new_file, Voltera, FramewiseDisplacement, Globals)
     options = struct('Voltera', Voltera, ...
                      'FramewiseDisplacement', FramewiseDisplacement, ...
                      'Globals', Globals);
-    metadata.Columns = column_headers(options);
+    metadata.Columns = set_column_headers(options);
     
     all_regressors = spm_load(new_file);
-    nb_censoring_regressors = size(all_regressors, 2) - numel(metadata.Columns);
-    
+
     for i = 1:numel(1:nb_censoring_regressors)
         metadata.Columns{end+1} = sprintf('outlier_%04.0f', i);
     end
     spm_jsonwrite(spm_file(new_file, 'ext', '.json'), metadata, opts)
 end
 
-function headers = column_headers(options)
+function headers = set_column_headers(options)
   
   headers = {'trans_x'; ...
             'trans_y'; ...
@@ -248,10 +251,11 @@ function headers = column_headers(options)
   end
   
   if strcmpi(options.FramewiseDisplacement, 'on')
-       headers{end+1} = 'FramewiseDisplacement';
+       headers{end+1} = 'framewise_displacement';
+       headers{end+1} = 'rms';
   end
   if strcmpi(options.Globals, 'on')
-      headers{end+1} = 'Globals';
+      headers{end+1} = 'globals';
   end
     
 end

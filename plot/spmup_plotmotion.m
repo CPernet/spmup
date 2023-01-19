@@ -38,13 +38,16 @@ RMS                = sqrt(sum(derivatives.^2,2));  % Mean square displacement
 %% plot
 figure('Name','Motion','Visible','On');
 set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized', 'outerposition',[0 0 1 1]);
+
 subplot(2,2,1); plot(temp_motion(:,1:3),'LineWidth',3);
 axis tight; grid on; title('Translation','Fontsize',14)
 xlabel('scans'); ylabel('mm');
+
 subplot(2,2,2); plot(temp_motion(:,4:6),'LineWidth',3);
 axis tight; grid on; title('Rotation','Fontsize',14)
 xlabel('scans'); ylabel('degrees');
-subplot(2,2,3:4); plot(delta,'LineWidth',3); hold on;
+
+subplot(2,2,3:4); plot(RMS,'LineWidth',3); hold on;
 axis tight; grid on; title(['Mean square displacement ' num2str(mean(RMS)) ' std ' num2str(std(RMS))],'FontSize',14);
 xlabel('scans'); ylabel('displacement');
 

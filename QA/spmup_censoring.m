@@ -1,15 +1,13 @@
-function [design,censoring_regressors] = spmup_censoring(data)
+function censoring_regressors = spmup_censoring(data)
 
 % routine that computes robust outliers for each column of the data in
 % and return a matrix of censsoring regressors (0s and a 1 per column)
 %
-% FORMAT [design,censoring_regressors] = spmup_censoring(data)
-%        [design,censoring_regressors] = spmup_censoring(data)
+% FORMAT censoring_regressors = spmup_censoring(data)
 %
 % INPUT  data is a n volumes * m matrix to censor column wise
 %
-% OUTPUT design is the augmented design matrix of regressors
-%        censoring_regressors matrix with ones in each column for
+% OUTPUT censoring_regressors matrix with ones in each column for
 %        outliers found in coumns of data 
 %        if no output specified saves it as design.txt
 % 
@@ -22,7 +20,6 @@ function [design,censoring_regressors] = spmup_censoring(data)
 
 
 %% get outliers
-design = [];
 censoring_regressors = [];
 
 if ~isempty(data)
@@ -43,15 +40,4 @@ if ~isempty(data)
         end
     end
     censoring_regressors(:,sum(censoring_regressors,1)==0) = [];
-    design = [data censoring_regressors];
 end
-
-if nargout == 0 && ~isempty(design)
-    save(fullfile(filepath,[filename(4:end) '_design.txt']),'design','-ascii')
-end
-
-% % quick check
-% if sum(censoring_regressors(:))/size(censoring_regressors,1)*100 > 10
-%     warndlg('Censoring was performed but more than 10% of data were marked which can be problematic fitting data');
-% end
-
