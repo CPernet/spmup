@@ -1,0 +1,70 @@
+---
+name: tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: ['*']
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+
+  test:
+
+    runs-on: ubuntu-latest
+
+
+    steps:
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get -y -qq update
+        sudo apt-get -y install unzip wget
+
+    - name: Clone spmup
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Install SPM
+      run: |
+        git clone https://github.com/spm/spm12.git --depth 1
+
+    - name: Get data from OSF
+      run: |
+        mkdir -p unit_test/data
+        cd unit_test/data
+        wget https://files.de-1.osf.io/v1/resources/3vufp/providers/osfstorage/62ab744a97edfb08e41a2a77/?zip=
+        unzip sub-01.zip
+
+    - name: Install MATLAB
+      uses: matlab-actions/setup-matlab@v1.2.3
+      with:
+        release: R2020a
+
+    - name: Run unit tests MATLAB
+      uses: matlab-actions/run-command@v1.1.2
+      with:
+        command: cd(fullfile(getenv('GITHUB_WORKSPACE'), '.github', 'workflows')); run tests_matlab;
+
+    - name: Check unit tests
+      if: matrix.test_type == 'unit'
+      run: |
+        cat test_report.log | grep 0
+
+    - name: Code coverage ${{ matrix.platform }}
+      if: matrix.test_type == 'unit'
+      uses: codecov/codecov-action@v3
+      with:
+        file: coverage.xml
+        flags: ${{ matrix.platform }}
+        name: codecov-${{ matrix.platform }}
+        fail_ci_if_error: false
+      # token: ${{ secrets.CODECOV_TOKEN }}  # not required but might help API rate limits
