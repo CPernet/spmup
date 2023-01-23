@@ -64,7 +64,7 @@ if davg ~= 50
 end
 
 % now compute
-for frun = size(subject.func, 1):-1:1
+for frun = max(size(subject.func)):-1:1  % max of cell array so it doesn't matter transposed or not
     if strcmpi(options.scrubbing,'on')
         QAjobs{frun} = spmup_first_level_qa(subject.func{frun}, 'Radius',davg, ...
             'Movie','off','Voltera',options.motionexp,...
@@ -123,6 +123,10 @@ if strcmp(options.overwrite_data,'on') || ...
     clear matlabbatch; 
     if ~exist(Statspath,'dir')
         mkdir(Statspath)
+        check_mat = dir(fullfile(Statspath,'SPM.mat'));
+        if ~isempty(check_mat)
+           delete(fullfile(check_mat.folder,check_mat.name)) 
+        end
     end
     N                                                 = length(subject.func_metadata{1}.SliceTiming);
     matlabbatch{1}.spm.stats.fmri_spec.dir            = {Statspath};
@@ -132,7 +136,7 @@ if strcmp(options.overwrite_data,'on') || ...
     matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0 = round(N/ 2);
     
     % sessions, onsets and durations
-    for frun = size(subject.func,1):-1:1
+    for frun = max(size(subject.func)):-1:1 
         if ~contains(subject.func{frun},'task-rest','IgnoreCase',true)
             
             events = readtable(subject.event{frun}, ...
@@ -289,7 +293,7 @@ if ~exist('resting_state','var')
     % is only one run, no need this is the same as betas, if there are
     % seveal runs, simply match condition labels - and do it for each
     % derivatives if any
-    if size(subject.func,1) > 1
+    if max(size(subject.func)) > 1
         disp('computing contrasts across conditions')
         con_file1 = [Statspath filesep 'con_0001.nii'];
         
