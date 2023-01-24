@@ -161,8 +161,8 @@ for frun = 1:size(subject.func, 1) % each run
     [filepath,filename,ext] = fileparts(filesin);
     if exist(fullfile(filepath,[filename '.json']),'file')
         meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-    elseif exist(fullfile(filepath,[filename '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
-        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+    elseif exist(fullfile(filepath,[filename '_space-IXI549_desc-preprocessed_bold.json']),'file')
+        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
     elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
         meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
     end
@@ -524,8 +524,8 @@ if isempty(options.VDM)
         [filepath,filename]        = fileparts(subject.func{frun});
         if exist(fullfile(filepath,[filename '.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
@@ -575,8 +575,8 @@ else % --------------------------------------------------------------------
         [filepath,filename]        = fileparts(subject.func{frun});
         if exist(fullfile(filepath,[filename '.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
@@ -636,8 +636,8 @@ if strcmp(options.despike,'after')
         [filepath,filename] = fileparts(subject.func{frun});
         if exist(fullfile(filepath,[filename '.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
@@ -668,8 +668,8 @@ for frun = 1:size(subject.func,1)
     [filepath,filename] = fileparts(subject.func{frun});
     if exist(fullfile(filepath,[filename '.json']),'file')
         meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-    elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
-        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+    elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
     elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
         meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
     end
@@ -981,8 +981,8 @@ if strcmp(options.overwrite_data,'on') || ...
         [filepath,filename] = fileparts(subject.func{frun});
         if exist(fullfile(filepath,[filename '.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
@@ -1002,7 +1002,7 @@ end
 % QC original data
 if strcmp(options.QC,'on') && ~isfield(subject,'anat_qa') && ~isfield(anatinfo,'QA')
     [anat_dir,filename] = fileparts(subject.anat{1});
-    if contains(filename,'space-MNI152NLin2009')
+    if contains(filename,'space-IXI549')
         subject.anat_qa = spmup_anatQA(subject.anat{1},...
             fullfile(anat_dir,[filename(1:end-3) 'label-GM_probseg.nii']),...
             fullfile(anat_dir,[filename(1:end-3) 'label-WM_probseg.nii']));
@@ -1030,8 +1030,8 @@ for frun = 1:size(Normalized_files,1)
         [filepath,filename,ext] = fileparts(subject.func{frun});
         if exist(fullfile(filepath,[filename '.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
@@ -1084,7 +1084,7 @@ if contains(subject.anat{1},'_T1w.nii')
     [filepath,filename,ext] = fileparts(subject.anat{1});
     partA   = get_fileparts(filename);
     partB   = filename(max(strfind(filename,'_'))+1:end);
-    newname = fullfile(filepath,[partA 'space-MNI152NLin2009_' partB ext]);
+    newname = fullfile(filepath,[partA 'space-IXI549_' partB ext]);
     if exist(NormalizedAnat_file,'file')
         movefile(NormalizedAnat_file,newname);
         subject.anat{1} = newname;
@@ -1106,7 +1106,7 @@ if contains(subject.anat{1},'_T1w.nii')
         json = json(index);
     end
     if ~isempty(json)
-        newname = fullfile(filepath,[partA 'space-MNI152NLin2009_desc-preprocessed_anat.json']);
+        newname = fullfile(filepath,[partA 'space-IXI549_desc-preprocessed_anat.json']);
         movefile(fullfile(json.folder,json.name),newname);
     end
 else
@@ -1126,7 +1126,7 @@ for tissue = 1:3
     
     [filepath,filename,ext] = fileparts(Normalized_class{tissue});
     partA = get_fileparts(filename);
-    partB = ['space-MNI152NLin2009_label-' labels{tissue} '_probseg' ext];
+    partB = ['space-IXI549_label-' labels{tissue} '_probseg' ext];
     if exist(Normalized_class{tissue},'file')
         movefile(Normalized_class{tissue},fullfile(filepath,[partA partB]));
         subject.tissues{tissue} = fullfile(filepath,[partA partB]);
@@ -1158,7 +1158,7 @@ end
 wspaceEPI = dir(fullfile(fileparts(subject.anat{1}),'wspace-EPI*.nii'));
 if ~isempty(wspaceEPI)
     partA = get_fileparts(wspaceEPI.name);
-    partB = ['space-MNI152NLin2009_desc-epiresliced' ext];
+    partB = ['space-IXI549_desc-epiresliced' ext];
     movefile(fullfile(wspaceEPI.folder,wspaceEPI.name),fullfile(fileparts(subject.anat{1}),[partA partB]))
 end
 
@@ -1229,15 +1229,15 @@ end
 for frun = 1:size(subject.func,1)
     if exist(stats_ready{frun},'file')
         [filepath,filename,ext] = fileparts(subject.func{frun});
-        newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold' ext]);
+        newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold' ext]);
         movefile(stats_ready{frun},newname);
         subject.func{frun} = newname;
         
         if strcmp(options.QC,'on')
             if exist(fullfile(filepath,[filename '.json']),'file')
                 meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-            elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
-                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+            elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
             elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json']),'file')
                 meta = spm_jsonread(fullfile(filepath,[subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json']));
             end
@@ -1259,7 +1259,7 @@ for frun = 1:size(subject.func,1)
         else
             json = dir(fullfile(filepath,[filename(1:end-5) '*desc-preprocessed_bold.json']));
             if ~isempty(json)
-                newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']);
+                newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']);
                 movefile(fullfile(json.folder,json.name),newname);
             end
         end
@@ -1267,7 +1267,7 @@ for frun = 1:size(subject.func,1)
     else % it could be it was done and just need updated
         
         [filepath,filename,ext] = fileparts(subject.func{frun});
-        newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold' ext]);
+        newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold' ext]);
         if exist(newname,'file')
             subject.func{frun} = newname;
             
@@ -1279,8 +1279,8 @@ for frun = 1:size(subject.func,1)
                 
                 if exist(fullfile(filepath,[filename '.json']),'file')
                     meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-                elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']),'file')
-                    meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152NLin2009_desc-preprocessed_bold.json']));
+                elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+                    meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
                 else
                     meta.QA = [];
                 end

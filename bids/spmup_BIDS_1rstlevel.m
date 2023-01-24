@@ -183,7 +183,7 @@ if strcmp(options.overwrite_data,'on') || ...
                warning('number of unique condition found = 1') 
             end
             
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {subject.func{frun}}; 
+            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans = {subject.func{frun}};  %#ok<CCAT1>
             for C = 1:N_cond
                 trial_index = cellfun(@(x) strcmp(cond{C},x), events.(options.conditions));
                 onsets      = events.onset(trial_index);
