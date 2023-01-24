@@ -344,7 +344,7 @@ if ~exist('resting_state','var')
     end
     
     %% correct hrf for time dispersion
-    if ~strcmp(options.derivatives,'off')
+    if options.derivatives ~= 0 
         outfiles = spmup_hrf_boost(SPMmat_file);
         if isempty(options.skernel)
             options.skernel = [3 3 3];
