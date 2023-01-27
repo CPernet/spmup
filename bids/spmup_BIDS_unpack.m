@@ -70,6 +70,193 @@ spm('defaults', 'FMRI');
 disp('getting BIDS info')
 BIDS = spm_BIDS(BIDS_dir);  
 
+% update BIDS for multiple 'overlapping' fmaps
+% these can be filtered durnig the analysis
+for s=1:size(BIDS.subjects,2)
+    location = fullfile(BIDS.subjects(s).path,'fmap');
+    if exist(location,'dir')
+        contents = dir(fullfile(location,[BIDS.subjects(s).name '*.nii*']));
+        if ~isempty(contents) && isempty(BIDS.subjects(s).fmap)
+             fmap_index = size(BIDS.subjects(s).fmap,2)+1;
+             for file = 1:size(contents,1)
+                 name = fullfile(contents(file).folder,contents(file).name);
+                 if ~contains(name,'magnitude')
+                     json_content = jsondecode(fileread([name(1:strfind(name,'.nii')) 'json']));
+                     
+                     if contains(name,'acq-')
+                         tmp         = name(strfind(name,'acq-')+4:end);
+                         acquisition = tmp(1:min(strfind(tmp,'_'))-1);
+                     else
+                         acquisition = json_content.ScanningSequence;
+                     end
+                     
+                     if contains(name,'dir-')
+                         tmp         = name(strfind(name,'dir-')+4:end);
+                         direction   = tmp(1:min(strfind(tmp,'_'))-1);
+                     else
+                         direction   = json_content.PhaseEncodingDirection;
+                     end
+                     
+                     if contains(name,'run-')
+                         tmp         = name(strfind(name,'run-')+4:end);
+                         run_number  = tmp(1:min(strfind(tmp,'_'))-1);
+                     else
+                         run_number  = '';
+                     end
+                     
+                     if contains(name,'_epi')
+                         type = 'epi';
+                     elseif contains(name,'_phasediff')
+                         type = 'phasediff';
+                         ext  = name(strfind(name,'_phasediff')+length('_phasediff'):end);
+                         if exist([name(1:strfind(name,'_phasediff')) 'magnitude' ext],'file')
+                             magnitude = [name(1:strfind(name,'_phasediff')) 'magnitude' ext];
+                         elseif exist([name(1:strfind(name,'_phasediff')) 'magnitude1' ext],'file')
+                             if exist([name(1:strfind(name,'_phasediff')) 'magnitude2' ext],'file')
+                                 magnitude{1} = [name(1:strfind(name,'_phasediff')) 'magnitude1' ext];
+                                 magnitude{2} = [name(1:strfind(name,'_phasediff')) 'magnitude2' ext];
+                             else
+                                 magnitude = [name(1:strfind(name,'_phasediff')) 'magnitude1' ext];
+                             end
+                         end
+                     elseif any(contains(name,{'_phase1','_phase2'}))
+                         type = 'phase';
+                         tmp  = name; clear name
+                         ext  = tmp(strfind(tmp,'_phase')+length('_phase')+1:end);
+                         if contains(tmp,'_phase1')
+                             if exist([tmp(1:strfind(tmp,'_phase1')) 'phase2' ext],'file')
+                                 name{1} = tmp;
+                                 name{2} = [tmp(1:strfind(tmp,'_phase1')) 'phase2' ext];
+                             else
+                                 error('phase1 fmap found but not phase2')
+                             end
+                         else
+                             if exist([tmp(1:strfind(tmp,'_phase2')) 'phase1' ext],'file')
+                                 name{1} = [tmp(1:strfind(tmp,'_phase2')) 'phase1' ext];
+                                 name{2} = tmp;
+                             else
+                                 error('phase2 fmap found but not phase1')
+                             end
+                         end
+                         if exist([tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext],'file')
+                             if exist([tmp(1:strfind(tmp,'_phase')) 'magnitude2' ext],'file')
+                                 magnitude{1} = [tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext];
+                                 magnitude{2} = [tmp(1:strfind(tmp,'_phase')) 'magnitude2' ext];
+                             else
+                                 magnitude = [tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext];
+                             end
+                         end
+                     end
+                     
+                     BIDS.subjects(s).fmap(fmap_index).type          = type;
+                     BIDS.subjects(s).fmap(fmap_index).filename      =  name;
+                     BIDS.subjects(s).fmap(fmap_index).ses           =  BIDS.subjects(s).session;
+                     BIDS.subjects(s).fmap(fmap_index).acq           =  acquisition;
+                     BIDS.subjects(s).fmap(fmap_index).dir           =  direction;
+                     BIDS.subjects(s).fmap(fmap_index).run           =  run_number;
+                     BIDS.subjects(s).fmap(fmap_index).meta          =  json_content;
+                     if ~strcmp(type,'epi')
+                         BIDS.subjects(s).fmap(fmap_index).magnitude = magnitude;
+                     end
+                     fmap_index = fmap_index+1;
+                 end
+             end
+                 
+         elseif ~isempty(contents) && ~isempty(BIDS.subjects(s).fmap)
+            fmap_index = size(BIDS.subjects(s).fmap,2)+1;
+            for file = 1:size(contents,1)
+                existing_names = arrayfun(@(x) x.filename, BIDS.subjects(s).fmap, 'UniformOutput',false);
+                islisted = any(cell2mat(cellfun(@(x) strcmp(x, contents(file).name), existing_names, 'UniformOutput', false)));
+                if ~islisted
+                    name = fullfile(contents(file).folder,contents(file).name);
+                    if ~contains(name,'magnitude')
+                        json_content = jsondecode(fileread([name(1:strfind(name,'.nii')) 'json']));
+                        
+                        if contains(name,'acq-')
+                            tmp         = name(strfind(name,'acq-')+4:end);
+                            acquisition = tmp(1:min(strfind(tmp,'_'))-1);
+                        else
+                            acquisition = json_content.ScanningSequence;
+                        end
+                        
+                        if contains(name,'dir-')
+                            tmp         = name(strfind(name,'dir-')+4:end);
+                            direction   = tmp(1:min(strfind(tmp,'_'))-1);
+                        else
+                            direction   = json_content.PhaseEncodingDirection;
+                        end
+                        
+                        if contains(name,'run-')
+                            tmp         = name(strfind(name,'run-')+4:end);
+                            run_number  = tmp(1:min(strfind(tmp,'_'))-1);
+                        else
+                            run_number  = '';
+                        end
+                        
+                        if contains(name,'_epi')
+                            type = 'epi';
+                        elseif contains(name,'_phasediff')
+                            type = 'phasediff';
+                            ext  = name(strfind(name,'_phasediff')+length('_phasediff'):end);
+                            if exist([name(1:strfind(name,'_phasediff')) 'magnitude' ext],'file')
+                                magnitude = [name(1:strfind(name,'_phasediff')) 'magnitude' ext];
+                            elseif exist([name(1:strfind(name,'_phasediff')) 'magnitude1' ext],'file') 
+                                if exist([name(1:strfind(name,'_phasediff')) 'magnitude2' ext],'file') 
+                                    magnitude{1} = [name(1:strfind(name,'_phasediff')) 'magnitude1' ext];
+                                    magnitude{2} = [name(1:strfind(name,'_phasediff')) 'magnitude2' ext];
+                                else
+                                    magnitude = [name(1:strfind(name,'_phasediff')) 'magnitude1' ext];
+                                end
+                            end
+                        elseif any(contains(name,{'_phase1','_phase2'}))
+                            type = 'phase';
+                            tmp  = name; clear name
+                            ext  = tmp(strfind(tmp,'_phase')+length('_phase')+1:end);
+                            if contains(tmp,'_phase1')
+                                if exist([tmp(1:strfind(tmp,'_phase1')) 'phase2' ext],'file')
+                                    name{1} = tmp;
+                                    name{2} = [tmp(1:strfind(tmp,'_phase1')) 'phase2' ext];
+                                else
+                                   error('phase1 fmap found but not phase2') 
+                                end
+                            else
+                                if exist([tmp(1:strfind(tmp,'_phase2')) 'phase1' ext],'file')
+                                    name{1} = [tmp(1:strfind(tmp,'_phase2')) 'phase1' ext];
+                                    name{2} = tmp;
+                                else
+                                   error('phase2 fmap found but not phase1') 
+                                end
+                            end
+                            if exist([tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext],'file')
+                                if exist([tmp(1:strfind(tmp,'_phase')) 'magnitude2' ext],'file')
+                                    magnitude{1} = [tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext];
+                                    magnitude{2} = [tmp(1:strfind(tmp,'_phase')) 'magnitude2' ext];
+                                else
+                                    magnitude = [tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext];
+                                end
+                            end
+                        end
+                        
+                        BIDS.subjects(s).fmap(fmap_index) = struct(...
+                            'type',type, ...
+                            'filename', name, ...
+                            'ses', BIDS.subjects(s).session, ...
+                            'acq', acquisition, ...
+                            'dir', direction, ...
+                            'run', run_number, ...
+                            'meta', json_content);
+                        if ~strcmp(type,'epi')
+                            BIDS.subjects(s).fmap(fmap_index).magnitude = magnitude;
+                        end
+                        fmap_index = fmap_index+1;
+                    end
+                end
+            end
+        end
+    end
+end
+
+
 if ~isempty(options.subjects)
     % remove subjects from BIDS
     subindex = 1;
@@ -181,7 +368,7 @@ end % for each subject
 
 % if more than 2 functional run, try to unpack data using multiple cores
 % ----------------------------------------------------------------------
-if size(spm_BIDS(BIDS, 'runs', 'sub', subjs_ls{s}),2) >= 2 %#ok<*UNRCH>
+if size(spm_BIDS(BIDS, 'runs', 'sub', subjs_ls{s}),2) > 2 %#ok<*UNRCH>
     spmup_setparallel(options.Ncores)
 end
 
@@ -266,7 +453,7 @@ parfor s=1:nb_sub
             % check which types of fieldmaps we are dealing with
             fmap_type_ls = spm_BIDS(BIDS, 'types', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'modality', 'fmap');
-
+            
             % goes through each type in case we have several fieldmap types in that
             % data set
             for ifmap_type_ls = 1:size(fmap_type_ls,1)
@@ -321,7 +508,12 @@ parfor s=1:nb_sub
 
                         case 'epi'
                             subjects{s}.fieldmap(session,fmap_run_count).type = 'epi';
-                            warning(' EPI type of fielmaps not implemented')
+                            warning(' EPI type of fielmaps are not SPM supported ...')
+                            if contains(name,{'AP','PA','LR','RL'})
+                                subjects{s}.fieldmap(session,fmap_run_count).epi = ...
+                                    fullfile(target_dir, [name ext]);
+                                file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).epi,'file');
+                            end
 
                         otherwise
                             subjects{s}.fieldmap(session,fmap_run_count).type = 'unknown';
