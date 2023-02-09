@@ -72,7 +72,6 @@ BIDS = spm_BIDS(BIDS_dir);
 
 % update BIDS for multiple 'overlapping' fmaps
 % these can be filtered durnig the analysis
-% -- this part of code might not be necessary --
 for s=1:size(BIDS.subjects,2)
     location = fullfile(BIDS.subjects(s).path,'fmap');
     if exist(location,'dir')
@@ -511,7 +510,7 @@ parfor s=1:nb_sub
             
             % goes through each type in case we have several fieldmap types in that
             % data set
-            for ifmap_type_ls = 1:size(fmap_type_ls,1)
+            for ifmap_type_ls = 1:size(fmap_type_ls,2)
 
                 % lists all the fieldmap files of that type as there might
                 % be several runs / acq / rec ...
