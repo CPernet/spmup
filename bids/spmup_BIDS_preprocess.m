@@ -2,7 +2,12 @@ function [subject,options] = spmup_BIDS_preprocess(subject, options)
 
 % routine to preprocess BIDS fMRI data following 'options'
 % Preprocessing is intented FOR ONE TASK AND ONE SESSION (but multiple runs ok)
-%
+% Note that even if EPI-norm is used (because eg no fieldmaps), anat is expected
+% to run the segmentation and coregester it with EPI for vizualization. 
+% If anat is not available, or other options are not here, just use the 
+% regular spm batch and call spmup_QA functions, rather than forcing 
+% spmup_BIDS_preprocess to do somehting is was not designed for.
+
 % FORMAT spmup_BIDS_preprocess(subject, s)
 %        spmup_BIDS_preprocess(subjects s, options)
 %
@@ -78,25 +83,40 @@ end
 if strcmp(options.overwrite_data,'on') || ...
         (strcmp(options.overwrite_data,'off') && ~RMexist)
     
+    if size(subject.func,1) == 1 && size(subject.func,2) > 1
+        subject.func = subject.func';
+    end
     Data = [subject.anat; subject.func];
+   
     if isfield(subject,'fieldmap')
-        if size(subject.fieldmap,1) == 1
-            FMindex = structfun(@(x) ischar(x), subject.fieldmap);
-            FN      = fieldnames(subject.fieldmap);
-            FN      = FN(FMindex);
-            for f= 1:size(FN,1)
-                if exist(subject.fieldmap.(FN{f}),'file')
-                    Data = [Data ; subject.fieldmap.(FN{f})];
+        if ~isempty(subject.fieldmap)
+
+            if any(contains(options.fieldmaps,{'phasediff','epi','phase12'}))
+                % filter content as likely multiple types
+                keep = find(arrayfun(@(x) strcmpi(x.type,options.fieldmaps),subject.fieldmap));
+                if ~isempty(keep)
+                    subject.fieldmap = subject.fieldmap(keep);
                 end
             end
-        else % 1 field map per run
-            for f= 1:size(subject.fieldmap,1)
-                FMindex = structfun(@(x) ischar(x), subject.fieldmap(f));
-                FN      = fieldnames(subject.fieldmap(f));
+            
+            if size(subject.fieldmap,1) == 1
+                FMindex = structfun(@(x) ischar(x), subject.fieldmap);
+                FN      = fieldnames(subject.fieldmap);
                 FN      = FN(FMindex);
-                for ff= 1:size(FN,1)
-                    if exist(subject.fieldmap(f).(FN{ff}),'file')
-                        Data = [Data ; subject.fieldmap(f).(FN{ff})];
+                for f= 1:size(FN,1)
+                    if exist(subject.fieldmap.(FN{f}),'file')
+                        Data = [Data ; subject.fieldmap.(FN{f})];
+                    end
+                end
+            else % 1 field map per run
+                for f= 1:size(subject.fieldmap,1)
+                    FMindex = structfun(@(x) ischar(x), subject.fieldmap(f));
+                    FN      = fieldnames(subject.fieldmap(f));
+                    FN      = FN(FMindex);
+                    for ff= 1:size(FN,1)
+                        if exist(subject.fieldmap(f).(FN{ff}),'file')
+                            Data = [Data ; subject.fieldmap(f).(FN{ff})];
+                        end
                     end
                 end
             end
@@ -411,6 +431,8 @@ if isfield(subject, 'fieldmap') && strcmpi(options.fmap,'on')
                             subject.fieldmap(ifmap).mag2;...
                             subject.fieldmap(ifmap).phase1;...
                             subject.fieldmap(ifmap).phase2};
+                    elseif strcmp(subject.fieldmap(ifmap).type, 'e')
+                    
                     end
                     
                     fprintf(' coregistering fmap %g to its reference run\n',ifmap)
@@ -862,81 +884,86 @@ if strcmp(options.overwrite_data,'on') || ...
         clear matlabbatch
     end
     
+    bounding_box = [-78 -112 -70 ; 78 76 85];
+    if strcmpi(options.norm,'EPInorm') && ~rem(norm_res(3),2)
+        % anat likely complains but runas before but old EPI now matches
+        bounding_box = [-78 -112 -70 ; 78 76 86]; 
+    end
+    
+    % segment the coregistered T1 (not resliced) and possibly other
+    % modality (T2 or FLAIR most likely bit not checking)
+    % --------------------------------------------------------
+    for channel = 1:size(subject.anat,1)
+        if channel == 1
+            matlabbatch{1}.spm.spatial.preproc.channel(channel).vols   = {subject.anat{channel}};
+        else
+            matlabbatch{1}.spm.spatial.preproc.channel(channel).vols   = {others{1}.rfiles{channel-1}};
+        end
+        matlabbatch{end}.spm.spatial.preproc.channel(channel).biasreg  = 0.001;
+        matlabbatch{end}.spm.spatial.preproc.channel(channel).biasfwhm = 60;
+        matlabbatch{end}.spm.spatial.preproc.channel(channel).write    = [0 1];
+    end
+    matlabbatch{end}.spm.spatial.preproc.tissue(1).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,1']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(1).ngaus  = 2;
+    matlabbatch{end}.spm.spatial.preproc.tissue(1).native = [1 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(1).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(2).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,2']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(2).ngaus  = 2;
+    matlabbatch{end}.spm.spatial.preproc.tissue(2).native = [1 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(2).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(3).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,3']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(3).ngaus  = 2;
+    matlabbatch{end}.spm.spatial.preproc.tissue(3).native = [1 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(3).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(4).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,4']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(4).ngaus  = 3;
+    matlabbatch{end}.spm.spatial.preproc.tissue(4).native = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(4).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(5).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,5']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(5).ngaus  = 4;
+    matlabbatch{end}.spm.spatial.preproc.tissue(5).native = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(5).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(6).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,6']};
+    matlabbatch{end}.spm.spatial.preproc.tissue(6).ngaus  = 2;
+    matlabbatch{end}.spm.spatial.preproc.tissue(6).native = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.tissue(6).warped = [0 0];
+    matlabbatch{end}.spm.spatial.preproc.warp.mrf         = 1;
+    matlabbatch{end}.spm.spatial.preproc.warp.cleanup     = 1;
+    matlabbatch{end}.spm.spatial.preproc.warp.reg         = [0 0.001 0.5 0.05 0.2];
+    matlabbatch{end}.spm.spatial.preproc.warp.affreg      = 'mni';
+    matlabbatch{end}.spm.spatial.preproc.warp.fwhm        = 0;
+    matlabbatch{end}.spm.spatial.preproc.warp.samp        = 3;
+    if strcmpi(options.norm_inv_save,'on')
+        matlabbatch{end}.spm.spatial.preproc.warp.write   = [1 1];
+    else
+        matlabbatch{end}.spm.spatial.preproc.warp.write   = [0 1];
+    end
+    
+    % normalize EPI using T1 info
+    % ----------------------------
+    % normalize space-EPI_T1
+    matlabbatch{2}.spm.spatial.normalise.write.subj(1).def(1) = ...
+        cfg_dep('Segment: Forward Deformations', ...
+        substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+        substruct('.','fordef', '()',{':'}));
+    matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(1) = {spaceEPI_T1w};
+    
+    % normalize bias corrected T1 and tissue classes
+    matlabbatch{end}.spm.spatial.normalise.write.subj(2).def(1) = ...
+        cfg_dep('Segment: Forward Deformations', ...
+        substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
+        substruct('.','fordef', '()',{':'}));
+    
+    for channel = 1:size(subject.anat,1)
+        matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel) = cfg_dep(['Segment: Bias Corrected (' num2str(channel) ')'], substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','channel', '()',{1}, '.','biascorr', '()',{':'}));
+    end
+    matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel+1) = cfg_dep('Segment: c1 Images', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
+    matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel+2) = cfg_dep('Segment: c2 Images', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
+    matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel+3) = cfg_dep('Segment: c3 Images', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
+    
     % if field maps, normalize EPI from T1
     % -------------------------------------
     if strcmpi(options.norm,'T1norm')
-        
-        % segment the coregistered T1 (not resliced) and possibly other
-        % modality (T2 or FLAIR most likely bit not checking)
-        % --------------------------------------------------------
-        for channel = 1:size(subject.anat,1)
-            if channel == 1
-                matlabbatch{1}.spm.spatial.preproc.channel(channel).vols   = {subject.anat{channel}};
-            else
-                matlabbatch{1}.spm.spatial.preproc.channel(channel).vols   = {others{1}.rfiles{channel-1}};
-            end
-            matlabbatch{end}.spm.spatial.preproc.channel(channel).biasreg  = 0.001;
-            matlabbatch{end}.spm.spatial.preproc.channel(channel).biasfwhm = 60;
-            matlabbatch{end}.spm.spatial.preproc.channel(channel).write    = [0 1];
-        end
-        matlabbatch{end}.spm.spatial.preproc.tissue(1).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,1']};
-        matlabbatch{end}.spm.spatial.preproc.tissue(1).ngaus  = 2;
-        matlabbatch{end}.spm.spatial.preproc.tissue(1).native = [1 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(1).warped = [0 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(2).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,2']};
-        matlabbatch{end}.spm.spatial.preproc.tissue(2).ngaus  = 2;
-        matlabbatch{end}.spm.spatial.preproc.tissue(2).native = [1 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(2).warped = [0 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(3).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,3']};
-        matlabbatch{end}.spm.spatial.preproc.tissue(3).ngaus  = 2;
-        matlabbatch{end}.spm.spatial.preproc.tissue(3).native = [1 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(3).warped = [0 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(4).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,4']};
-        matlabbatch{end}.spm.spatial.preproc.tissue(4).ngaus  = 3;
-        matlabbatch{end}.spm.spatial.preproc.tissue(4).native = [0 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(4).warped = [0 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(5).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,5']};
-        matlabbatch{end}.spm.spatial.preproc.tissue(5).ngaus  = 4;
-        matlabbatch{end}.spm.spatial.preproc.tissue(5).native = [0 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(5).warped = [0 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(6).tpm    = {[spm_root filesep 'tpm' filesep 'TPM.nii,6']};
-        matlabbatch{end}.spm.spatial.preproc.tissue(6).ngaus  = 2;
-        matlabbatch{end}.spm.spatial.preproc.tissue(6).native = [0 0];
-        matlabbatch{end}.spm.spatial.preproc.tissue(6).warped = [0 0];
-        matlabbatch{end}.spm.spatial.preproc.warp.mrf         = 1;
-        matlabbatch{end}.spm.spatial.preproc.warp.cleanup     = 1;
-        matlabbatch{end}.spm.spatial.preproc.warp.reg         = [0 0.001 0.5 0.05 0.2];
-        matlabbatch{end}.spm.spatial.preproc.warp.affreg      = 'mni';
-        matlabbatch{end}.spm.spatial.preproc.warp.fwhm        = 0;
-        matlabbatch{end}.spm.spatial.preproc.warp.samp        = 3;
-        if strcmpi(options.norm_inv_save,'on')
-            matlabbatch{end}.spm.spatial.preproc.warp.write   = [1 1];
-        else
-            matlabbatch{end}.spm.spatial.preproc.warp.write   = [0 1];
-        end
-        
-        % normalize EPI using T1 info
-        % ----------------------------
-        % normalize space-EPI_T1
-        matlabbatch{2}.spm.spatial.normalise.write.subj(1).def(1) = ...
-            cfg_dep('Segment: Forward Deformations', ...
-            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
-            substruct('.','fordef', '()',{':'}));
-        matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(1) = {spaceEPI_T1w};
-        
-        % normalize bias corrected T1 and tissue classes
-        matlabbatch{end}.spm.spatial.normalise.write.subj(2).def(1) = ...
-            cfg_dep('Segment: Forward Deformations', ...
-            substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
-            substruct('.','fordef', '()',{':'}));
-        
-        for channel = 1:size(subject.anat,1)
-            matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel) = cfg_dep(['Segment: Bias Corrected (' num2str(channel) ')'], substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','channel', '()',{1}, '.','biascorr', '()',{':'}));
-        end
-        matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel+1) = cfg_dep('Segment: c1 Images', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
-        matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel+2) = cfg_dep('Segment: c2 Images', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
-        matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel+3) = cfg_dep('Segment: c3 Images', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
-        
         % normalize EPI
         matlabbatch{end}.spm.spatial.normalise.write.subj(3).def(1) = ...
             cfg_dep('Segment: Forward Deformations', ...
@@ -946,14 +973,14 @@ if strcmp(options.overwrite_data,'on') || ...
             matlabbatch{end}.spm.spatial.normalise.write.subj(3).resample(frun,:) = {realigned_files{frun}}; %#ok<CCAT1>
         end
         matlabbatch{end}.spm.spatial.normalise.write.subj(3).resample(end+1,:)    = {mean_realigned_file}; % adding mean image
-        matlabbatch{end}.spm.spatial.normalise.write.woptions.bb                  = [-78 -112 -70 ; 78 76 85];
+        matlabbatch{end}.spm.spatial.normalise.write.woptions.bb                  = bounding_box;
         matlabbatch{end}.spm.spatial.normalise.write.woptions.vox                 = norm_res;
         matlabbatch{end}.spm.spatial.normalise.write.woptions.interp              = 4;
         matlabbatch{end}.spm.spatial.normalise.write.woptions.prefix              = 'w';
         
     else  % normalize EPI on EPI template (old routine)
         % -------------------------------------------
-        matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.source(1)                  = {mean_realigned_file};
+        matlabbatch{end+1}.spm.tools.oldnorm.estwrite.subj.source(1)                  = {mean_realigned_file};
         matlabbatch{end}.spm.tools.oldnorm.estwrite.subj.wtsrc                    = '';
         for frun = 1:size(realigned_files,1)
             matlabbatch{end}.spm.tools.oldnorm.estwrite.subj.resample(frun,:)     = {realigned_files{frun}}; %#ok<CCAT1>
@@ -968,7 +995,7 @@ if strcmp(options.overwrite_data,'on') || ...
         matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.nits                 = 16;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.eoptions.reg                  = 1;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.preserve             = 0;
-        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.bb                   = [-78 -112 -70 ; 78 76 85];
+        matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.bb                   = bounding_box;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.vox                  = norm_res;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.interp               = 4;
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.wrap                 = [0 0 0];
@@ -987,8 +1014,8 @@ if strcmp(options.overwrite_data,'on') || ...
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
         
+        meta.segment = matlabbatch{1}.spm.spatial.preproc.channel.vols;
         if strcmpi(options.norm,'T1norm')
-            meta.segment        = matlabbatch{1}.spm.spatial.preproc.channel.vols;
             meta.normalise.from = 'segment';
         else
             meta.normalise.from = 'EPI template';
@@ -1024,7 +1051,7 @@ for frun = 1:size(Normalized_files,1)
     if strcmp(options.overwrite_data,'on') || ...
             (strcmp(options.overwrite_data,'off') && ~isfield(meta,'smoothingkernel'))
         
-        fprintf(' smoothing sesssion/run %g \n',frun);
+        fprintf(' smoothing run %g \n',frun);
         V                       = spm_vol(Normalized_files{frun});
         skernel                 = abs(diag(V(1).mat)); clear V
         [filepath,filename,ext] = fileparts(subject.func{frun});
@@ -1032,6 +1059,8 @@ for frun = 1:size(Normalized_files,1)
             meta = spm_jsonread(fullfile(filepath,[filename '.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
@@ -1158,7 +1187,11 @@ end
 wspaceEPI = dir(fullfile(fileparts(subject.anat{1}),'wspace-EPI*.nii'));
 if ~isempty(wspaceEPI)
     partA = get_fileparts(wspaceEPI.name);
-    partB = ['space-IXI549_desc-epiresliced' ext];
+    if strcmpi(options.norm,'EPInorm')
+        partB = ['space-MNI152Lin_desc-epiresliced' ext];
+    else
+        partB = ['space-IXI549_desc-epiresliced' ext];
+    end
     movefile(fullfile(wspaceEPI.folder,wspaceEPI.name),fullfile(fileparts(subject.anat{1}),[partA partB]))
 end
 
@@ -1229,15 +1262,21 @@ end
 for frun = 1:size(subject.func,1)
     if exist(stats_ready{frun},'file')
         [filepath,filename,ext] = fileparts(subject.func{frun});
-        newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold' ext]);
+            if strcmpi(options.norm,'EPInorm')
+                newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold' ext]);
+            else
+                newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold' ext]);
+            end
         movefile(stats_ready{frun},newname);
         subject.func{frun} = newname;
         
-        if strcmp(options.QC,'on')
+        if strcmp(options.QC,'on') 
             if exist(fullfile(filepath,[filename '.json']),'file')
                 meta = spm_jsonread(fullfile(filepath,[filename '.json']));
             elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_space-IXI549_desc-preprocessed_bold.json']),'file')
                 meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
+            elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_space-MNI152Lin_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']));
             elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json']),'file')
                 meta = spm_jsonread(fullfile(filepath,[subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json']));
             end
@@ -1259,7 +1298,11 @@ for frun = 1:size(subject.func,1)
         else
             json = dir(fullfile(filepath,[filename(1:end-5) '*desc-preprocessed_bold.json']));
             if ~isempty(json)
-                newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']);
+                if strcmpi(options.norm,'EPInorm')
+                    newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']);
+                else
+                    newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']);
+                end
                 movefile(fullfile(json.folder,json.name),newname);
             end
         end
@@ -1267,7 +1310,11 @@ for frun = 1:size(subject.func,1)
     else % it could be it was done and just need updated
         
         [filepath,filename,ext] = fileparts(subject.func{frun});
-        newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold' ext]);
+        if strcmpi(options.norm,'EPInorm')
+            newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold' ext]);
+        else
+            newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold' ext]);
+        end
         if exist(newname,'file')
             subject.func{frun} = newname;
             
@@ -1281,6 +1328,8 @@ for frun = 1:size(subject.func,1)
                     meta = spm_jsonread(fullfile(filepath,[filename '.json']));
                 elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
                     meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
+                elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']),'file')
+                    meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']));
                 else
                     meta.QA = [];
                 end
