@@ -257,9 +257,8 @@ for s=1:size(BIDS.subjects,2)
     end
 end
 
-
+% remove subjects from BIDS
 if ~isempty(options.subjects)
-    % remove subjects from BIDS
     subindex = 1;
     subnames = arrayfun(@(x) x.name,BIDS.subjects,'UniformOutput',false);
     for sub = 1:length(options.subjects)
@@ -285,7 +284,33 @@ if ~isempty(options.subjects)
         tmp           = BIDS;
         BIDS          = rmfield(BIDS,'subjects');
         BIDS.subjects = tmp.subjects(allsub);
-        clear tmp
+        clear tmp keep
+    
+        % also update BIDS.participants
+        subindex = 1;
+        subnames = arrayfun(@(x) x.participant_id,BIDS.participants,'UniformOutput',false);
+        for sub = 1:length(options.subjects)
+            if strncmp(options.subjects{sub},'sub-',4)
+                tmp = find(cellfun(@(x) strcmpi(x,options.subjects{sub}),subnames{1}));
+            else
+                tmp = find(cellfun(@(x) strcmpi(x,['sub-' options.subjects{sub}]),subnames{1}));
+            end
+            
+            if ~isempty(tmp)
+                keep(subindex) = tmp; %#ok<AGROW>
+                subindex = subindex+1;
+            end
+        end
+        
+        if exist('keep','var')
+            fn = fieldnames(BIDS.participants);
+            for f=1:size(fn,1)
+                if ~strcmpi(fn{f},'meta')
+                    BIDS.participants.(fn{f}) = BIDS.participants.(fn{f})(keep);
+                end
+            end
+        end
+        
     else
         error('options.subjects %s was used to filter data, but no match was found')
     end
