@@ -72,6 +72,7 @@ BIDS = spm_BIDS(BIDS_dir);
 
 % update BIDS for multiple 'overlapping' fmaps
 % these can be filtered durnig the analysis
+% -- this part of code might not be necessary --
 for s=1:size(BIDS.subjects,2)
     location = fullfile(BIDS.subjects(s).path,'fmap');
     if exist(location,'dir')
@@ -262,9 +263,14 @@ if ~isempty(options.subjects)
     subindex = 1;
     subnames = arrayfun(@(x) x.name,BIDS.subjects,'UniformOutput',false);
     for sub = 1:length(options.subjects)
-        tmp = find(cellfun(@(x) strcmpi(x,options.subjects{sub}),subnames));
+        if strncmp(options.subjects{sub},'sub-',4)
+            tmp = find(cellfun(@(x) strcmpi(x,options.subjects{sub}),subnames));
+        else
+            tmp = find(cellfun(@(x) strcmpi(x,['sub-' options.subjects{sub}]),subnames));
+        end
+        
         if ~isempty(tmp)
-            keep{subindex} = tmp;
+            keep{subindex} = tmp; %#ok<AGROW>
             subindex = subindex+1;
         end
     end
@@ -281,7 +287,7 @@ if ~isempty(options.subjects)
         BIDS.subjects = tmp.subjects(allsub);
         clear tmp
     else
-        error('options.subjects was used to filter data, but no match was found')
+        error('options.subjects %s was used to filter data, but no match was found')
     end
 end
 
@@ -300,10 +306,19 @@ nb_sub    = numel(subjs_ls);
 for s = nb_sub:-1:1 % for each subject
 
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
+    if ~isempty(options.ses)
+        sess_ls = sess_ls(strcmpi(sess_ls,options.ses));
+        if isempty(sess_ls)
+            warning('%s session not found, unpacking all sessions',options.ses)
+            sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
+        end
+    end
+    
     if isempty(sess_ls)
         sess_ls{1} = '';
     end
-    BIDSindex = find(arrayfun(@(x) ~isempty(strfind(['sub-' subjs_ls{s}],x.name)), BIDS.subjects));
+
+    % BIDSindex = find(arrayfun(@(x) ~isempty(strfind(['sub-' subjs_ls{s}],x.name)), BIDS.subjects));
     
     if ~exist(fullfile(options.outdir, ['sub-' subjs_ls{s}]),'dir')
         mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}]))
@@ -376,14 +391,21 @@ end
 % -----------------------------------------------------------------------
 parfor s=1:nb_sub
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
+    if ~isempty(options.ses)
+        sess_ls = sess_ls(strcmpi(sess_ls,options.ses));
+        if isempty(sess_ls)
+            warning('%s session not found, unpacking all sessions',options.ses)
+            sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
+        end
+    end
+    
     if isempty(sess_ls)
         sess_ls = {''};
     end
     
-    if ~exist(fullfile(options.outdir, ['sub-' subjs_ls{s}]),'dir') %#ok<PFBNS>
+    if ~exist(fullfile(options.outdir, ['sub-' subjs_ls{s}]),'dir') 
         mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}]))
     end
-
 
     for session = 1:size(sess_ls,2) % for each session
                
@@ -417,17 +439,22 @@ parfor s=1:nb_sub
 
         %% functional
         for frun = 1:size(run_ls,1) % for each run
-
-            target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                sess_folder, 'func', ['run' num2str(frun)]);   
-            
             in                                        = run_ls{frun,1};
             [rootpath,name,ext]                       = spm_fileparts(in);
             [ext,name,compressed]                     = iscompressed(ext,name);
+            if contains(name,'run-')
+                runname    = name(strfind(name,'run-'):end);
+                runname    = runname(1:min(strfind(runname,'_'))-1);
+                target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                    sess_folder, 'func', runname);               
+            else
+                target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                    sess_folder, 'func', ['run' num2str(frun)]);
+            end
             subjects{s}.func{session,bold_run_count}  = fullfile(target_dir, [name ext]);
-            values                                    = strfind(name,'_')-1;
-            task                                      = strfind(name,'task-');
-            task                                      = name(task:min(values(values>task)));
+            % values                                    = strfind(name,'_')-1;
+            % task                                      = strfind(name,'task-');
+            % task                                      = name(task:min(values(values>task)));
             if exist(fullfile(rootpath, [name(1:end-5) '_events.tsv']),'file')
                 subjects{s}.event{session,bold_run_count,1} = fullfile(rootpath, [name(1:end-5) '_events.tsv']);
             end
@@ -441,6 +468,9 @@ parfor s=1:nb_sub
             bold_run_count = bold_run_count + 1;
         end
 
+        %% if exist physio
+        
+        
         %% field maps
         if ismember('fmap', spm_BIDS(BIDS,'modalities', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}))
