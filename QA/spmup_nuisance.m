@@ -1,7 +1,7 @@
 function nuisances = spmup_nuisance(fmridata, whitematter, csf)
 
 % Routine to compute nuisance regressors from White matter and CSF masks.
-% Masks are thresholded at 70%, the time series extracted, detrended (1st
+% Masks are thresholded at 70%, the time series extracted, detrended (2nd
 % order polynomial) and averaged
 %
 % FORMAT: nuisances = spmup_nuisance(fmridata, whitematter, csf)
