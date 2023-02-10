@@ -434,7 +434,7 @@ parfor s=1:nb_sub
     for session = 1:size(sess_ls,2) % for each session
                
         fprintf(' subject %g - session %i: checking functional data \n',s, session)
-        if size(sess_ls,2)==1
+        if isempty(sess_ls)
             sess_folder = '';
         else
             sess_folder = ['ses-' sess_ls{session}];
