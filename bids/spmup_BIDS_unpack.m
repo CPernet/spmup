@@ -428,6 +428,10 @@ end
 
 % unpack functional and field maps (still need to work out sessions here)
 % -----------------------------------------------------------------------
+if ~exist('keep_ses','var')
+    keep_ses = [];
+end
+
 parfor s=1:nb_sub
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
     if ~isempty(options.ses)
