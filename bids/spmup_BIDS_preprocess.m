@@ -91,9 +91,9 @@ if strcmp(options.overwrite_data,'on') || ...
     if isfield(subject,'fieldmap')
         if ~isempty(subject.fieldmap)
 
-            if any(contains(options.fieldmaps,{'phasediff','epi','phase12'}))
+            if any(contains(options.fmap,{'phasediff','epi','phase12'}))
                 % filter content as likely multiple types
-                keep = find(arrayfun(@(x) strcmpi(x.type,options.fieldmaps),subject.fieldmap));
+                keep = find(arrayfun(@(x) strcmpi(x.type,options.fmap),subject.fieldmap));
                 if ~isempty(keep)
                     subject.fieldmap = subject.fieldmap(keep);
                 end
