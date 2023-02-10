@@ -331,7 +331,22 @@ for s = nb_sub:-1:1 % for each subject
 
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
     if ~isempty(options.ses)
-        sess_ls = sess_ls(strcmpi(sess_ls,options.ses));
+        % quick cleaning of ses- if needed
+        for ses = 1:length(options.ses)
+             if strncmpi(options.ses{ses},'ses-',4)
+                 options.ses{ses} = options.ses{ses}(5:end);
+             end
+        end
+        % match options with available ses-
+        if numel(options.ses) == 1
+            sess_ls = sess_ls(strcmpi(sess_ls,options.ses));
+        else
+            for ses = length(options.ses):-1:1
+                keep_ses(ses) = find(strcmpi(sess_ls,options.ses{ses}));
+            end
+            sess_ls = sess_ls(keep_ses);
+        end
+        
         if isempty(sess_ls)
             warning('%s session not found, unpacking all sessions',options.ses)
             sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
@@ -416,7 +431,12 @@ end
 parfor s=1:nb_sub
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
     if ~isempty(options.ses)
-        sess_ls = sess_ls(strcmpi(sess_ls,options.ses));
+        if numel(options.ses) == 1
+            sess_ls = sess_ls(strcmpi(sess_ls,options.ses));
+        else
+            sess_ls = sess_ls(keep_ses);
+        end
+        
         if isempty(sess_ls)
             warning('%s session not found, unpacking all sessions',options.ses)
             sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
@@ -455,6 +475,8 @@ parfor s=1:nb_sub
                 'ses', sess_ls{session}, 'type', 'bold', 'task', options.task);
             metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'type', 'bold', 'task', options.task);
+            physio_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
+                'ses', sess_ls{session}, 'type', 'physio', 'task', options.task)   
         end        
 
         % counters to list files across different sessions
@@ -489,12 +511,19 @@ parfor s=1:nb_sub
                 subjects{s}.func_metadata{session,bold_run_count} = metadata;
             end
             unzip_or_copy(compressed, options, exist(subjects{s}.func{session,bold_run_count},'file'), in, target_dir)
+            
+            % associated physio
+            if ~isempty(physio_ls)
+                [~,name,ext]      = spm_fileparts(physio_ls{frun,1});
+                [~,~,compressed]  = iscompressed(ext,name);
+                unzip_or_copy(compressed, options, 0, ...
+                    physio_ls{frun,1}, target_dir)
+            end
+            
+            % update count
             bold_run_count = bold_run_count + 1;
         end
 
-        %% if exist physio
-        
-        
         %% field maps
         if ismember('fmap', spm_BIDS(BIDS,'modalities', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}))
