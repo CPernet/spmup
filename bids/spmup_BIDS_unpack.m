@@ -286,30 +286,32 @@ if ~isempty(options.subjects)
         clear tmp keep
     
         % also update BIDS.participants
-        subindex = 1;
-        subnames = arrayfun(@(x) x.participant_id,BIDS.participants,'UniformOutput',false);
-        for sub = 1:length(options.subjects)
-            if strncmp(options.subjects{sub},'sub-',4)
-                tmp = find(cellfun(@(x) strcmpi(x,options.subjects{sub}),subnames{1}));
-            else
-                tmp = find(cellfun(@(x) strcmpi(x,['sub-' options.subjects{sub}]),subnames{1}));
+        if ~isempty(BIDS.participants)
+            subindex = 1;
+            subnames = arrayfun(@(x) x.participant_id,BIDS.participants,'UniformOutput',false);
+            for sub = 1:length(options.subjects)
+                if strncmp(options.subjects{sub},'sub-',4)
+                    tmp = find(cellfun(@(x) strcmpi(x,options.subjects{sub}),subnames{1}));
+                else
+                    tmp = find(cellfun(@(x) strcmpi(x,['sub-' options.subjects{sub}]),subnames{1}));
+                end
+
+                if ~isempty(tmp)
+                    keep(subindex) = tmp; %#ok<AGROW>
+                    subindex = subindex+1;
+                end
             end
-            
-            if ~isempty(tmp)
-                keep(subindex) = tmp; %#ok<AGROW>
-                subindex = subindex+1;
-            end
-        end
-        
-        if exist('keep','var')
-            fn = fieldnames(BIDS.participants);
-            for f=1:size(fn,1)
-                if ~strcmpi(fn{f},'meta')
-                    BIDS.participants.(fn{f}) = BIDS.participants.(fn{f})(keep);
+
+            if exist('keep','var')
+                fn = fieldnames(BIDS.participants);
+                for f=1:size(fn,1)
+                    if ~strcmpi(fn{f},'meta')
+                        BIDS.participants.(fn{f}) = BIDS.participants.(fn{f})(keep);
+                    end
                 end
             end
         end
-        
+            
     else
         error('options.subjects %s was used to filter data, but no match was found')
     end
@@ -474,13 +476,15 @@ parfor s=1:nb_sub
                 'ses', sess_ls{session}, 'type', 'bold');
             metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'type', 'bold');
+            physio_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
+                'ses', sess_ls{session}, 'type', 'physio');
         else
             run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'type', 'bold', 'task', options.task);
             metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'type', 'bold', 'task', options.task);
             physio_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
-                'ses', sess_ls{session}, 'type', 'physio', 'task', options.task)   
+                'ses', sess_ls{session}, 'type', 'physio', 'task', options.task);
         end        
 
         % counters to list files across different sessions
