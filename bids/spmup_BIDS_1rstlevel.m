@@ -90,7 +90,7 @@ for frun = max(size(subject.func)):-1:1  % max of cell array so it doesn't matte
                 subject.tissues{3},subject.tissues{1});
             QAjobs{frun}.nuisance.anoise = anoise;
             QAjobs{frun}.nuisance.tnoise = tnoise;
-            design = [design QAjobs{frun}.nuisance.anoise QAjobs{frun}.nuisance.tnoise]; %#ok<AGROW>
+            design = [design anoise{3} tnoise]; %#ok<AGROW>
             json.Columns{end+size(QAjobs{frun}.nuisance.anoise,2)} = 'anoise';
             json.Columns{end+size(QAjobs{frun}.nuisance.tnoise,2)} = 'tnoise';
         else
@@ -106,8 +106,20 @@ for frun = max(size(subject.func)):-1:1  % max of cell array so it doesn't matte
     if ~isfield(subject.func_qa{frun},'Globals') && isfield(QAjobs{frun},'glo')
         subject.func_qa{frun}.Globals = QAjobs{frun}.glo;
     end
-    if ~isfield(subject.func_qa{frun},'nuisance') && isfield(QAjobs{frun},'nuisance')
-        subject.func_qa{frun}.Globals = QAjobs{frun}.nuisance;
+    
+    if isfield(QAjobs{frun},'nuisance')
+        if ~isfield(subject.func_qa{frun},'nuisance')
+            subject.func_qa{frun}.nuisance = QAjobs{frun}.nuisance;
+        else
+            if all(~isfield(subject.func_qa{frun}.nuisance,{'WM','CSF'})) && ...
+                all(isfield(QAjobs{frun}.nuisance,{'WM','CSF'})) 
+                subject.func_qa{frun}.nuisance = QAjobs{frun}.nuisance;
+            elseif ~isfield(subject.func_qa{frun}.nuisance,'anoise') && ...
+                    isfield(QAjobs{frun}.nuisance,'anoise')
+                subject.func_qa{frun}.nuisance.anoise = QAjobs{frun}.nuisance.anoise;
+                subject.func_qa{frun}.nuisance.tnoise = QAjobs{frun}.nuisance.tnoise;
+            end
+        end
     end
 end
 
