@@ -268,7 +268,8 @@ if strcmp(options.overwrite_data,'on') || ...
     
     if all(contains(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans,'rest'))
         residuals = spm_jobman('run',matlabbatch);
-        if size(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans,1)
+        if size(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans,1) && ...
+                ~iscell(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans)
             [filepath,filename,ext]=fileparts(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans);
             VfMRI = spm_file_merge(residuals{2}.res,fullfile(filepath,[filename(1:end-5) '-GLMdenoised_bold' ext]));
         else
