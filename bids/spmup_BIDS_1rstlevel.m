@@ -268,9 +268,12 @@ if strcmp(options.overwrite_data,'on') || ...
     
     if all(contains(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans,'rest'))
         residuals = spm_jobman('run',matlabbatch);
-        if size(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans,1) && ...
-                ~iscell(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans)
-            [filepath,filename,ext]=fileparts(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans);
+        if size(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans,1)
+            try
+                [filepath,filename,ext]=fileparts(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans);
+            catch % some older matlab version doesn't like cell
+                [filepath,filename,ext]=fileparts(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans{1});
+            end
             VfMRI = spm_file_merge(residuals{2}.res,fullfile(filepath,[filename(1:end-5) '-GLMdenoised_bold' ext]));
         else
             [~,filename,ext]=fileparts(matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans{1});
