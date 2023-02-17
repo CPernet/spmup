@@ -197,7 +197,12 @@ if strcmpi(motion, 'on') || ~exist('motion', 'var')
             return
         end
     else
-        rfile = rfile.name;
+        if size(rfile ,1) > 1
+            idx= find(arrayfun(@(x) strncmp(x.name, 'rp', 2), rfile));
+            rfile = rfile(idx).name;
+        else
+            rfile = rfile.name;
+        end
     end
     motion = spmup_FD([fileparts(Vfmri(1).fname) filesep rfile])';
     figplot = figplot + 1;
