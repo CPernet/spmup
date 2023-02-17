@@ -107,11 +107,17 @@ end
 index      = find(whitematter);
 [x,y,z]    = ind2sub(size(whitematter),index);
 timeseries = spm_get_data(Vfmri,[x y z]');
+disp('getting WM components')
+anoise{1} = decompose(timeseries,fig);
 
 index      = find(csf);
 [x,y,z]    = ind2sub(size(csf),index);
 timeseries = [timeseries spm_get_data(Vfmri,[x y z]')];
+disp('getting CSF components')
+anoise{2} = decompose(spm_get_data(Vfmri,[x y z]'),fig);
 
+disp('getting joint components')
+anoise{3} = decompose(timeseries,fig);
 
 %%
 % if QC then output the thresholded mask images
@@ -128,11 +134,6 @@ if length(nargout) == 3
     QC.whitematter.V     = Vcsf;
     QC.whitematter.img   = csf;    
 end
-
-%%
-% get regressors from WM and CSF
-disp('getting WM and CSF components')
-anoise = decompose(timeseries,fig);
 
 %% tnoise
 % Following Lund et al. 2006 <http://www.ncbi.nlm.nih.gov/pubmed/16099175>
