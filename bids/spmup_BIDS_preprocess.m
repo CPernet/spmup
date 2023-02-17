@@ -3,9 +3,9 @@ function [subject,options] = spmup_BIDS_preprocess(subject, options)
 % routine to preprocess BIDS fMRI data following 'options'
 % Preprocessing is intented FOR ONE TASK AND ONE SESSION (but multiple runs ok)
 % Note that even if EPI-norm is used (because eg no fieldmaps), anat is expected
-% to run the segmentation and coregester it with EPI for vizualization. 
-% If anat is not available, or other options are not here, just use the 
-% regular spm batch and call spmup_QA functions, rather than forcing 
+% to run the segmentation and coregester it with EPI for vizualization.
+% If anat is not available, or other options are not here, just use the
+% regular spm batch and call spmup_QA functions, rather than forcing
 % spmup_BIDS_preprocess to do somehting is was not designed for.
 
 % FORMAT spmup_BIDS_preprocess(subject, s)
@@ -70,102 +70,104 @@ subject.anat                      = rmfield(subject,'anat');
 subject.anat                      = anat';
 clear anat
 
-% process
-RMexist = 0;
-[anat_dir,filename] = fileparts(subject.anat{1});
-if exist(fullfile(anat_dir,[filename(1:end-4) '_desc-preprocessed_anat.json']),'file')
-    anatinfo = spm_jsonread(fullfile(anat_dir,[filename(1:end-4) '_desc-preprocessed_anat.json']));
-    if isfield(anatinfo,'reorientation_matrix')
-        RMexist = 1;
+if strcmp(options.reorient,'on')
+    % process
+    RMexist = 0;
+    [anat_dir,filename] = fileparts(subject.anat{1});
+    if exist(fullfile(anat_dir,[filename(1:end-4) '_desc-preprocessed_anat.json']),'file')
+        anatinfo = spm_jsonread(fullfile(anat_dir,[filename(1:end-4) '_desc-preprocessed_anat.json']));
+        if isfield(anatinfo,'reorientation_matrix')
+            RMexist = 1;
+        end
     end
-end
-
-if strcmp(options.overwrite_data,'on') || ...
-        (strcmp(options.overwrite_data,'off') && ~RMexist)
     
-    if size(subject.func,1) == 1 && size(subject.func,2) > 1
-        subject.func = subject.func';
-    end
-    Data = [subject.anat; subject.func];
-   
-    if isfield(subject,'fieldmap')
-        if ~isempty(subject.fieldmap)
-
-            if any(contains(options.fmap,{'phasediff','epi','phase12'}))
-                % filter content as likely multiple types
-                keep = find(arrayfun(@(x) strcmpi(x.type,options.fmap),subject.fieldmap));
-                if ~isempty(keep)
-                    subject.fieldmap = subject.fieldmap(keep);
-                end
-            end
-            
-            if size(subject.fieldmap,1) == 1
-                FMindex = structfun(@(x) ischar(x), subject.fieldmap);
-                FN      = fieldnames(subject.fieldmap);
-                FN      = FN(FMindex);
-                for f= 1:size(FN,1)
-                    if exist(subject.fieldmap.(FN{f}),'file')
-                        Data = [Data ; subject.fieldmap.(FN{f})];
+    if strcmp(options.overwrite_data,'on') && ~RMexist || ...
+            (strcmp(options.overwrite_data,'off') && ~RMexist)
+        
+        if size(subject.func,1) == 1 && size(subject.func,2) > 1
+            subject.func = subject.func';
+        end
+        Data = [subject.anat; subject.func];
+        
+        if isfield(subject,'fieldmap')
+            if ~isempty(subject.fieldmap)
+                
+                if any(contains(options.fmap,{'phasediff','epi','phase12'}))
+                    % filter content as likely multiple types
+                    keep = find(arrayfun(@(x) strcmpi(x.type,options.fmap),subject.fieldmap));
+                    if ~isempty(keep)
+                        subject.fieldmap = subject.fieldmap(keep);
                     end
                 end
-            else % 1 field map per run
-                for f= 1:size(subject.fieldmap,1)
-                    FMindex = structfun(@(x) ischar(x), subject.fieldmap(f));
-                    FN      = fieldnames(subject.fieldmap(f));
+                
+                if size(subject.fieldmap,1) == 1
+                    FMindex = structfun(@(x) ischar(x), subject.fieldmap);
+                    FN      = fieldnames(subject.fieldmap);
                     FN      = FN(FMindex);
-                    for ff= 1:size(FN,1)
-                        if exist(subject.fieldmap(f).(FN{ff}),'file')
-                            Data = [Data ; subject.fieldmap(f).(FN{ff})];
+                    for f= 1:size(FN,1)
+                        if exist(subject.fieldmap.(FN{f}),'file')
+                            Data = [Data ; subject.fieldmap.(FN{f})];
+                        end
+                    end
+                else % 1 field map per run
+                    for f= 1:size(subject.fieldmap,1)
+                        FMindex = structfun(@(x) ischar(x), subject.fieldmap(f));
+                        FN      = fieldnames(subject.fieldmap(f));
+                        FN      = FN(FMindex);
+                        for ff= 1:size(FN,1)
+                            if exist(subject.fieldmap(f).(FN{ff}),'file')
+                                Data = [Data ; subject.fieldmap(f).(FN{ff})];
+                            end
                         end
                     end
                 end
             end
         end
-    end
-    
-    if ~isempty(options.VDM)
-        for v = 1:length(options.VDM)
-            Data = [Data ; options.VDM{v}];
-        end
-    end
-    
-    if ~RMexist
-        RM = spmup_auto_reorient(Data,1);
-        disp(' Data reoriented');
-    else
-        warning('options.overwrite_data is %s,\nbut data are already reoriented = skipping this step',options.overwrite_data)
-    end
-    
-    % update info about all those files
-    func_index = 0;
-    fmap_index = 0;
-    for f=1:size(Data,1)
-        [filepath,filename] = fileparts(Data{f});
-        if f==1 && ~RMexist
-            anatinfo.reoriented           = '(0,0,0) set with spmup_auto_reorient';
-            anatinfo.reorientation_matrix = RM;
-            spm_jsonwrite(fullfile(filepath,[filename(1:end-4) '_desc-preprocessed_anat.json']),anatinfo,opts)
-        else
-            if contains(filepath,'anat')
-                meta.reoriented = '(0,0,0) set with spmup_auto_reorient';
-                spm_jsonwrite(fullfile(filepath,[filename '_desc-preprocessed_anat.json']),meta,opts)
-            elseif contains(filepath,'func')
-                if func_index == 0
-                    func_index = 1;
-                end
-                meta.reoriented = '(0,0,0) set from anat with spmup_auto_reorient';
-                spm_jsonwrite([subject.func{func_index}(1:end-9) '_desc-preprocessed_bold.json'],meta,opts)
-                func_index = func_index+1;
-            elseif contains(filepath,'fmap')
-                if fmap_index == 0
-                    fmap_index = 1;
-                end
-                meta.reoriented = '(0,0,0) set from anat with spmup_auto_reorient';
-                spm_jsonwrite([subject.fmap{fmap_index}(1:end-9) '_desc-preprocessed-fmap.json'],meta,opts)
-                fmap_index = fmap_index+1;
+        
+        if ~isempty(options.VDM)
+            for v = 1:length(options.VDM)
+                Data = [Data ; options.VDM{v}];
             end
         end
-        clear meta
+        
+        if ~RMexist
+            RM = spmup_auto_reorient(Data,1);
+            disp(' Data reoriented');
+        else
+            warning('options.overwrite_data is %s,\nbut data are already reoriented = skipping this step',options.overwrite_data)
+        end
+        
+        % update info about all those files
+        func_index = 0;
+        fmap_index = 0;
+        for f=1:size(Data,1)
+            [filepath,filename] = fileparts(Data{f});
+            if f==1 && ~RMexist
+                anatinfo.reoriented           = '(0,0,0) set with spmup_auto_reorient';
+                anatinfo.reorientation_matrix = RM;
+                spm_jsonwrite(fullfile(filepath,[filename(1:end-4) '_desc-preprocessed_anat.json']),anatinfo,opts)
+            else
+                if contains(filepath,'anat')
+                    meta.reoriented = '(0,0,0) set with spmup_auto_reorient';
+                    spm_jsonwrite(fullfile(filepath,[filename '_desc-preprocessed_anat.json']),meta,opts)
+                elseif contains(filepath,'func')
+                    if func_index == 0
+                        func_index = 1;
+                    end
+                    meta.reoriented = '(0,0,0) set from anat with spmup_auto_reorient';
+                    spm_jsonwrite([subject.func{func_index}(1:end-9) '_desc-preprocessed_bold.json'],meta,opts)
+                    func_index = func_index+1;
+                elseif contains(filepath,'fmap')
+                    if fmap_index == 0
+                        fmap_index = 1;
+                    end
+                    meta.reoriented = '(0,0,0) set from anat with spmup_auto_reorient';
+                    spm_jsonwrite([subject.fmap{fmap_index}(1:end-9) '_desc-preprocessed-fmap.json'],meta,opts)
+                    fmap_index = fmap_index+1;
+                end
+            end
+            clear meta
+        end
     end
 end
 
@@ -310,7 +312,16 @@ end % end processing per run
 %% Field Map - compute VDM
 % ------------------------
 
-if isfield(subject, 'fieldmap') && strcmpi(options.fmap,'on')
+if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
+    if any(contains(options.fmap,{'phasediff','epi','phase12'}))
+        % filter content as likely multiple types - maybe done above,
+        % depends if overwrite is on or off
+        keep = find(arrayfun(@(x) strcmpi(x.type,options.fmap),subject.fieldmap));
+        if ~isempty(keep)
+            subject.fieldmap = subject.fieldmap(keep);
+        end
+    end
+    
     for ifmap = 1:numel(subject.fieldmap)
         
         % index which fieldmap goes to which bold run and vice versa
@@ -373,7 +384,9 @@ if isfield(subject, 'fieldmap') && strcmpi(options.fmap,'on')
                 case 'fieldmap'
                     warning('Fieldmap type of fielmaps not implemented')
                 case 'epi'
-                    warning('EPI type of fielmaps not implemented')
+                    fslfiles = spmup_FSLtopup(subject);
+                    [filepath,name,ext]  = fileparts(subject.fieldmap(ifmap).phasediff);
+                    options.VDM{ifmap,1} = [filepath filesep 'vdm5_sc' name ext];
                 otherwise
                     warning('%s is an unsupported type of fieldmap', subject.fieldmap(ifmap).type)
             end
@@ -432,7 +445,7 @@ if isfield(subject, 'fieldmap') && strcmpi(options.fmap,'on')
                             subject.fieldmap(ifmap).phase1;...
                             subject.fieldmap(ifmap).phase2};
                     elseif strcmp(subject.fieldmap(ifmap).type, 'e')
-                    
+                        
                     end
                     
                     fprintf(' coregistering fmap %g to its reference run\n',ifmap)
@@ -761,7 +774,7 @@ for frun = 1:size(subject.func,1)
 end
 
 % -------------------------------
-%% Coregistration / Segmentation 
+%% Coregistration / Segmentation
 % --------------------------------
 
 [filepath,filename,ext] = fileparts(subject.anat{1}); % T1 is now always in starting position
@@ -887,7 +900,7 @@ if strcmp(options.overwrite_data,'on') || ...
     bounding_box = [-78 -112 -70 ; 78 76 85];
     if strcmpi(options.norm,'EPInorm') && ~rem(norm_res(3),2)
         % anat likely complains but runas before but old EPI now matches
-        bounding_box = [-78 -112 -70 ; 78 76 86]; 
+        bounding_box = [-78 -112 -70 ; 78 76 86];
     end
     
     % segment the coregistered T1 (not resliced) and possibly other
@@ -1129,7 +1142,7 @@ if contains(subject.anat{1},'_T1w.nii')
         allfiles = [1:size(json,1)];
         allfiles(allfiles == index) = [];
         for d=1:length(allfiles)
-           delete(fullfile(json(allfiles(d)).folder,json(allfiles(d)).name));
+            delete(fullfile(json(allfiles(d)).folder,json(allfiles(d)).name));
         end
         %keep right file info
         json = json(index);
@@ -1262,15 +1275,15 @@ end
 for frun = 1:size(subject.func,1)
     if exist(stats_ready{frun},'file')
         [filepath,filename,ext] = fileparts(subject.func{frun});
-            if strcmpi(options.norm,'EPInorm')
-                newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold' ext]);
-            else
-                newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold' ext]);
-            end
+        if strcmpi(options.norm,'EPInorm')
+            newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold' ext]);
+        else
+            newname = fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold' ext]);
+        end
         movefile(stats_ready{frun},newname);
         subject.func{frun} = newname;
         
-        if strcmp(options.QC,'on') 
+        if strcmp(options.QC,'on')
             if exist(fullfile(filepath,[filename '.json']),'file')
                 meta = spm_jsonread(fullfile(filepath,[filename '.json']));
             elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_space-IXI549_desc-preprocessed_bold.json']),'file')
