@@ -63,7 +63,8 @@ if isempty(davg)
     else
         FV       = gifti(surface_file);
         center   = FV.vertices(FV.faces(:, :), :);
-        center   = reshape(center, [size(FV.faces,1) 3 3]);
+        tmp      = FV.faces; % some versions do not like 'size' on objects
+        center   = reshape(center, [size(tmp,1) 3 3]);
         center   = squeeze(mean(center,2));
         ori_dist = sqrt(sum((center.*-1).^2,2));
         davg     = mean(ori_dist);
