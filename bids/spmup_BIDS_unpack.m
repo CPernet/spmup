@@ -9,7 +9,7 @@ function [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options)
 %
 % INPUT - BIDS_dir is the BIDS directory
 %       - options are given using 'key', 'value' pairs in a structure
-%         see spmup_getoptions - the minimal required field is 
+%         see spmup_getoptions - the minimal required field is
 %         'outdir' where to write the data (default is [BIDS_dir filesep derivatives])
 %         additional fields can be used to filter data, see options
 %         for instance 'subjects' to choose only some subjects
@@ -20,7 +20,7 @@ function [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options)
 %                  >>> dimension 1 encodes sessions, dimension 2 scans, runs, etc
 %
 % Example usage BIDS_dir        = 'F:\WakemanHenson_Faces\fmri';
-%               options         = spmup_getoptions(BIDS_dir); 
+%               options         = spmup_getoptions(BIDS_dir);
 %               options.anat    = {'_T1w'}; % will only unpack the sub-*_T1w.nii images
 %               options.task    = {'facerecognition','plt'}; % will only unpack those 2 tasks
 %               [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options)
@@ -29,17 +29,17 @@ function [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options)
 %
 %               % you already unpacked but just want the lists
 %               BIDS_dir        = 'F:\WakemanHenson_Faces\fmri';
-%               options         = spmup_getoptions(BIDS_dir); 
+%               options         = spmup_getoptions(BIDS_dir);
 %               options.anat    = {'_T1w'}; % will only lists the sub-*_T1w.nii images
 %               options.task    = {'facerecognition'}; % will only lists this task
-%               options.overwrite_data = 'off'; % magic !! 
+%               options.overwrite_data = 'off'; % magic !!
 %               [BIDS,subjects] = spmup_BIDS_unpack(BIDS_dir,options)
 %
 % see also spmup_getoptions
 %
 % Cyril Pernet & Remi Gau
 % --------------------------
-%  Copyright (C) SPMUP Team 
+%  Copyright (C) SPMUP Team
 
 %% inputs
 % -------------------------------------------------------------------------
@@ -68,7 +68,7 @@ end
 % --------------------
 spm('defaults', 'FMRI');
 disp('getting BIDS info')
-BIDS = spm_BIDS(BIDS_dir);  
+BIDS = spm_BIDS(BIDS_dir);
 
 % update BIDS for multiple 'overlapping' fmaps
 % these can be filtered durnig the analysis
@@ -77,92 +77,92 @@ for s=1:size(BIDS.subjects,2)
     if exist(location,'dir')
         contents = dir(fullfile(location,[BIDS.subjects(s).name '*.nii*']));
         if ~isempty(contents) && isempty(BIDS.subjects(s).fmap)
-             fmap_index = size(BIDS.subjects(s).fmap,2)+1;
-             for file = 1:size(contents,1)
-                 name = fullfile(contents(file).folder,contents(file).name);
-                 if ~contains(name,'magnitude')
-                     json_content = jsondecode(fileread([name(1:strfind(name,'.nii')) 'json']));
-                     
-                     if contains(name,'acq-')
-                         tmp         = name(strfind(name,'acq-')+4:end);
-                         acquisition = tmp(1:min(strfind(tmp,'_'))-1);
-                     else
-                         acquisition = json_content.ScanningSequence;
-                     end
-                     
-                     if contains(name,'dir-')
-                         tmp         = name(strfind(name,'dir-')+4:end);
-                         direction   = tmp(1:min(strfind(tmp,'_'))-1);
-                     else
-                         direction   = json_content.PhaseEncodingDirection;
-                     end
-                     
-                     if contains(name,'run-')
-                         tmp         = name(strfind(name,'run-')+4:end);
-                         run_number  = tmp(1:min(strfind(tmp,'_'))-1);
-                     else
-                         run_number  = '';
-                     end
-                     
-                     if contains(name,'_epi')
-                         type = 'epi';
-                     elseif contains(name,'_phasediff')
-                         type = 'phasediff';
-                         ext  = name(strfind(name,'_phasediff')+length('_phasediff'):end);
-                         if exist([name(1:strfind(name,'_phasediff')) 'magnitude' ext],'file')
-                             magnitude = [name(1:strfind(name,'_phasediff')) 'magnitude' ext];
-                         elseif exist([name(1:strfind(name,'_phasediff')) 'magnitude1' ext],'file')
-                             if exist([name(1:strfind(name,'_phasediff')) 'magnitude2' ext],'file')
-                                 magnitude{1} = [name(1:strfind(name,'_phasediff')) 'magnitude1' ext];
-                                 magnitude{2} = [name(1:strfind(name,'_phasediff')) 'magnitude2' ext];
-                             else
-                                 magnitude = [name(1:strfind(name,'_phasediff')) 'magnitude1' ext];
-                             end
-                         end
-                     elseif any(contains(name,{'_phase1','_phase2'}))
-                         type = 'phase';
-                         tmp  = name; clear name
-                         ext  = tmp(strfind(tmp,'_phase')+length('_phase')+1:end);
-                         if contains(tmp,'_phase1')
-                             if exist([tmp(1:strfind(tmp,'_phase1')) 'phase2' ext],'file')
-                                 name{1} = tmp;
-                                 name{2} = [tmp(1:strfind(tmp,'_phase1')) 'phase2' ext];
-                             else
-                                 error('phase1 fmap found but not phase2')
-                             end
-                         else
-                             if exist([tmp(1:strfind(tmp,'_phase2')) 'phase1' ext],'file')
-                                 name{1} = [tmp(1:strfind(tmp,'_phase2')) 'phase1' ext];
-                                 name{2} = tmp;
-                             else
-                                 error('phase2 fmap found but not phase1')
-                             end
-                         end
-                         if exist([tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext],'file')
-                             if exist([tmp(1:strfind(tmp,'_phase')) 'magnitude2' ext],'file')
-                                 magnitude{1} = [tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext];
-                                 magnitude{2} = [tmp(1:strfind(tmp,'_phase')) 'magnitude2' ext];
-                             else
-                                 magnitude = [tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext];
-                             end
-                         end
-                     end
-                     
-                     BIDS.subjects(s).fmap(fmap_index).type          = type;
-                     BIDS.subjects(s).fmap(fmap_index).filename      =  name;
-                     BIDS.subjects(s).fmap(fmap_index).ses           =  BIDS.subjects(s).session;
-                     BIDS.subjects(s).fmap(fmap_index).acq           =  acquisition;
-                     BIDS.subjects(s).fmap(fmap_index).dir           =  direction;
-                     BIDS.subjects(s).fmap(fmap_index).run           =  run_number;
-                     BIDS.subjects(s).fmap(fmap_index).meta          =  json_content;
-                     if ~strcmp(type,'epi')
-                         BIDS.subjects(s).fmap(fmap_index).magnitude = magnitude;
-                     end
-                     fmap_index = fmap_index+1;
-                 end
-             end
-                 
-         elseif ~isempty(contents) && ~isempty(BIDS.subjects(s).fmap)
+            fmap_index = size(BIDS.subjects(s).fmap,2)+1;
+            for file = 1:size(contents,1)
+                name = fullfile(contents(file).folder,contents(file).name);
+                if ~contains(name,'magnitude')
+                    json_content = jsondecode(fileread([name(1:strfind(name,'.nii')) 'json']));
+                    
+                    if contains(name,'acq-')
+                        tmp         = name(strfind(name,'acq-')+4:end);
+                        acquisition = tmp(1:min(strfind(tmp,'_'))-1);
+                    else
+                        acquisition = json_content.ScanningSequence;
+                    end
+                    
+                    if contains(name,'dir-')
+                        tmp         = name(strfind(name,'dir-')+4:end);
+                        direction   = tmp(1:min(strfind(tmp,'_'))-1);
+                    else
+                        direction   = json_content.PhaseEncodingDirection;
+                    end
+                    
+                    if contains(name,'run-')
+                        tmp         = name(strfind(name,'run-')+4:end);
+                        run_number  = tmp(1:min(strfind(tmp,'_'))-1);
+                    else
+                        run_number  = '';
+                    end
+                    
+                    if contains(name,'_epi')
+                        type = 'epi';
+                    elseif contains(name,'_phasediff')
+                        type = 'phasediff';
+                        ext  = name(strfind(name,'_phasediff')+length('_phasediff'):end);
+                        if exist([name(1:strfind(name,'_phasediff')) 'magnitude' ext],'file')
+                            magnitude = [name(1:strfind(name,'_phasediff')) 'magnitude' ext];
+                        elseif exist([name(1:strfind(name,'_phasediff')) 'magnitude1' ext],'file')
+                            if exist([name(1:strfind(name,'_phasediff')) 'magnitude2' ext],'file')
+                                magnitude{1} = [name(1:strfind(name,'_phasediff')) 'magnitude1' ext];
+                                magnitude{2} = [name(1:strfind(name,'_phasediff')) 'magnitude2' ext];
+                            else
+                                magnitude = [name(1:strfind(name,'_phasediff')) 'magnitude1' ext];
+                            end
+                        end
+                    elseif any(contains(name,{'_phase1','_phase2'}))
+                        type = 'phase';
+                        tmp  = name; clear name
+                        ext  = tmp(strfind(tmp,'_phase')+length('_phase')+1:end);
+                        if contains(tmp,'_phase1')
+                            if exist([tmp(1:strfind(tmp,'_phase1')) 'phase2' ext],'file')
+                                name{1} = tmp;
+                                name{2} = [tmp(1:strfind(tmp,'_phase1')) 'phase2' ext];
+                            else
+                                error('phase1 fmap found but not phase2')
+                            end
+                        else
+                            if exist([tmp(1:strfind(tmp,'_phase2')) 'phase1' ext],'file')
+                                name{1} = [tmp(1:strfind(tmp,'_phase2')) 'phase1' ext];
+                                name{2} = tmp;
+                            else
+                                error('phase2 fmap found but not phase1')
+                            end
+                        end
+                        if exist([tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext],'file')
+                            if exist([tmp(1:strfind(tmp,'_phase')) 'magnitude2' ext],'file')
+                                magnitude{1} = [tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext];
+                                magnitude{2} = [tmp(1:strfind(tmp,'_phase')) 'magnitude2' ext];
+                            else
+                                magnitude = [tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext];
+                            end
+                        end
+                    end
+                    
+                    BIDS.subjects(s).fmap(fmap_index).type          = type;
+                    BIDS.subjects(s).fmap(fmap_index).filename      =  name;
+                    BIDS.subjects(s).fmap(fmap_index).ses           =  BIDS.subjects(s).session;
+                    BIDS.subjects(s).fmap(fmap_index).acq           =  acquisition;
+                    BIDS.subjects(s).fmap(fmap_index).dir           =  direction;
+                    BIDS.subjects(s).fmap(fmap_index).run           =  run_number;
+                    BIDS.subjects(s).fmap(fmap_index).meta          =  json_content;
+                    if ~strcmp(type,'epi')
+                        BIDS.subjects(s).fmap(fmap_index).magnitude = magnitude;
+                    end
+                    fmap_index = fmap_index+1;
+                end
+            end
+            
+        elseif ~isempty(contents) && ~isempty(BIDS.subjects(s).fmap)
             fmap_index = size(BIDS.subjects(s).fmap,2)+1;
             for file = 1:size(contents,1)
                 existing_names = arrayfun(@(x) x.filename, BIDS.subjects(s).fmap, 'UniformOutput',false);
@@ -200,8 +200,8 @@ for s=1:size(BIDS.subjects,2)
                             ext  = name(strfind(name,'_phasediff')+length('_phasediff'):end);
                             if exist([name(1:strfind(name,'_phasediff')) 'magnitude' ext],'file')
                                 magnitude = [name(1:strfind(name,'_phasediff')) 'magnitude' ext];
-                            elseif exist([name(1:strfind(name,'_phasediff')) 'magnitude1' ext],'file') 
-                                if exist([name(1:strfind(name,'_phasediff')) 'magnitude2' ext],'file') 
+                            elseif exist([name(1:strfind(name,'_phasediff')) 'magnitude1' ext],'file')
+                                if exist([name(1:strfind(name,'_phasediff')) 'magnitude2' ext],'file')
                                     magnitude{1} = [name(1:strfind(name,'_phasediff')) 'magnitude1' ext];
                                     magnitude{2} = [name(1:strfind(name,'_phasediff')) 'magnitude2' ext];
                                 else
@@ -217,14 +217,14 @@ for s=1:size(BIDS.subjects,2)
                                     name{1} = tmp;
                                     name{2} = [tmp(1:strfind(tmp,'_phase1')) 'phase2' ext];
                                 else
-                                   error('phase1 fmap found but not phase2') 
+                                    error('phase1 fmap found but not phase2')
                                 end
                             else
                                 if exist([tmp(1:strfind(tmp,'_phase2')) 'phase1' ext],'file')
                                     name{1} = [tmp(1:strfind(tmp,'_phase2')) 'phase1' ext];
                                     name{2} = tmp;
                                 else
-                                   error('phase2 fmap found but not phase1') 
+                                    error('phase2 fmap found but not phase1')
                                 end
                             end
                             if exist([tmp(1:strfind(tmp,'_phase')) 'magnitude1' ext],'file')
@@ -284,7 +284,7 @@ if ~isempty(options.subjects)
         BIDS          = rmfield(BIDS,'subjects');
         BIDS.subjects = tmp.subjects(allsub);
         clear tmp keep
-    
+        
         % also update BIDS.participants
         subindex = 1;
         subnames = arrayfun(@(x) x.participant_id,BIDS.participants,'UniformOutput',false);
@@ -325,17 +325,23 @@ end
 subjs_ls  = spm_BIDS(BIDS,'subjects');
 nb_sub    = numel(subjs_ls);
 
-% unpack anat 
+% unpack anat
 % ------------
 for s = nb_sub:-1:1 % for each subject
-
+    
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
     if ~isempty(options.ses)
         % quick cleaning of ses- if needed
+        if ~iscell(options.ses)
+            tmp = options.ses;
+            options = rmfield(options,'ses');
+            options.ses = {tmp}; clear tmp
+        end
+        
         for ses = 1:length(options.ses)
-             if strncmpi(options.ses{ses},'ses-',4)
-                 options.ses{ses} = options.ses{ses}(5:end);
-             end
+            if strncmpi(options.ses{ses},'ses-',4)
+                options.ses{ses} = options.ses{ses}(5:end);
+            end
         end
         % match options with available ses-
         if numel(options.ses) == 1
@@ -356,7 +362,7 @@ for s = nb_sub:-1:1 % for each subject
     if isempty(sess_ls)
         sess_ls{1} = '';
     end
-
+    
     % BIDSindex = find(arrayfun(@(x) ~isempty(strfind(['sub-' subjs_ls{s}],x.name)), BIDS.subjects));
     
     if ~exist(fullfile(options.outdir, ['sub-' subjs_ls{s}]),'dir')
@@ -364,17 +370,17 @@ for s = nb_sub:-1:1 % for each subject
     end
     
     for session = 1:length(sess_ls) % for each session
-
+        
         if isempty(sess_ls{session})
             sess_folder = '';
         else
             sess_folder = ['ses-' sess_ls{session}];
         end
-
+        
         % target directory where the anat images will be copied/unzipped
-        target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'anat'); 
+        target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'anat');
         fprintf(' subject %g - session %s: checking anat \n', s, sess_ls{session})
-
+        
         % lists all the anat images for that subject and session
         in = char(spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
             'ses', sess_ls{session}, 'modality', 'anat'));
@@ -401,7 +407,7 @@ for s = nb_sub:-1:1 % for each subject
             for i=1:size(in,1)
                 names{i} = in(i,:);
             end
-            in = unique(names)'; 
+            in = unique(names)';
             clear names
             
             % unpack
@@ -432,7 +438,7 @@ if ~exist('keep_ses','var')
     keep_ses = [];
 end
 
-parfor s=1:nb_sub
+for s=1:nb_sub
     sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
     if ~isempty(options.ses)
         if numel(options.ses) == 1
@@ -451,42 +457,44 @@ parfor s=1:nb_sub
         sess_ls = {''};
     end
     
-    if ~exist(fullfile(options.outdir, ['sub-' subjs_ls{s}]),'dir') 
+    if ~exist(fullfile(options.outdir, ['sub-' subjs_ls{s}]),'dir')
         mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}]))
     end
-
+    
     for session = 1:size(sess_ls,2) % for each session
-               
+        
         fprintf(' subject %g - session %i: checking functional data \n',s, session)
         if isempty(sess_ls)
             sess_folder = '';
         else
             sess_folder = ['ses-' sess_ls{session}];
         end
-
+        
         if ~exist(fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'func'),'dir')
-            mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'func')); 
+            mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'func'));
         end
-
+        
         % list all bold files for that subject and session
         if isempty(options.task)
             run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'type', 'bold');
             metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'type', 'bold');
+            physio_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
+                'ses', sess_ls{session}, 'type', 'physio');
         else
             run_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'type', 'bold', 'task', options.task);
             metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'type', 'bold', 'task', options.task);
             physio_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
-                'ses', sess_ls{session}, 'type', 'physio', 'task', options.task)   
-        end        
-
+                'ses', sess_ls{session}, 'type', 'physio', 'task', options.task);
+        end
+        
         % counters to list files across different sessions
         bold_run_count = 1;
         fmap_run_count = 1;
-
+        
         %% functional
         for frun = 1:size(run_ls,1) % for each run
             in                                        = run_ls{frun,1};
@@ -496,7 +504,7 @@ parfor s=1:nb_sub
                 runname    = name(strfind(name,'run-'):end);
                 runname    = runname(1:min(strfind(runname,'_'))-1);
                 target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                    sess_folder, 'func', runname);               
+                    sess_folder, 'func', runname);
             else
                 target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
                     sess_folder, 'func', ['run' num2str(frun)]);
@@ -518,127 +526,132 @@ parfor s=1:nb_sub
             
             % associated physio
             if ~isempty(physio_ls)
-                [~,name,ext]      = spm_fileparts(physio_ls{frun,1});
-                [~,~,compressed]  = iscompressed(ext,name);
-                unzip_or_copy(compressed, options, 0, ...
-                    physio_ls{frun,1}, target_dir)
+                idx = cellfun(@(x) contains(x,name(1:strfind(name,'_bold')-1)),physio_ls);
+                if any(idx)
+                    [~,name,ext]      = spm_fileparts(physio_ls{idx});
+                    [~,~,compressed]  = iscompressed(ext,name);
+                    unzip_or_copy(compressed, options, 0, ...
+                        physio_ls{idx}, target_dir)
+                end
             end
             
             % update count
             bold_run_count = bold_run_count + 1;
         end
-
+        
         %% field maps
         if ismember('fmap', spm_BIDS(BIDS,'modalities', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}))
-
+            
             file_exists = 0;
             fprintf(' subject %g - session %i: checking field maps \n',s, session)
             target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
                 sess_folder, 'fieldmaps');
-
+            
             % check which types of fieldmaps we are dealing with
             fmap_type_ls = spm_BIDS(BIDS, 'types', 'sub', subjs_ls{s}, ...
                 'ses', sess_ls{session}, 'modality', 'fmap');
             
             % goes through each type in case we have several fieldmap types in that
             % data set
-            for ifmap_type_ls = 1:size(fmap_type_ls,2)
-
-                % lists all the fieldmap files of that type as there might
-                % be several runs / acq / rec ...
-                fmap_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
-                    'ses', sess_ls{session}, 'modality', 'fmap', ...
-                    'type', fmap_type_ls{ifmap_type_ls});
-
-                metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
-                    'ses', sess_ls{session}, 'modality', 'fmap', ...
-                    'type', fmap_type_ls{ifmap_type_ls});
-
-                % for all the fieldmaps of that type
-                for ifmap = 1:size(fmap_ls,1)
-
-                    in                    = fmap_ls{ifmap,1};
-                    [path,name,ext]       = spm_fileparts(in);
-                    [ext,name,compressed] = iscompressed(ext,name);
-                    if iscell(metadata)
-                        subjects{s}.fieldmap(session,fmap_run_count).metadata = ...
-                        metadata{ifmap};
-                    else
-                        subjects{s}.fieldmap(session,fmap_run_count).metadata = metadata;
-                    end
-
-                    % different behavior depending on fielpmap type
-                    switch fmap_type_ls{ifmap_type_ls}
-
-                        case 'phasediff'
-                            subjects{s}.fieldmap(session,fmap_run_count).phasediff = ...
-                                fullfile(target_dir, [name ext]);
-                            subjects{s}.fieldmap(session,fmap_run_count).type = 'phasediff';
-                            file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phasediff,'file');
-
-                        case 'phase12'
-                            subjects{s}.fieldmap(session,fmap_run_count).type = 'phase12';
-                            if contains(name,'phase1')
-                                subjects{s}.fieldmap(session,fmap_run_count).phase1 = ...
+            if ~isempty(fmap_type_ls)
+                for ifmap_type_ls = 1:size(fmap_type_ls,2)
+                    
+                    % lists all the fieldmap files of that type as there might
+                    % be several runs / acq / rec ...
+                    fmap_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
+                        'ses', sess_ls{session}, 'modality', 'fmap', ...
+                        'type', fmap_type_ls{ifmap_type_ls});
+                    
+                    metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
+                        'ses', sess_ls{session}, 'modality', 'fmap', ...
+                        'type', fmap_type_ls{ifmap_type_ls});
+                    
+                    % for all the fieldmaps of that type
+                    for ifmap = 1:size(fmap_ls,1)
+                        
+                        in                    = fmap_ls{ifmap,1};
+                        [path,name,ext]       = spm_fileparts(in);
+                        [ext,name,compressed] = iscompressed(ext,name);
+                        if iscell(metadata)
+                            subjects{s}.fieldmap(session,fmap_run_count).metadata = ...
+                                metadata{ifmap};
+                        else
+                            subjects{s}.fieldmap(session,fmap_run_count).metadata = metadata;
+                        end
+                        
+                        % different behavior depending on fielpmap type
+                        switch fmap_type_ls{ifmap_type_ls}
+                            
+                            case 'phasediff'
+                                subjects{s}.fieldmap(session,fmap_run_count).phasediff = ...
                                     fullfile(target_dir, [name ext]);
-                                file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phase1,'file');
-                            elseif contains(name,'phase2')
-                                subjects{s}.fieldmap(fmap_run_count,1).phase2 = ...
-                                    fullfile(target_dir, [name ext]);
-                                file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phase2,'file');
-                            end
-
-                        case 'fieldmap'
-                            subjects{s}.fieldmap(session,fmap_run_count).type = 'fieldmap';
-                            warning(' Fieldmap type of fielmaps not implemented')
-
-                        case 'epi'
-                            subjects{s}.fieldmap(session,fmap_run_count).type = 'epi';
-                            warning(' EPI type of fielmaps are not SPM supported ...')
-                            if contains(name,{'AP','PA','LR','RL'})
-                                subjects{s}.fieldmap(session,fmap_run_count).epi = ...
-                                    fullfile(target_dir, [name ext]);
-                                file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).epi,'file');
-                            end
-
-                        otherwise
-                            subjects{s}.fieldmap(session,fmap_run_count).type = 'unknown';
-                            warning(' %s is an unsupported type of fieldmap', fmap_type_ls(ifmap_type_ls))
-                    end
-                    unzip_or_copy(compressed, options, file_exists, in, target_dir)
-
-                    % taking care of magnitude images
-                    if strcmp(fmap_type_ls(ifmap_type_ls), 'phasediff') ...
-                            || strcmp(fmap_type_ls(ifmap_type_ls), 'phase12')
-
-                        diff_name = name;
-                        % there might be 2 magnitude images
-                        for imag = 1:2
-                            loof_for = strrep(diff_name, fmap_type_ls{ifmap_type_ls}, ...
-                                sprintf('magnitude%i', imag) );
-                            [~,name,ext] = spm_fileparts(spm_select('List',path,...
-                                [loof_for '.nii';loof_for '.*gz']));
-                            in = fullfile(path, [name ext]);
-
-                            % mostly in case there is only one
-                            if ~isempty(name)
-
-                                [ext,name,compressed] = iscompressed(ext,name);
-                                if imag==1
-                                    subjects{s}.fieldmap(session,fmap_run_count).mag1 = ...
+                                subjects{s}.fieldmap(session,fmap_run_count).type = 'phasediff';
+                                file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phasediff,'file');
+                                
+                            case 'phase12'
+                                subjects{s}.fieldmap(session,fmap_run_count).type = 'phase12';
+                                if contains(name,'phase1')
+                                    subjects{s}.fieldmap(session,fmap_run_count).phase1 = ...
                                         fullfile(target_dir, [name ext]);
-                                    file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).mag1,'file');
-                                elseif imag==2
-                                    subjects{s}.fieldmap(session,fmap_run_count).mag2 = ...
+                                    file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phase1,'file');
+                                elseif contains(name,'phase2')
+                                    subjects{s}.fieldmap(fmap_run_count,1).phase2 = ...
                                         fullfile(target_dir, [name ext]);
-                                    file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).mag2,'file');
+                                    file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phase2,'file');
                                 end
-                                unzip_or_copy(compressed, options, file_exists, in, target_dir)
+                                
+                            case 'fieldmap'
+                                subjects{s}.fieldmap(session,fmap_run_count).type = 'fieldmap';
+                                warning(' Fieldmap type of fielmaps not implemented')
+                                
+                            case 'epi'
+                                subjects{s}.fieldmap(session,fmap_run_count).type = 'epi';
+                                warning(' EPI type of fielmaps are not SPM supported ...')
+                                if contains(name,{'AP','PA','LR','RL'})
+                                    subjects{s}.fieldmap(session,fmap_run_count).epi = ...
+                                        fullfile(target_dir, [name ext]);
+                                    file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).epi,'file');
+                                end
+                                
+                            otherwise
+                                subjects{s}.fieldmap(session,fmap_run_count).type = 'unknown';
+                                warning(' %s is an unsupported type of fieldmap', fmap_type_ls(ifmap_type_ls))
+                        end
+                        unzip_or_copy(compressed, options, file_exists, in, target_dir)
+                        
+                        % taking care of magnitude images
+                        if strcmp(fmap_type_ls(ifmap_type_ls), 'phasediff') ...
+                                || strcmp(fmap_type_ls(ifmap_type_ls), 'phase12')
+                            
+                            diff_name = name;
+                            % there might be 2 magnitude images
+                            for imag = 1:2
+                                loof_for = strrep(diff_name, fmap_type_ls{ifmap_type_ls}, ...
+                                    sprintf('magnitude%i', imag) );
+                                [~,name,ext] = spm_fileparts(spm_select('List',path,...
+                                    [loof_for '.nii';loof_for '.*gz']));
+                                in = fullfile(path, [name ext]);
+                                
+                                % mostly in case there is only one
+                                if ~isempty(name)
+                                    
+                                    [ext,name,compressed] = iscompressed(ext,name);
+                                    if imag==1
+                                        subjects{s}.fieldmap(session,fmap_run_count).mag1 = ...
+                                            fullfile(target_dir, [name ext]);
+                                        file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).mag1,'file');
+                                    elseif imag==2
+                                        subjects{s}.fieldmap(session,fmap_run_count).mag2 = ...
+                                            fullfile(target_dir, [name ext]);
+                                        file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).mag2,'file');
+                                    end
+                                    unzip_or_copy(compressed, options, file_exists, in, target_dir)
+                                end
                             end
                         end
+                        fmap_run_count = fmap_run_count + 1;
                     end
-                    fmap_run_count = fmap_run_count + 1;
                 end
             end
         end
