@@ -1,9 +1,9 @@
-function spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
+function [M,MG] = spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 
 % routine to produce plots a la Jonathan Power
 %
 % FORMAT spmup_timeseriesplot(fmridata, c1, c2, c3, options)
-%        M = spmup_timeseriesplot(fmridata, c1, c2, c3, ...
+%        [M,MG] = spmup_timeseriesplot(fmridata, c1, c2, c3, ...
 %                                                       'motion','on',...
 %                                                       'nuisances','on',...
 %                                                       'correlation','on', ...
@@ -42,7 +42,11 @@ function spmup_timeseriesplot(fmridata, cn1, cn2, cn3, varargin)
 %       of two time series is provided, it assumes the same motion and nuisance
 %       apply, taking data from the 1st set eg data before and after denoising
 %
-% OUTPUT 2 figures
+% OUTPUTS
+%        M is a cell array of the top percentile voxels used to make the
+%        voxplot M{1] is Grey matter, M{2} is white matter and M{3} csf
+%        MG is the matrix of gray matter voxel intersecting c1 and Yeo's atlas
+%        + 2 figures
 %        - a voxplot showing all grey and white matter voxels
 %          in time, associated to the traces in options
 %        - corrrelations matrices as per Yeo 7 parcellation
@@ -448,11 +452,7 @@ if ~strcmpi(makefig, 'off')
     % ----------------2nd figure for correlations only when explicit ----------------
     if strcmpi(makefig,'on')
         figure('Name','Correlation matrices')
-        if strcmpi(makefig,'on')
-            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
-        else
-            set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1],'visible','off')
-        end
+        set(gcf,'Color','w','InvertHardCopy','off', 'units','normalized','outerposition',[0 0 1 1])
         subplot(1,2,1); imagesc(corr(MG')); caxis([-1 1]); title('Correlations among all Gray Matter voxel time series')
         xlabel('Voxels'); ylabel('Voxels');
         subplot(1,2,2);  N = corr(N');
