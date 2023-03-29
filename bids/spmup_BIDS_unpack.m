@@ -378,7 +378,11 @@ for s = nb_sub:-1:1 % for each subject
         end
         
         % target directory where the anat images will be copied/unzipped
-        target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'anat');
+        if isempty(sess_folder)
+            target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], 'anat');
+        else
+            target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'anat');
+        end        
         fprintf(' subject %g - session %s: checking anat \n', s, sess_ls{session})
         
         % lists all the anat images for that subject and session
@@ -451,9 +455,7 @@ for s=1:nb_sub
             warning('%s session not found, unpacking all sessions',options.ses)
             sess_ls = spm_BIDS(BIDS,'sessions', 'sub', subjs_ls{s});
         end
-    end
-    
-    if isempty(sess_ls)
+    else
         sess_ls = {''};
     end
     
@@ -464,14 +466,16 @@ for s=1:nb_sub
     for session = 1:size(sess_ls,2) % for each session
         
         fprintf(' subject %g - session %i: checking functional data \n',s, session)
-        if isempty(sess_ls)
+        if isempty(sess_ls{1})
             sess_folder = '';
+            if ~exist(fullfile(options.outdir, ['sub-' subjs_ls{s}], 'func'),'dir')
+                mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}], 'func'));
+            end
         else
             sess_folder = ['ses-' sess_ls{session}];
-        end
-        
-        if ~exist(fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'func'),'dir')
-            mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'func'));
+            if ~exist(fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'func'),'dir')
+                mkdir(fullfile(options.outdir, ['sub-' subjs_ls{s}], sess_folder, 'func'));
+            end
         end
         
         % list all bold files for that subject and session
@@ -503,11 +507,21 @@ for s=1:nb_sub
             if contains(name,'run-')
                 runname    = name(strfind(name,'run-'):end);
                 runname    = runname(1:min(strfind(runname,'_'))-1);
-                target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                    sess_folder, 'func', runname);
+                if isempty(sess_folder)
+                    target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                        'func', runname);
+                else
+                    target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                        sess_folder, 'func', runname);
+                end
             else
-                target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                    sess_folder, 'func', ['run' num2str(frun)]);
+                if isempty(sess_folder)
+                    target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                        'func', ['run' num2str(frun)]);
+                else
+                    target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                        sess_folder, 'func', ['run' num2str(frun)]);
+                end
             end
             subjects{s}.func{session,bold_run_count}  = fullfile(target_dir, [name ext]);
             % values                                    = strfind(name,'_')-1;
@@ -545,8 +559,13 @@ for s=1:nb_sub
             
             file_exists = 0;
             fprintf(' subject %g - session %i: checking field maps \n',s, session)
-            target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                sess_folder, 'fieldmaps');
+            if isempty(sess_folder)
+                target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                    'fieldmaps');
+            else
+                target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                    sess_folder, 'fieldmaps');
+            end
             
             % check which types of fieldmaps we are dealing with
             fmap_type_ls = spm_BIDS(BIDS, 'types', 'sub', subjs_ls{s}, ...
