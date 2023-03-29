@@ -1,4 +1,4 @@
-function [anoise,tnoise,QC] = spmup_rcompcor(fmridata,brainmask,whitematter,csf,graymatter)
+function [anoise,tnoise,QC] = spmup_rcompcor(fmridata,brainmask,whitematter,csf)
 
 % This function compute the 'compcor' regressors of Behzadi et al. 2007
 % <http://www.ncbi.nlm.nih.gov/pmc/articles/PMC2214855/>
@@ -12,7 +12,6 @@ function [anoise,tnoise,QC] = spmup_rcompcor(fmridata,brainmask,whitematter,csf,
 %        brainmask the name of the brain mask
 %        whitematter the name of the white matter mask 
 %        csf the name of the csf mask 
-%        graymatter the name of the gray matter mask (only use for QC)
 %
 % OUTPUT: anoise the compoments related to anatomical ROI
 %         tnoise the components related to temporal ROI
@@ -37,11 +36,6 @@ if nargin == 0
     [whitematter,sts]= spm_select(1,'image','Select white matter tissue image');
     if sts == 0; disp('selection aborded'); return; end
     [csf,sts]= spm_select(1,'image','Select csf tissue image');
-    if sts == 0; disp('selection aborded'); return; end
-    if length(nargout) == 3 % if QC requested
-        if sts == 0; disp('selection aborded'); return; end
-        [graymatter,sts]= spm_select(1,'image','Select gray matter tissue image');
-    end
     if sts == 0; disp('selection aborded'); return; end
 end
 
@@ -68,11 +62,6 @@ if fig == 1
     end
 end
 
-Vgraymatter = spm_vol(graymatter); graymatter = spm_read_vols(Vgraymatter);
-if ~any(Vgraymatter.dim == size(brainmask))
-    error('Dimension issue between mask and gray matter')
-end
-
 Vwhitematter = spm_vol(whitematter); whitematter = spm_read_vols(Vwhitematter);
 if ~any(Vwhitematter.dim == size(brainmask))
     error('Dimension issue between mask and white matter')
@@ -86,11 +75,6 @@ end
     
 % check if the masks are binary or not, if not threshold at 0.99 assuming
 % these images reflect probability maps (allows removing partial volumes)
-graymatter = graymatter.*brainmask;
-if length(unique(whitematter)) ~= 2
-    graymatter = graymatter > 0.99;
-end
-
 whitematter = whitematter.*brainmask;
 if length(unique(whitematter)) ~= 2
     whitematter = whitematter > 0.99;
