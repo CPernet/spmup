@@ -1,4 +1,4 @@
-function subject = spmup_BIDS_1rstlevel(subject, options)
+function [subject,GMV] = spmup_BIDS_1rstlevel(subject, options)
 
 % 1st level analysis of BIDS fMRI data
 %
@@ -11,6 +11,8 @@ function subject = spmup_BIDS_1rstlevel(subject, options)
 % OUTPUT subject is the same structure updated
 %        - with the preprocessed data information
 %        - with QC metrics
+%        GMV is the matrix of gray matter voxels returned by spmup_timeseriesplot
+%            These are residuals from the GLM (i.e. clean data in resting state fmri)
 %
 % Example usage from start to finish: BIDS_dir        = 'F:\WakemanHenson_Faces\fmri';
 %                                     options         = spmup_getoptions(BIDS_dir);
@@ -25,6 +27,7 @@ function subject = spmup_BIDS_1rstlevel(subject, options)
 % --------------------------
 %  Copyright (C) SPMUP Team 
 
+GMV = []; % the matrix of grey matter voxels 
 opts.indent = ' '; % for spm_jsonwrite
 spm_jobman('initcfg');
 
@@ -86,8 +89,8 @@ for frun = max(size(subject.func)):-1:1  % max of cell array so it doesn't matte
             json.Columns{end+1} = 'CSF';
         elseif strcmpi(options.nuisance,'compcor')
             brainmask             = spmup_auto_mask(spm_vol(subject.func{frun}));
-            [anoise,tnoise]       = spmup_rcompcor(subject.func{frun},brainmask,subject.tissues{2},...
-                subject.tissues{3},subject.tissues{1});
+            [anoise,tnoise]       = spmup_rcompcor(subject.func{frun},brainmask,...
+                subject.tissues{2},subject.tissues{3});
             QAjobs{frun}.nuisance.anoise = anoise;
             QAjobs{frun}.nuisance.tnoise = tnoise;
             design = [design anoise{3} tnoise]; %#ok<AGROW>
@@ -214,14 +217,22 @@ if strcmp(options.overwrite_data,'on') || ...
             else
                 matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi_reg = {QAjobs{frun}.design};
             end
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf           = 128;
+            if isempty(options.highpass)
+                matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf       = 128;
+            else
+                matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf       = options.highpass;                
+            end
         else % resting state
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).scans         = {subject.func{frun}}; %#ok<CCAT1>
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).cond          = struct('name', {}, 'onset', {}, 'duration', {}, 'tmod', {}, 'pmod', {}, 'orth', {});
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi         = {''};
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).regress       = struct('name', {}, 'val', {});
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi_reg     = {QAjobs{frun}.design};
-            matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf           = 1000;
+            if isempty(options.highpass)
+                matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf       = 1000;
+            else
+                matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf       = options.highpass;
+            end
         end
     end
     
@@ -280,7 +291,7 @@ if strcmp(options.overwrite_data,'on') || ...
             VfMRI = spm_file_merge(residuals{2}.res,fullfile(fileparts(Statspath),[filename(1:end-5) '-GLMdenoised_bold' ext]));
         end
         subject.func{1} = VfMRI(1).fname;
-        spmup_timeseriesplot(VfMRI(1).fname, ...
+        [~,GMV] = spmup_timeseriesplot(VfMRI(1).fname, ...
             subject.tissues{1}, subject.tissues{2}, subject.tissues{3}, ...
             'motion','on','nuisances','on','correlation','off',...
             'clean','off','figure','save');
@@ -385,7 +396,7 @@ if ~exist('resting_state','var')
             for frun = 1:size(subject.func)
                 FD = [FD; subject.func_qa{frun}.FD]; %#ok<AGROW>
             end
-            spmup_timeseriesplot(P, subject.tissues{1},subject.tissues{2},subject.tissues{3}, ...
+            [~,GMV] = spmup_timeseriesplot(P, subject.tissues{1},subject.tissues{2},subject.tissues{3}, ...
                 'motion',FD,'nuisances','on','correlation','off','clean','off','figure','save');
         end
         
