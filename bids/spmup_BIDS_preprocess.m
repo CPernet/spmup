@@ -899,7 +899,7 @@ if strcmp(options.overwrite_data,'on') || ...
     
     bounding_box = [-78 -112 -70 ; 78 76 85];
     if strcmpi(options.norm,'EPInorm') && ~rem(norm_res(3),2)
-        % anat likely complains but runas before but old EPI now matches
+        % anat likely complains but run as before but old EPI now matches
         bounding_box = [-78 -112 -70 ; 78 76 86];
     end
     
