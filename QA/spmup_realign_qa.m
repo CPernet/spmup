@@ -144,12 +144,14 @@ if size(motion_file,1)>1
     % remove eventual prefix in case we need to match 
     % the realignement parameters with a realigned file
     % that was prefixed
-    unprefixed_filename = filename(3:end);
-    motion_file = motion_file(arrayfun(@(x) contains(x.name, unprefixed_filename), motion_file)).name;
-    motion_file = fullfile(filepath, motion_file);
-else
-    motion_file = fullfile(filepath, motion_file.name);
+    if strcmp(filename(1:3),'sub')
+        motion_file = motion_file(arrayfun(@(x) contains(x.name, filename(1:round(length(x.name)/2))), motion_file));
+    else
+        unprefixed_filename = filename(3:end);
+        motion_file = motion_file(arrayfun(@(x) contains(x.name, unprefixed_filename(1:round(length(x.name)/2))), motion_file));
+    end
 end
+motion_file = fullfile(filepath, motion_file.name);
 
 if strcmpi(FramewiseDisplacement,'on')
     MotionParameters = 'on';
