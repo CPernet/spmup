@@ -1086,7 +1086,7 @@ for frun = 1:size(Normalized_files,1)
                 options.skernel      = 3;
                 meta.smoothingkernel = 3;
             end
-            spm_smooth(Normalized_files{frun},stats_ready{frun},skernel(1:3).*options.skernel);
+            spm_smooth(Normalized_files{frun},stats_ready{frun},options.skernel);
             meta.smoothingkernel = skernel(1:3).*options.skernel;
         else % tiny kernel just to take closest neighbourghs
             spm_smooth(Normalized_files{frun},stats_ready{frun},skernel(1:3));
