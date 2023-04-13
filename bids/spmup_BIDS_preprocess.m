@@ -973,6 +973,10 @@ if strcmp(options.overwrite_data,'on') || ...
     matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel+1) = cfg_dep('Segment: c1 Images', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{1}, '.','c', '()',{':'}));
     matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel+2) = cfg_dep('Segment: c2 Images', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{2}, '.','c', '()',{':'}));
     matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel+3) = cfg_dep('Segment: c3 Images', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','tiss', '()',{3}, '.','c', '()',{':'}));
+    matlabbatch{end}.spm.spatial.normalise.write.woptions.bb                 = bounding_box;
+    matlabbatch{end}.spm.spatial.normalise.write.woptions.vox                = norm_res;
+    matlabbatch{end}.spm.spatial.normalise.write.woptions.interp             = 4;
+    matlabbatch{end}.spm.spatial.normalise.write.woptions.prefix             = 'w';
     
     % if field maps, normalize EPI from T1
     % -------------------------------------
@@ -986,10 +990,6 @@ if strcmp(options.overwrite_data,'on') || ...
             matlabbatch{end}.spm.spatial.normalise.write.subj(3).resample(frun,:) = {realigned_files{frun}}; %#ok<CCAT1>
         end
         matlabbatch{end}.spm.spatial.normalise.write.subj(3).resample(end+1,:)    = {mean_realigned_file}; % adding mean image
-        matlabbatch{end}.spm.spatial.normalise.write.woptions.bb                  = bounding_box;
-        matlabbatch{end}.spm.spatial.normalise.write.woptions.vox                 = norm_res;
-        matlabbatch{end}.spm.spatial.normalise.write.woptions.interp              = 4;
-        matlabbatch{end}.spm.spatial.normalise.write.woptions.prefix              = 'w';
         
     else  % normalize EPI on EPI template (old routine)
         % -------------------------------------------
@@ -1249,7 +1249,9 @@ if strcmpi(options.keep_data,'off')
             end
             wst = dir(fullfile(filepath,['wst*' ext]));
             if ~isempty(wst)
-                delete(fullfile(wst.folder,wst.name))
+                for f=1:size(wst,1)
+                    delete(fullfile(wst.folder,wst.name))
+                end
             end
             wur = dir(fullfile(filepath,['wur*' ext]));
             if ~isempty(wur)
