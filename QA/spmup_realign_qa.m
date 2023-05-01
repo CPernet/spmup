@@ -140,18 +140,59 @@ end
 findex              = 1; % index for the new_files variables
 [filepath,filename] = fileparts(V(1).fname);
 motion_file         = dir(fullfile(filepath,'rp*.txt'));
-if size(motion_file,1)>1
-    % remove eventual prefix in case we need to match 
-    % the realignement parameters with a realigned file
-    % that was prefixed
-    if strcmp(filename(1:3),'sub')
-        motion_file = motion_file(arrayfun(@(x) contains(x.name, filename(1:round(length(x.name)/2))), motion_file));
+
+% get name parts for filename
+fparts = strsplit(filename, '_');
+fstruct = struct();
+for i = 1:numel(fparts)
+    kvparts = strsplit(fparts{i}, '-');
+    if numel(kvparts) < 2
+        continue
+    end
+    fstruct.(kvparts{1}) = kvparts{2};
+end
+
+% identify motion file that matches filename
+match = false;
+counter = 1;
+while ~match
+    mparts = strsplit(motion_file(counter).name, '_');
+    mstruct = struct();
+    for i = 1:numel(mparts)
+        kvparts = strsplit(mparts{i}, '-');
+        if numel(kvparts) < 2
+            continue
+        end
+        mstruct.(kvparts{1}) = kvparts{2};
+    end
+    % update motion_file if all rp*txt file fields match respective fields
+    % for filename
+    if all(cellfun(@(x) strcmpi(fstruct.(x), mstruct.(x)), fields(mstruct), 'UniformOutput', true))
+        match = true;
+        motion_file = fullfile(filepath, motion_file(counter).name);
     else
-        unprefixed_filename = filename(3:end);
-        motion_file = motion_file(arrayfun(@(x) contains(x.name, unprefixed_filename(1:round(length(x.name)/2))), motion_file));
+        counter = counter + 1;
+        % no matching motion file found
+        if counter > numel(motion_file)
+            error(['No matching motion file found for: ' fullfile(filepath, filename)])
+        end
     end
 end
-motion_file = fullfile(filepath, motion_file.name);
+
+% issue with below code is that file name for all rp text files will be concatenated into motion_file variable (creates error)
+
+% if size(motion_file,1)>1
+%     % remove eventual prefix in case we need to match 
+%     % the realignement parameters with a realigned file
+%     % that was prefixed
+%     if strcmp(filename(1:3),'sub')
+%         motion_file = motion_file(arrayfun(@(x) contains(x.name, filename(1:round(length(x.name)/2))), motion_file));
+%     else
+%         unprefixed_filename = filename(3:end);
+%         motion_file = motion_file(arrayfun(@(x) contains(x.name, unprefixed_filename(1:round(length(x.name)/2))), motion_file));
+%     end
+% end
+% motion_file = fullfile(filepath, motion_file.name);
 
 if strcmpi(FramewiseDisplacement,'on')
     MotionParameters = 'on';
