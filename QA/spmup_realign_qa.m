@@ -141,42 +141,18 @@ findex              = 1; % index for the new_files variables
 [filepath,filename] = fileparts(V(1).fname);
 motion_file         = dir(fullfile(filepath,'rp*.txt'));
 
-% get name parts for filename
-fparts = strsplit(filename, '_');
-fstruct = struct();
-for i = 1:numel(fparts)
-    kvparts = strsplit(fparts{i}, '-');
-    if numel(kvparts) < 2
-        continue
-    end
-    fstruct.(kvparts{1}) = kvparts{2};
-end
+% filename task
+fparts      = strsplit(filename, '_');
+fidx        = find(~cellfun(@isempty, regexp(fparts, '^(task)', 'once'), 'UniformOutput', true));
 
 % identify motion file that matches filename
 match = false;
 counter = 1;
 while ~match
     mparts = strsplit(motion_file(counter).name, '_');
-    mstruct = struct();
-    for i = 1:numel(mparts)
-        kvparts = strsplit(mparts{i}, '-');
-        if numel(kvparts) < 2
-            continue
-        end
-        mstruct.(kvparts{1}) = kvparts{2};
-    end
-    % update motion_file if all rp*txt file fields match respective fields
-    % for filename
-    mfields = fields(mstruct);
-    mfieldmatches = zeros(1,numel(mfields));
-    for i = 1:numel(mfields)
-        if ismember(mfields{i}, fields(fstruct))
-            if strcmpi(mstruct.(mfields{i}), fstruct.(mfields{i}))
-                mfieldmatches(1,i) = 1;
-            end
-        end
-    end
-    if all(mfieldmatches)
+    midx   = find(~cellfun(@isempty, regexp(mparts, '^(task)', 'once'), 'UniformOutput', true));
+    
+    if strcmp(fparts{fidx}, mparts{midx})
         match = true;
         motion_file = fullfile(filepath, motion_file(counter).name);
     else
@@ -197,6 +173,7 @@ if strcmpi(MotionParameters,'on')
 else
     FD = [];
 end
+
 %% look at globals
 
 if strcmpi(Globals,'on')   
