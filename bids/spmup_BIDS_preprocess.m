@@ -1089,11 +1089,14 @@ for frun = 1:size(Normalized_files,1)
             spm_smooth(Normalized_files{frun},stats_ready{frun},options.skernel);
             meta.smoothingkernel = skernel(1:3).*options.skernel;
         else % tiny kernel just to take closest neighbourghs
+            
+            % if skernel not specified, smooth by one voxel
+            if isempty(options.skernel)
+                options.skernel = 1;
+            end
+            skernel = skernel.*options.skernel;
             spm_smooth(Normalized_files{frun},stats_ready{frun},skernel(1:3));
             meta.smoothingkernel = skernel(1:3);
-            if isempty(options.skernel)
-                options.skernel = meta.smoothingkernel;
-            end
         end
         spm_jsonwrite(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),meta,opts)
     end
