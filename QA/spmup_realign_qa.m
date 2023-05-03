@@ -167,7 +167,16 @@ while ~match
     end
     % update motion_file if all rp*txt file fields match respective fields
     % for filename
-    if all(cellfun(@(x) strcmpi(fstruct.(x), mstruct.(x)), fields(mstruct), 'UniformOutput', true))
+    mfields = fields(mstruct);
+    mfieldmatches = zeros(1,numel(mfields));
+    for i = 1:numel(mfields)
+        if ismember(mfields{i}, fields(fstruct))
+            if strcmpi(mstruct.(mfields{i}), fstruct.(mfields{i}))
+                mfieldmatches(1,i) = 1;
+            end
+        end
+    end
+    if all(mfieldmatches)
         match = true;
         motion_file = fullfile(filepath, motion_file(counter).name);
     else
@@ -179,21 +188,6 @@ while ~match
     end
 end
 
-% issue with below code is that file name for all rp text files will be concatenated into motion_file variable (creates error)
-
-% if size(motion_file,1)>1
-%     % remove eventual prefix in case we need to match 
-%     % the realignement parameters with a realigned file
-%     % that was prefixed
-%     if strcmp(filename(1:3),'sub')
-%         motion_file = motion_file(arrayfun(@(x) contains(x.name, filename(1:round(length(x.name)/2))), motion_file));
-%     else
-%         unprefixed_filename = filename(3:end);
-%         motion_file = motion_file(arrayfun(@(x) contains(x.name, unprefixed_filename(1:round(length(x.name)/2))), motion_file));
-%     end
-% end
-% motion_file = fullfile(filepath, motion_file.name);
-
 if strcmpi(FramewiseDisplacement,'on')
     MotionParameters = 'on';
 end
@@ -203,7 +197,6 @@ if strcmpi(MotionParameters,'on')
 else
     FD = [];
 end
-
 %% look at globals
 
 if strcmpi(Globals,'on')   
