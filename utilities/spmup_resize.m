@@ -7,6 +7,7 @@ function fname = spmup_resize(P,bb,vs)
 %
 % INPUT:  P is a cell string with images to resize (see spm_select)
 %         bb is the bounding box (default is [-78 -112 -70; 78 76 86])
+%              --- the tpm is [-90  -126   -72; 90    90   108]
 %         vs is the voxel size (default is [2 2 2])
 %
 % OUTPUT fname is the name of the file
@@ -59,5 +60,6 @@ for v=size(vols,1):-1:1
         end
     else
         disp('dimension alreay match - nothing done')
+        fname = [];
     end
 end
