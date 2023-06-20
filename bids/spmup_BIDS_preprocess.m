@@ -80,18 +80,18 @@ if strcmp(options.reorient,'on')
             RMexist = 1;
         end
     end
-    
+
     if strcmp(options.overwrite_data,'on') && ~RMexist || ...
             (strcmp(options.overwrite_data,'off') && ~RMexist)
-        
+
         if size(subject.func,1) == 1 && size(subject.func,2) > 1
             subject.func = subject.func';
         end
         Data = [subject.anat; subject.func];
-        
+
         if isfield(subject,'fieldmap')
             if ~isempty(subject.fieldmap)
-                
+
                 if any(contains(options.fmap,{'phasediff','epi','phase12'}))
                     % filter content as likely multiple types
                     keep = find(arrayfun(@(x) strcmpi(x.type,options.fmap),subject.fieldmap));
@@ -99,7 +99,7 @@ if strcmp(options.reorient,'on')
                         subject.fieldmap = subject.fieldmap(keep);
                     end
                 end
-                
+
                 if size(subject.fieldmap,1) == 1
                     FMindex = structfun(@(x) ischar(x), subject.fieldmap);
                     FN      = fieldnames(subject.fieldmap);
@@ -123,20 +123,20 @@ if strcmp(options.reorient,'on')
                 end
             end
         end
-        
+
         if ~isempty(options.VDM)
             for v = 1:length(options.VDM)
                 Data = [Data ; options.VDM{v}];
             end
         end
-        
+
         if ~RMexist
             RM = spmup_auto_reorient(Data,1);
             disp(' Data reoriented');
         else
             warning('options.overwrite_data is %s,\nbut data are already reoriented = skipping this step',options.overwrite_data)
         end
-        
+
         % update info about all those files
         func_index = 0;
         fmap_index = 0;
@@ -171,512 +171,522 @@ if strcmp(options.reorient,'on')
     end
 end
 
-% ----------------------------------------
-%% Despiking and slice timing for each run
-% ----------------------------------------
+% -------------------------
+%% Check if Multi-echo
+% -------------------------
+multiecho = 'off';
+% check the match task, run and number of 4D time series = gives the number of echos
+% read the json to check which is which echo 1,2,3 -- should be also in filenames
+if strcmpi(multiecho,'on')
+    spmup_tedana(varargin)
+else
 
-bold_include = [];
-included_idx = 0;
-for frun = 1:size(subject.func, 1) % each run
-    
-    filesin                 = subject.func{frun};
-    [filepath,filename,ext] = fileparts(filesin);
-    if exist(fullfile(filepath,[filename '.json']),'file')
-        meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-    elseif exist(fullfile(filepath,[filename '_space-IXI549_desc-preprocessed_bold.json']),'file')
-        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
-    elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
-        meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
-    end
-    meta.run      = frun;
-    if isfield(subject.func_metadata{frun},'TaskName')
-        meta.TaskName = subject.func_metadata{frun}.TaskName;
-    else
-        start         = strfind(filename,'task');
-        keyindices    = strfind(filename,'_');
-        keyindices    = min(keyindices(keyindices>start));
-        task          = filename(start+length('task-'):keyindices-1);
-        subject.func_metadata{frun}.TaskName = task;
-        meta.TaskName = subject.func_metadata{frun}.TaskName;
-    end
-    
-    % check that this BOLD file is of the right task, acquisition,
-    % reconstruction
-    if ~isempty(options.acq)
-        acq = contains(filename, ['acq-' options.acq]);
-    else
-        acq = 1;
-    end
-    
-    if ~isempty(options.rec)
-        rec = contains(filename, ['rec-' options.rec]);
-    else
-        rec = 1;
-    end
-    
-    if ~isempty(options.task)
-        task = contains(filename, ['task-' options.task]);
-    else
-        task = 1;
-    end
-    
-    % only preprocess this file if it fits what has been requested
-    bold_include(frun) = all([task acq rec]);
-    if bold_include(frun)
-        
-        included_idx = included_idx + 1;
-        if ~isfield(subject.func_metadata{frun}, 'SliceTiming')
-            error('Slice Timing Information missing')
-        else
-            SliceTiming = subject.func_metadata{frun}.SliceTiming;
-        end
-        
-        if ~isfield(subject.func_metadata{frun}, 'RepetitionTime')
-            error('RepetitionTime Information missing')
-        else
-            RepetitionTime = subject.func_metadata{frun}.RepetitionTime;
-        end
-        
-        % -----------------------------------------
-        % remove first volumes
-        % -----------------------------------------
-        
-        if options.removeNvol ~=0
-            if strcmp(options.overwrite_data,'on')...
-                    || ((strcmp(options.overwrite_data,'off') && ~isfield(meta,'NumberOfVolumesDiscarded')))
-                
-                % remove from the 4D the files we don't want and proceed
-                fprintf('\nadjusting 4D file size run %g \n',frun)
-                fmri_out                = spmup_skip(filesin,options.removeNvol);
-                [filepath,filename,ext] = fileparts(fmri_out);
-                
-                % write a json file containing the details of what volumes were
-                % removed (see BIDS derivatives specs)
-                meta.NumberOfVolumesDiscarded = options.removeNvol;
-                spm_jsonwrite([subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json'],meta,opts)
-            end
-        end
-        
-        % -----------------------------------------
-        % despiking using adaptive median filter
-        % -----------------------------------------
-        
-        if strcmp(options.despike,'before')
-            if strcmp(options.overwrite_data,'on') || ...
-                    (strcmp(options.overwrite_data,'off') && ~isfield(meta,'despike'))
-                
-                flags              = struct('auto_mask','on', 'method','median', 'window', [],'skip',0, 'savelog', 'off');
-                [V,~,loginfo]      = spmup_despike(fullfile(filepath,[filename,ext]),[],flags);
-                filesin            = V.fname; clear V;
-                meta.Despiked      = 'before slice timing using spmup_despike';
-                meta.despike.param = 'median filter based on the autocorrelation function';
-                meta.despike.RMS   = loginfo.RMS;
-                spm_jsonwrite([subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json'],meta,opts)
-            else
-                if exist(fullfile(filepath, [filename(1:end-5) '_rec-despiked_bold' ext]),'file')
-                    filesin = fullfile(filepath, [filename(1:end-5) '_rec-despiked_bold' ext]);
-                end
-            end
-        end
-        
-        % -------------
-        % slice timing
-        % -------------
-        % sliceorder - vector containig the acquisition time for each slice in milliseconds
-        % refslice   - time in milliseconds for the reference slice
-        % timing     - [0 TR]
-        
-        if exist('SliceTiming', 'var')
-            sliceorder  = SliceTiming; % time
-            refslice    = sliceorder(round(length(SliceTiming)/2));
-            timing      = [0 RepetitionTime];
-            
-            [filepath,filename,ext]  = fileparts(filesin);
-            st_files{included_idx,1} = fullfile(filepath, ['st_' filename ext]); %#ok<*AGROW>
-            
-            if strcmp(options.overwrite_data, 'on') || ...
-                    (strcmp(options.overwrite_data, 'off') && ~isfield(meta,'slicetiming'))
-                fprintf(' starting slice timing correction run %g \n',frun)
-                spm_slice_timing(filesin, sliceorder, refslice, timing, 'st_');
-                meta.slicetiming.reference = refslice;
-                spm_jsonwrite([subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json'],meta,opts)
-            end
-        else
-            st_files{included_idx,1} = fullfile(filepath, [filename ext]);
-        end
-    end
-    clear meta
-end % end processing per run
+    % ----------------------------------------
+    %% Despiking and slice timing for each run
+    % ----------------------------------------
 
-% ------------------------
-%% Field Map - compute VDM
-% ------------------------
+    bold_include = [];
+    included_idx = 0;
+    for frun = 1:size(subject.func, 1) % each run
 
-if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
-    if any(contains(options.fmap,{'phasediff','epi','phase12'}))
-        % filter content as likely multiple types - maybe done above,
-        % depends if overwrite is on or off
-        keep = find(arrayfun(@(x) strcmpi(x.type,options.fmap),subject.fieldmap));
-        if ~isempty(keep)
-            subject.fieldmap = subject.fieldmap(keep);
-        end
-    end
-    
-    for ifmap = 1:numel(subject.fieldmap)
-        
-        % index which fieldmap goes to which bold run and vice versa
-        if length(subject.fieldmap) == 1 % 1 field map for all
-            if isfield(subject.fieldmap(ifmap).metadata,'IntendedFor')
-                file_to_parse = subject.fieldmap(ifmap).metadata.IntendedFor(ifmap);
-                if iscell(file_to_parse)
-                    file_to_parse = file_to_parse{1};
-                end
-                [~, filename]                                      = spm_fileparts(file_to_parse);
-                which_func_file                                    = contains(subject.func, filename);
-                subject.fieldmap(ifmap).metadata.which_func(ifmap) = find(which_func_file); % to know which func files needs this fmap
-                subject.which_fmap(find(which_func_file))          = ifmap; % to know which fmap is needed by which func files
-            else
-                which_func_file                                    = ifmap;
-                subject.fieldmap(ifmap).metadata.which_func        = ifmap;
-                subject.which_fmap(ifmap)                          = ifmap;
-            end
-        else
-            if isfield(subject.fieldmap(ifmap).metadata,'IntendedFor')
-                file_to_parse = subject.fieldmap(ifmap).metadata.IntendedFor(ifmap);
-                if iscell(file_to_parse)
-                    file_to_parse = file_to_parse{1};
-                end
-                [~, filename]                                  = spm_fileparts(file_to_parse);
-                which_func_file                                = contains(subject.func, filename);
-                subject.fieldmap(ifmap).metadata.which_func    = find(which_func_file);
-                subject.which_fmap(find(which_func_file))      = ifmap;
-            else
-                which_func_file                                = ifmap;
-                subject.fieldmap(ifmap).metadata.which_func    = ifmap;
-                subject.which_fmap(ifmap)                      = ifmap;
-            end
-        end
-        
-        % only continue if this fmap is needed for any of the bold run for
-        % this task / acq / rec
-        if any(bold_include(which_func_file))
-            
-            % computes average of that run
-            % finding bold reference run to which the fielmap will be coregistered
-            [filepath,filename,ext]  = fileparts(st_files{find(bold_include, 1)});
-            avg = fullfile(filepath,[filename(1:end-5) '-mean_bold' ext]);
-            if strcmp(options.overwrite_data,'on') || ...
-                    (strcmp(options.overwrite_data,'off') && ~exist(avg,'file'))
-                spmup_basics(st_files{find(bold_include, 1)},'mean'); % use the mean slice timed EPI for QC
-            end
-            
-            % VDM creation: output images
-            % check which types of fieldmaps we are dealing with
-            switch subject.fieldmap(ifmap).type
-                case 'phasediff'
-                    % two magnitudes (use only 1) and 1 phase difference image
-                    [filepath,name,ext]  = fileparts(subject.fieldmap(ifmap).phasediff);
-                    options.VDM{ifmap,1} = [filepath filesep 'vdm5_sc' name ext];
-                case 'phase12'
-                    % two magnitude images and 2 phase images
-                    [filepath,name,ext]  = fileparts(subject.fieldmap(ifmap).phase1);
-                    options.VDM{ifmap,1} = [filepath filesep 'vdm5_sc' name ext];
-                case 'fieldmap'
-                    warning('Fieldmap type of fielmaps not implemented')
-                case 'epi'
-                    vol1 = fileparts(subject.fieldmap(ifmap).img1; % path to first image (blip up)
-                    vol2 = fileparts(subject.fieldmap(ifmap).img2; % path to first image (blip up)
-                    % fwhm       - Gaussian kernel spatial scales (default: [8 4 2 1 0.1])
-                    reg        - regularisation settings (default: [0 10 100])
-                    %            See spm_field for details:
-                    %               - [1] Penalty on absolute values.
-                    %               - [2] Penalty on the `membrane energy'. This penalises
-                    %                  the sum of squares of the gradients of the values.
-                    %               - [3] Penalty on the `bending energy'. This penalises
-                    %                  the sum of squares of the 2nd derivatives.
-                    % rinterp    - Degree of B-spline
-                    % rt         - Option to apply a supplementary refine over topup to include in the
-                    %              process the changes of intensities due to stretching and compression.
-                    % pref       - string to be prepended to the VDM files.
-                    % outdir     - output directory.
-                    options.VDM{ifmap,1} = spm_topup(vol1, vol2, FWHM, reg, rinterp, rt, pref, outdir);
-
-                otherwise
-                    warning('%s is an unsupported type of fieldmap', subject.fieldmap(ifmap).type)
-            end
-            
-            
-            if strcmp(subject.fieldmap(ifmap).type, 'phasediff') || ...
-                    strcmp(subject.fieldmap(ifmap).type, 'phase12')
-                
-                if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
-                        && ~exist(options.VDM{ifmap},'file'))
-                    
-                    % quick fix: 1 phase difference image no magnitude
-                    if strcmp(subject.fieldmap(ifmap).type, 'phasediff') && ~isfield(subject.fieldmap(ifmap),'mag1') || ...
-                            strcmp(subject.fieldmap(ifmap).type, 'phasediff') && isempty(subject.fieldmap(ifmap).mag1)
-                        clear matlabbatch
-                        t1index                                                = find(cellfun(@(x) contains(x,'T1w'),subject.anat));
-                        if length(t1index>1)
-                            t1index = t1index(ifmap); % this should match session order as spm_BIDS
-                        end
-                        matlabbatch{1}.spm.spatial.coreg.write.ref             = {subject.fieldmap(ifmap).phasediff};
-                        matlabbatch{1}.spm.spatial.coreg.write.source          = {subject.anat{t1index}}; %#ok<FNDSB>
-                        matlabbatch{1}.spm.spatial.coreg.write.roptions.interp = 1;
-                        matlabbatch{1}.spm.spatial.coreg.write.roptions.wrap   = [0 0 0];
-                        matlabbatch{1}.spm.spatial.coreg.write.roptions.mask   = 0;
-                        matlabbatch{1}.spm.spatial.coreg.write.roptions.prefix = 'r';
-                        out                                                    = spm_jobman('run',matlabbatch);
-                        destination                                            = fileparts(subject.fieldmap(ifmap).phasediff);
-                        [source,filename,ext]                                  = spm_fileparts(out{1}.rfiles{1});
-                        subject.fieldmap(ifmap).mag1                           = fullfile(destination,[filename ext]);
-                        movefile(fullfile(source,[filename ext]),subject.fieldmap(ifmap).mag1)
-                        clear matlabbatch;
-                    end
-                    
-                    % coregister fmap to bold reference
-                    matlabbatch{1}.spm.spatial.coreg.estimate.ref                 = {avg};
-                    matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.cost_fun = 'nmi';
-                    matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.sep      = [16 8 4 2 1];
-                    matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.tol      = ...
-                        [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
-                    matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.fwhm     = [7 7];
-                    
-                    if strcmp(subject.fieldmap(ifmap).type, 'phasediff')
-                        % two magnitudes (use only 1) and 1 phase difference image
-                        % possibly the magnitude image is missing !! let's use the t1
-                        matlabbatch{end}.spm.spatial.coreg.estimate.source = ...
-                            {subject.fieldmap(ifmap).mag1};
-                        matlabbatch{end}.spm.spatial.coreg.estimate.other = ...
-                            {subject.fieldmap(ifmap).phasediff};
-                        
-                    elseif strcmp(subject.fieldmap(ifmap).type, 'phase12')
-                        % two magnitide images and 2 phase images
-                        matlabbatch{end}.spm.spatial.coreg.estimate.source = ...
-                            {subject.fieldmap(ifmap).mag1};
-                        matlabbatch{end}.spm.spatial.coreg.estimate.other = {...
-                            subject.fieldmap(ifmap).mag2;...
-                            subject.fieldmap(ifmap).phase1;...
-                            subject.fieldmap(ifmap).phase2};
-                    elseif strcmp(subject.fieldmap(ifmap).type, 'e')
-                        
-                    end
-                    
-                    fprintf(' coregistering fmap %g to its reference run\n',ifmap)
-                    spm_jobman('run',matlabbatch); clear matlabbatch;
-                    
-                    % VDM creation: input images
-                    
-                    % quickly check if we have a magnitude image! if not
-                    % reslice T1 and put it in there
-                    
-                    
-                    if strcmp(subject.fieldmap(ifmap).type, 'phasediff')
-                        % two magnitudes (use only 1) and 1 phase difference image
-                        matlabbatch = spmup_get_FM_workflow('phasediff');
-                        matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.phase = ...
-                            {subject.fieldmap(ifmap).phasediff};
-                        matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.magnitude = ...
-                            {subject.fieldmap(ifmap).mag1};
-                    elseif strcmp(subject.fieldmap(ifmap).type, 'phase12')
-                        % two magnitide images and 2 phase images
-                        matlabbatch = spmup_get_FM_workflow('phase&mag');
-                        matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.shortphase = ...
-                            {subject.fieldmap(ifmap).phase1};
-                        matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.shortmag   = ...
-                            {subject.fieldmap(ifmap).mag1};
-                        matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.longphase  = ...
-                            {subject.fieldmap(ifmap).phase2};
-                        matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.longmag    = ...
-                            {subject.fieldmap(ifmap).mag2};
-                    elseif strcmp(subject.fieldmap(ifmap).type, 'epi')
-                        error('to do my friend');                                           
-                    end
-                    
-                    % fieldmap metadata
-                    fmap_metadata = subject.fieldmap(ifmap).metadata;
-                    echotimes =  1000.*[fmap_metadata.EchoTime1 ...
-                        fmap_metadata.EchoTime2]; % change to ms
-                    matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.et = echotimes;
-                    
-                    % func run metadata: if the fmap is applied to several
-                    % runs we take the metadata of the first run it must
-                    % applied to
-                    func_metadata = subject.func_metadata{which_func_file};
-                    if numel(func_metadata)>1
-                        func_metadata = func_metadata{1};
-                    end
-                    
-                    if isfield(func_metadata,'TotalReadoutTime')
-                        TotalReadoutTime = func_metadata.TotalReadoutTime;
-                    elseif isfield(func_metadata,'RepetitionTime')
-                        TotalReadoutTime = func_metadata.RepetitionTime;
-                    elseif isfield(func_metadata,'EffectiveEchoSpacing')
-                        TotalReadoutTime = (func_metadata.NumberOfEchos-1)...
-                            *func_metadata.EffectiveEchoSpacing;
-                    end
-                    
-                    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.tert = TotalReadoutTime;
-                    
-                    if isfield(fmap_metadata,'PulseSequenceType')
-                        if sum(strfind(fmap_metadata.PulseSequenceType,'EPI')) ~= 0
-                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.epifm = 1;
-                        else
-                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.epifm = 0;
-                        end
-                    else
-                        disp('Field maps is using default sequence! assuming non-EPI acquisition')
-                    end
-                    
-                    if isfield(fmap_metadata,'PhaseEncodingDirection')
-                        if strcmp(fmap_metadata.PhaseEncodingDirection,'j') ...
-                                || strcmp(fmap_metadata.PhaseEncodingDirection,'y')
-                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = 1;
-                        elseif strcmp(fmap_metadata.PhaseEncodingDirection,'-j') ...
-                                || strcmp(fmap_metadata.PhaseEncodingDirection,'-y')
-                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = -1;
-                        end
-                    elseif isfield(func_metadata,'PhaseEncodingDirection')
-                        if strcmp(func_metadata.PhaseEncodingDirection,'j') ...
-                                || strcmp(func_metadata.PhaseEncodingDirection,'y')
-                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = 1;
-                        elseif strcmp(func_metadata.PhaseEncodingDirection,'-j') ...
-                                || strcmp(func_metadata.PhaseEncodingDirection,'-y')
-                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = -1;
-                        end
-                    else
-                        error('No phase encoding direction found')
-                    end
-                    
-                    matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.session.epi = {avg}; % use the mean despiked / slice timed image
-                    
-                    fprintf(' computing voxel displacement map %g\n',ifmap)
-                    out = spm_jobman('run',matlabbatch); clear matlabbatch;
-                end
-            end
-        end
-    end
-end
-
-% ------------------------
-%% Realignment across runs
-% ------------------------
-
-if isempty(options.VDM)
-    
-    % file out of realign will be
-    [filepath,filename,ext] = fileparts(st_files{1});
-    mean_realigned_file     = [filepath filesep 'mean' filename ext];
-    realign_done            = zeros(size(st_files,1),1);
-    for frun = size(st_files,1):-1:1
-        realigned_files{frun,1}    = st_files{frun}; % because we don't reslice, simple encode the linear transform in the header
-        [filepath,filename]        = fileparts(st_files{frun});
-        subject.motionfile{frun,1} = [filepath filesep 'rp_' filename '.txt'];
-        [filepath,filename]        = fileparts(subject.func{frun});
+        filesin                 = subject.func{frun};
+        [filepath,filename,ext] = fileparts(filesin);
         if exist(fullfile(filepath,[filename '.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+        elseif exist(fullfile(filepath,[filename '_space-IXI549_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
-        realign_done(frun) = isfield(meta,'realign');
-    end
-    
-    % actually do it
-    if strcmp(options.overwrite_data,'on') || ...
-            (strcmp(options.overwrite_data,'off') && sum(realign_done)==0)
-        
-        fprintf('Starting realignment \n')
-        for frun = size(st_files,1):-1:1
-            matlabbatch{1}.spm.spatial.realign.estwrite.data{frun} = {st_files{frun}}; %#ok<CCAT1>
+        meta.run      = frun;
+        if isfield(subject.func_metadata{frun},'TaskName')
+            meta.TaskName = subject.func_metadata{frun}.TaskName;
+        else
+            start         = strfind(filename,'task');
+            keyindices    = strfind(filename,'_');
+            keyindices    = min(keyindices(keyindices>start));
+            task          = filename(start+length('task-'):keyindices-1);
+            subject.func_metadata{frun}.TaskName = task;
+            meta.TaskName = subject.func_metadata{frun}.TaskName;
         end
-        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.quality = 1;
-        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.sep     = 4;
-        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.fwhm    = 5;
-        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.rtm     = 1;
-        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.interp  = 4;
-        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.wrap    = [0 0 0];
-        matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.weight  = '';
-        matlabbatch{end}.spm.spatial.realign.estwrite.roptions.which   = [0 1]; %only reslice the mean
-        matlabbatch{end}.spm.spatial.realign.estwrite.roptions.interp  = 4;
-        matlabbatch{end}.spm.spatial.realign.estwrite.roptions.wrap    = [0 0 0];
-        matlabbatch{end}.spm.spatial.realign.estwrite.roptions.mask    = 1;
-        matlabbatch{end}.spm.spatial.realign.estwrite.roptions.prefix  = 'r';
-        out = spm_jobman('run',matlabbatch); clear matlabbatch;
-    end
-    
-else % --------------------------------------------------------------------
-    
-    % which fieldmap for each run of this task / acq /rec
-    if iscell(subject.which_fmap)
-        which_fmap          = subject.which_fmap(find(bold_include));
-    else
-        which_fmap          = subject.which_fmap;
-    end
-    
-    % file out of realign will be
-    [filepath,filename,ext] = fileparts(st_files{1});
-    mean_realigned_file     = [filepath filesep 'meanur' filename ext];
-    realign_done            = zeros(size(st_files,1),1);
-    for frun = size(st_files,1):-1:1
-        [filepath,filename,ext]    = fileparts(st_files{frun});
-        realigned_files{frun,1}    = [filepath filesep 'ur' filename ext]; % because we have the reslice here (not linear)
-        subject.motionfile{frun,1} = [filepath filesep 'rp_' filename '.txt'];
-        [filepath,filename]        = fileparts(subject.func{frun});
-        if exist(fullfile(filepath,[filename '.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+
+        % check that this BOLD file is of the right task, acquisition,
+        % reconstruction
+        if ~isempty(options.acq)
+            acq = contains(filename, ['acq-' options.acq]);
+        else
+            acq = 1;
         end
-        realign_done(frun) = isfield(meta,'realign');
-    end
-    
-    % actually do it
-    if strcmp(options.overwrite_data,'on') || ...
-            (strcmp(options.overwrite_data,'off') && sum(realign_done)==0)
-        
-        fprintf(' starting realignment and unwarping \n')
-        for frun = size(st_files,1):-1:1
-            matlabbatch{1}.spm.spatial.realignunwarp.data(frun).scans = {st_files{frun}}; %#ok<CCAT1>
-            if ~isempty(options.VDM)
-                if length(which_fmap)==1
-                    matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {options.VDM{which_fmap}}; %#ok<CCAT1>
+
+        if ~isempty(options.rec)
+            rec = contains(filename, ['rec-' options.rec]);
+        else
+            rec = 1;
+        end
+
+        if ~isempty(options.task)
+            task = contains(filename, ['task-' options.task]);
+        else
+            task = 1;
+        end
+
+        % only preprocess this file if it fits what has been requested
+        bold_include(frun) = all([task acq rec]);
+        if bold_include(frun)
+
+            included_idx = included_idx + 1;
+            if ~isfield(subject.func_metadata{frun}, 'SliceTiming')
+                error('Slice Timing Information missing')
+            else
+                SliceTiming = subject.func_metadata{frun}.SliceTiming;
+            end
+
+            if ~isfield(subject.func_metadata{frun}, 'RepetitionTime')
+                error('RepetitionTime Information missing')
+            else
+                RepetitionTime = subject.func_metadata{frun}.RepetitionTime;
+            end
+
+            % -----------------------------------------
+            % remove first volumes
+            % -----------------------------------------
+
+            if options.removeNvol ~=0
+                if strcmp(options.overwrite_data,'on')...
+                        || ((strcmp(options.overwrite_data,'off') && ~isfield(meta,'NumberOfVolumesDiscarded')))
+
+                    % remove from the 4D the files we don't want and proceed
+                    fprintf('\nadjusting 4D file size run %g \n',frun)
+                    fmri_out                = spmup_skip(filesin,options.removeNvol);
+                    [filepath,filename,ext] = fileparts(fmri_out);
+
+                    % write a json file containing the details of what volumes were
+                    % removed (see BIDS derivatives specs)
+                    meta.NumberOfVolumesDiscarded = options.removeNvol;
+                    spm_jsonwrite([subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json'],meta,opts)
+                end
+            end
+
+            % -----------------------------------------
+            % despiking using adaptive median filter
+            % -----------------------------------------
+
+            if strcmp(options.despike,'before')
+                if strcmp(options.overwrite_data,'on') || ...
+                        (strcmp(options.overwrite_data,'off') && ~isfield(meta,'despike'))
+
+                    flags              = struct('auto_mask','on', 'method','median', 'window', [],'skip',0, 'savelog', 'off');
+                    [V,~,loginfo]      = spmup_despike(fullfile(filepath,[filename,ext]),[],flags);
+                    filesin            = V.fname; clear V;
+                    meta.Despiked      = 'before slice timing using spmup_despike';
+                    meta.despike.param = 'median filter based on the autocorrelation function';
+                    meta.despike.RMS   = loginfo.RMS;
+                    spm_jsonwrite([subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json'],meta,opts)
                 else
-                    matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {options.VDM{which_fmap(frun)}}; %#ok<CCAT1>
+                    if exist(fullfile(filepath, [filename(1:end-5) '_rec-despiked_bold' ext]),'file')
+                        filesin = fullfile(filepath, [filename(1:end-5) '_rec-despiked_bold' ext]);
+                    end
+                end
+            end
+
+            % -------------
+            % slice timing
+            % -------------
+            % sliceorder - vector containig the acquisition time for each slice in milliseconds
+            % refslice   - time in milliseconds for the reference slice
+            % timing     - [0 TR]
+
+            if exist('SliceTiming', 'var')
+                sliceorder  = SliceTiming; % time
+                refslice    = sliceorder(round(length(SliceTiming)/2));
+                timing      = [0 RepetitionTime];
+
+                [filepath,filename,ext]  = fileparts(filesin);
+                st_files{included_idx,1} = fullfile(filepath, ['st_' filename ext]); %#ok<*AGROW>
+
+                if strcmp(options.overwrite_data, 'on') || ...
+                        (strcmp(options.overwrite_data, 'off') && ~isfield(meta,'slicetiming'))
+                    fprintf(' starting slice timing correction run %g \n',frun)
+                    spm_slice_timing(filesin, sliceorder, refslice, timing, 'st_');
+                    meta.slicetiming.reference = refslice;
+                    spm_jsonwrite([subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json'],meta,opts)
                 end
             else
-                matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {''};
+                st_files{included_idx,1} = fullfile(filepath, [filename ext]);
             end
         end
-        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.quality    = 1;
-        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.sep        = 4;
-        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.fwhm       = 5;
-        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.rtm        = 1;
-        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.einterp    = 4;
-        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.ewrap      = [0 0 0];
-        matlabbatch{end}.spm.spatial.realignunwarp.eoptions.weight     = '';
-        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.basfcn   = [12 12];
-        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.regorder = 1;
-        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.lambda   = 100000;
-        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.jm       = 0;
-        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.fot      = [4 5];
-        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.sot      = [];
-        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.uwfwhm   = 4;
-        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.rem      = 1;
-        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.noi      = 5;
-        matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.expround = 'Average';
-        matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.uwwhich  = [2 1];
-        matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.rinterp  = 4;
-        matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.wrap     = [0 0 0];
-        matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.mask     = 1;
-        matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.prefix   = 'ur';
-        out = spm_jobman('run',matlabbatch); clear matlabbatch;
-    end
-end
+        clear meta
+    end % end processing per run
 
+    % ------------------------
+    %% Field Map - compute VDM
+    % ------------------------
+
+    if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
+        if any(contains(options.fmap,{'phasediff','epi','phase12'}))
+            % filter content as likely multiple types - maybe done above,
+            % depends if overwrite is on or off
+            keep = find(arrayfun(@(x) strcmpi(x.type,options.fmap),subject.fieldmap));
+            if ~isempty(keep)
+                subject.fieldmap = subject.fieldmap(keep);
+            end
+        end
+
+        for ifmap = 1:numel(subject.fieldmap)
+
+            % index which fieldmap goes to which bold run and vice versa
+            if length(subject.fieldmap) == 1 % 1 field map for all
+                if isfield(subject.fieldmap(ifmap).metadata,'IntendedFor')
+                    file_to_parse = subject.fieldmap(ifmap).metadata.IntendedFor(ifmap);
+                    if iscell(file_to_parse)
+                        file_to_parse = file_to_parse{1};
+                    end
+                    [~, filename]                                      = spm_fileparts(file_to_parse);
+                    which_func_file                                    = contains(subject.func, filename);
+                    subject.fieldmap(ifmap).metadata.which_func(ifmap) = find(which_func_file); % to know which func files needs this fmap
+                    subject.which_fmap(find(which_func_file))          = ifmap; % to know which fmap is needed by which func files
+                else
+                    which_func_file                                    = ifmap;
+                    subject.fieldmap(ifmap).metadata.which_func        = ifmap;
+                    subject.which_fmap(ifmap)                          = ifmap;
+                end
+            else
+                if isfield(subject.fieldmap(ifmap).metadata,'IntendedFor')
+                    file_to_parse = subject.fieldmap(ifmap).metadata.IntendedFor(ifmap);
+                    if iscell(file_to_parse)
+                        file_to_parse = file_to_parse{1};
+                    end
+                    [~, filename]                                  = spm_fileparts(file_to_parse);
+                    which_func_file                                = contains(subject.func, filename);
+                    subject.fieldmap(ifmap).metadata.which_func    = find(which_func_file);
+                    subject.which_fmap(find(which_func_file))      = ifmap;
+                else
+                    which_func_file                                = ifmap;
+                    subject.fieldmap(ifmap).metadata.which_func    = ifmap;
+                    subject.which_fmap(ifmap)                      = ifmap;
+                end
+            end
+
+            % only continue if this fmap is needed for any of the bold run for
+            % this task / acq / rec
+            if any(bold_include(which_func_file))
+
+                % computes average of that run
+                % finding bold reference run to which the fielmap will be coregistered
+                [filepath,filename,ext]  = fileparts(st_files{find(bold_include, 1)});
+                avg = fullfile(filepath,[filename(1:end-5) '-mean_bold' ext]);
+                if strcmp(options.overwrite_data,'on') || ...
+                        (strcmp(options.overwrite_data,'off') && ~exist(avg,'file'))
+                    spmup_basics(st_files{find(bold_include, 1)},'mean'); % use the mean slice timed EPI for QC
+                end
+
+                % VDM creation: output images
+                % check which types of fieldmaps we are dealing with
+                switch subject.fieldmap(ifmap).type
+                    case 'phasediff'
+                        % two magnitudes (use only 1) and 1 phase difference image
+                        [filepath,name,ext]  = fileparts(subject.fieldmap(ifmap).phasediff);
+                        options.VDM{ifmap,1} = [filepath filesep 'vdm5_sc' name ext];
+                    case 'phase12'
+                        % two magnitude images and 2 phase images
+                        [filepath,name,ext]  = fileparts(subject.fieldmap(ifmap).phase1);
+                        options.VDM{ifmap,1} = [filepath filesep 'vdm5_sc' name ext];
+                    case 'fieldmap'
+                        warning('Fieldmap type of fielmaps not implemented')
+                    case 'epi'
+                        vol1 = fileparts(subject.fieldmap(ifmap).img1); % path to first image (blip up)
+                        vol2 = fileparts(subject.fieldmap(ifmap).img2); % path to first image (blip up)
+                        % fwhm       - Gaussian kernel spatial scales (default: [8 4 2 1 0.1])
+                        % reg        - regularisation settings (default: [0 10 100])
+                        %            See spm_field for details:
+                        %               - [1] Penalty on absolute values.
+                        %               - [2] Penalty on the `membrane energy'. This penalises
+                        %                  the sum of squares of the gradients of the values.
+                        %               - [3] Penalty on the `bending energy'. This penalises
+                        %                  the sum of squares of the 2nd derivatives.
+                        % rinterp    - Degree of B-spline
+                        % rt         - Option to apply a supplementary refine over topup to include in the
+                        %              process the changes of intensities due to stretching and compression.
+                        % pref       - string to be prepended to the VDM files.
+                        % outdir     - output directory.
+                        options.VDM{ifmap,1} = spm_topup(vol1, vol2, FWHM, reg, rinterp, rt, pref, outdir);
+
+                    otherwise
+                        warning('%s is an unsupported type of fieldmap', subject.fieldmap(ifmap).type)
+                end
+
+
+                if strcmp(subject.fieldmap(ifmap).type, 'phasediff') || ...
+                        strcmp(subject.fieldmap(ifmap).type, 'phase12')
+
+                    if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                            && ~exist(options.VDM{ifmap},'file'))
+
+                        % quick fix: 1 phase difference image no magnitude
+                        if strcmp(subject.fieldmap(ifmap).type, 'phasediff') && ~isfield(subject.fieldmap(ifmap),'mag1') || ...
+                                strcmp(subject.fieldmap(ifmap).type, 'phasediff') && isempty(subject.fieldmap(ifmap).mag1)
+                            clear matlabbatch
+                            t1index                                                = find(cellfun(@(x) contains(x,'T1w'),subject.anat));
+                            if length(t1index>1)
+                                t1index = t1index(ifmap); % this should match session order as spm_BIDS
+                            end
+                            matlabbatch{1}.spm.spatial.coreg.write.ref             = {subject.fieldmap(ifmap).phasediff};
+                            matlabbatch{1}.spm.spatial.coreg.write.source          = {subject.anat{t1index}}; %#ok<FNDSB>
+                            matlabbatch{1}.spm.spatial.coreg.write.roptions.interp = 1;
+                            matlabbatch{1}.spm.spatial.coreg.write.roptions.wrap   = [0 0 0];
+                            matlabbatch{1}.spm.spatial.coreg.write.roptions.mask   = 0;
+                            matlabbatch{1}.spm.spatial.coreg.write.roptions.prefix = 'r';
+                            out                                                    = spm_jobman('run',matlabbatch);
+                            destination                                            = fileparts(subject.fieldmap(ifmap).phasediff);
+                            [source,filename,ext]                                  = spm_fileparts(out{1}.rfiles{1});
+                            subject.fieldmap(ifmap).mag1                           = fullfile(destination,[filename ext]);
+                            movefile(fullfile(source,[filename ext]),subject.fieldmap(ifmap).mag1)
+                            clear matlabbatch;
+                        end
+
+                        % coregister fmap to bold reference
+                        matlabbatch{1}.spm.spatial.coreg.estimate.ref                 = {avg};
+                        matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.cost_fun = 'nmi';
+                        matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.sep      = [16 8 4 2 1];
+                        matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.tol      = ...
+                            [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
+                        matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.fwhm     = [7 7];
+
+                        if strcmp(subject.fieldmap(ifmap).type, 'phasediff')
+                            % two magnitudes (use only 1) and 1 phase difference image
+                            % possibly the magnitude image is missing !! let's use the t1
+                            matlabbatch{end}.spm.spatial.coreg.estimate.source = ...
+                                {subject.fieldmap(ifmap).mag1};
+                            matlabbatch{end}.spm.spatial.coreg.estimate.other = ...
+                                {subject.fieldmap(ifmap).phasediff};
+
+                        elseif strcmp(subject.fieldmap(ifmap).type, 'phase12')
+                            % two magnitide images and 2 phase images
+                            matlabbatch{end}.spm.spatial.coreg.estimate.source = ...
+                                {subject.fieldmap(ifmap).mag1};
+                            matlabbatch{end}.spm.spatial.coreg.estimate.other = {...
+                                subject.fieldmap(ifmap).mag2;...
+                                subject.fieldmap(ifmap).phase1;...
+                                subject.fieldmap(ifmap).phase2};
+                        elseif strcmp(subject.fieldmap(ifmap).type, 'e')
+
+                        end
+
+                        fprintf(' coregistering fmap %g to its reference run\n',ifmap)
+                        spm_jobman('run',matlabbatch); clear matlabbatch;
+
+                        % VDM creation: input images
+
+                        % quickly check if we have a magnitude image! if not
+                        % reslice T1 and put it in there
+
+
+                        if strcmp(subject.fieldmap(ifmap).type, 'phasediff')
+                            % two magnitudes (use only 1) and 1 phase difference image
+                            matlabbatch = spmup_get_FM_workflow('phasediff');
+                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.phase = ...
+                                {subject.fieldmap(ifmap).phasediff};
+                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.magnitude = ...
+                                {subject.fieldmap(ifmap).mag1};
+                        elseif strcmp(subject.fieldmap(ifmap).type, 'phase12')
+                            % two magnitide images and 2 phase images
+                            matlabbatch = spmup_get_FM_workflow('phase&mag');
+                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.shortphase = ...
+                                {subject.fieldmap(ifmap).phase1};
+                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.shortmag   = ...
+                                {subject.fieldmap(ifmap).mag1};
+                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.longphase  = ...
+                                {subject.fieldmap(ifmap).phase2};
+                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.longmag    = ...
+                                {subject.fieldmap(ifmap).mag2};
+                        elseif strcmp(subject.fieldmap(ifmap).type, 'epi')
+                            error('to do my friend');
+                        end
+
+                        % fieldmap metadata
+                        fmap_metadata = subject.fieldmap(ifmap).metadata;
+                        echotimes =  1000.*[fmap_metadata.EchoTime1 ...
+                            fmap_metadata.EchoTime2]; % change to ms
+                        matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.et = echotimes;
+
+                        % func run metadata: if the fmap is applied to several
+                        % runs we take the metadata of the first run it must
+                        % applied to
+                        func_metadata = subject.func_metadata{which_func_file};
+                        if numel(func_metadata)>1
+                            func_metadata = func_metadata{1};
+                        end
+
+                        if isfield(func_metadata,'TotalReadoutTime')
+                            TotalReadoutTime = func_metadata.TotalReadoutTime;
+                        elseif isfield(func_metadata,'RepetitionTime')
+                            TotalReadoutTime = func_metadata.RepetitionTime;
+                        elseif isfield(func_metadata,'EffectiveEchoSpacing')
+                            TotalReadoutTime = (func_metadata.NumberOfEchos-1)...
+                                *func_metadata.EffectiveEchoSpacing;
+                        end
+
+                        matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.tert = TotalReadoutTime;
+
+                        if isfield(fmap_metadata,'PulseSequenceType')
+                            if sum(strfind(fmap_metadata.PulseSequenceType,'EPI')) ~= 0
+                                matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.epifm = 1;
+                            else
+                                matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.epifm = 0;
+                            end
+                        else
+                            disp('Field maps is using default sequence! assuming non-EPI acquisition')
+                        end
+
+                        if isfield(fmap_metadata,'PhaseEncodingDirection')
+                            if strcmp(fmap_metadata.PhaseEncodingDirection,'j') ...
+                                    || strcmp(fmap_metadata.PhaseEncodingDirection,'y')
+                                matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = 1;
+                            elseif strcmp(fmap_metadata.PhaseEncodingDirection,'-j') ...
+                                    || strcmp(fmap_metadata.PhaseEncodingDirection,'-y')
+                                matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = -1;
+                            end
+                        elseif isfield(func_metadata,'PhaseEncodingDirection')
+                            if strcmp(func_metadata.PhaseEncodingDirection,'j') ...
+                                    || strcmp(func_metadata.PhaseEncodingDirection,'y')
+                                matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = 1;
+                            elseif strcmp(func_metadata.PhaseEncodingDirection,'-j') ...
+                                    || strcmp(func_metadata.PhaseEncodingDirection,'-y')
+                                matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = -1;
+                            end
+                        else
+                            error('No phase encoding direction found')
+                        end
+
+                        matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.session.epi = {avg}; % use the mean despiked / slice timed image
+
+                        fprintf(' computing voxel displacement map %g\n',ifmap)
+                        out = spm_jobman('run',matlabbatch); clear matlabbatch;
+                    end
+                end
+            end
+        end
+    end
+
+    % ------------------------
+    %% Realignment across runs
+    % ------------------------
+
+    if isempty(options.VDM)
+
+        % file out of realign will be
+        [filepath,filename,ext] = fileparts(st_files{1});
+        mean_realigned_file     = [filepath filesep 'mean' filename ext];
+        realign_done            = zeros(size(st_files,1),1);
+        for frun = size(st_files,1):-1:1
+            realigned_files{frun,1}    = st_files{frun}; % because we don't reslice, simple encode the linear transform in the header
+            [filepath,filename]        = fileparts(st_files{frun});
+            subject.motionfile{frun,1} = [filepath filesep 'rp_' filename '.txt'];
+            [filepath,filename]        = fileparts(subject.func{frun});
+            if exist(fullfile(filepath,[filename '.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+            elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
+            elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+            end
+            realign_done(frun) = isfield(meta,'realign');
+        end
+
+        % actually do it
+        if strcmp(options.overwrite_data,'on') || ...
+                (strcmp(options.overwrite_data,'off') && sum(realign_done)==0)
+
+            fprintf('Starting realignment \n')
+            for frun = size(st_files,1):-1:1
+                matlabbatch{1}.spm.spatial.realign.estwrite.data{frun} = {st_files{frun}}; %#ok<CCAT1>
+            end
+            matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.quality = 1;
+            matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.sep     = 4;
+            matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.fwhm    = 5;
+            matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.rtm     = 1;
+            matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.interp  = 4;
+            matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.wrap    = [0 0 0];
+            matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.weight  = '';
+            matlabbatch{end}.spm.spatial.realign.estwrite.roptions.which   = [0 1]; %only reslice the mean
+            matlabbatch{end}.spm.spatial.realign.estwrite.roptions.interp  = 4;
+            matlabbatch{end}.spm.spatial.realign.estwrite.roptions.wrap    = [0 0 0];
+            matlabbatch{end}.spm.spatial.realign.estwrite.roptions.mask    = 1;
+            matlabbatch{end}.spm.spatial.realign.estwrite.roptions.prefix  = 'r';
+            out = spm_jobman('run',matlabbatch); clear matlabbatch;
+        end
+
+    else % --------------------------------------------------------------------
+
+        % which fieldmap for each run of this task / acq /rec
+        if iscell(subject.which_fmap)
+            which_fmap          = subject.which_fmap(find(bold_include));
+        else
+            which_fmap          = subject.which_fmap;
+        end
+
+        % file out of realign will be
+        [filepath,filename,ext] = fileparts(st_files{1});
+        mean_realigned_file     = [filepath filesep 'meanur' filename ext];
+        realign_done            = zeros(size(st_files,1),1);
+        for frun = size(st_files,1):-1:1
+            [filepath,filename,ext]    = fileparts(st_files{frun});
+            realigned_files{frun,1}    = [filepath filesep 'ur' filename ext]; % because we have the reslice here (not linear)
+            subject.motionfile{frun,1} = [filepath filesep 'rp_' filename '.txt'];
+            [filepath,filename]        = fileparts(subject.func{frun});
+            if exist(fullfile(filepath,[filename '.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+            elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
+            elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+            end
+            realign_done(frun) = isfield(meta,'realign');
+        end
+
+        % actually do it
+        if strcmp(options.overwrite_data,'on') || ...
+                (strcmp(options.overwrite_data,'off') && sum(realign_done)==0)
+
+            fprintf(' starting realignment and unwarping \n')
+            for frun = size(st_files,1):-1:1
+                matlabbatch{1}.spm.spatial.realignunwarp.data(frun).scans = {st_files{frun}}; %#ok<CCAT1>
+                if ~isempty(options.VDM)
+                    if length(which_fmap)==1
+                        matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {options.VDM{which_fmap}}; %#ok<CCAT1>
+                    else
+                        matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {options.VDM{which_fmap(frun)}}; %#ok<CCAT1>
+                    end
+                else
+                    matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {''};
+                end
+            end
+            matlabbatch{end}.spm.spatial.realignunwarp.eoptions.quality    = 1;
+            matlabbatch{end}.spm.spatial.realignunwarp.eoptions.sep        = 4;
+            matlabbatch{end}.spm.spatial.realignunwarp.eoptions.fwhm       = 5;
+            matlabbatch{end}.spm.spatial.realignunwarp.eoptions.rtm        = 1;
+            matlabbatch{end}.spm.spatial.realignunwarp.eoptions.einterp    = 4;
+            matlabbatch{end}.spm.spatial.realignunwarp.eoptions.ewrap      = [0 0 0];
+            matlabbatch{end}.spm.spatial.realignunwarp.eoptions.weight     = '';
+            matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.basfcn   = [12 12];
+            matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.regorder = 1;
+            matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.lambda   = 100000;
+            matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.jm       = 0;
+            matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.fot      = [4 5];
+            matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.sot      = [];
+            matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.uwfwhm   = 4;
+            matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.rem      = 1;
+            matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.noi      = 5;
+            matlabbatch{end}.spm.spatial.realignunwarp.uweoptions.expround = 'Average';
+            matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.uwwhich  = [2 1];
+            matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.rinterp  = 4;
+            matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.wrap     = [0 0 0];
+            matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.mask     = 1;
+            matlabbatch{end}.spm.spatial.realignunwarp.uwroptions.prefix   = 'ur';
+            out = spm_jobman('run',matlabbatch); clear matlabbatch;
+        end
+    end
+end % closes the if multiecho
 
 % -----------------------------------------------------------------------
 % despiking after rather than before realign using adaptive median filter
@@ -692,7 +702,7 @@ if strcmp(options.despike,'after')
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
-        
+
         if strcmp(options.overwrite_data,'on') || ...
                 (strcmp(options.overwrite_data,'off') && ~isfield(meta,'despike'))
             realigned = dir(fullfile(filepath,['urst_' filename(1:end-5) '*bold.nii']));
@@ -715,7 +725,7 @@ end
 % update the metadata and do QC
 % -----------------------------
 for frun = 1:size(subject.func,1)
-    
+
     [filepath,filename] = fileparts(subject.func{frun});
     if exist(fullfile(filepath,[filename '.json']),'file')
         meta = spm_jsonread(fullfile(filepath,[filename '.json']));
@@ -724,7 +734,7 @@ for frun = 1:size(subject.func,1)
     elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
         meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
     end
-    
+
     if strcmp(options.QC,'on')
         if exist('out','var')
             if isfield(out{1}.sess(frun),'uwrfiles') % write unwrap realign images
@@ -746,7 +756,7 @@ for frun = 1:size(subject.func,1)
                 error('no realigned file found run %g',frun)
             end
         end
-        
+
         if ~isempty(realigned) % after renaming file, re-running with overwrite 'off' that file is gone
             if ~isfield(subject,'func_qa')
                 subject.func_qa                     = cell(size(subject.func));
@@ -755,7 +765,7 @@ for frun = 1:size(subject.func,1)
                 meta.QA.spatialcorr.volume_outliers = cell(size(subject.func));
                 meta.QA.spatialcorr.slice_outliers  = cell(size(subject.func));
             end
-            
+
             if isempty(subject.func_qa{frun})
                 [subject.func_qa{frun}.volume_outliers, subject.func_qa{frun}.slice_outliers] = spmup_spatialcorr(realigned);
                 if iscell(meta.QA.spatialcorr.volume_outliers)
@@ -780,7 +790,7 @@ for frun = 1:size(subject.func,1)
             end
         end
     end
-    
+
     if isempty(options.VDM)
         meta.realign.type       = 'realign without field map correction';
     else
@@ -802,12 +812,12 @@ end
 
 if strcmp(options.overwrite_data,'on') || ...
         (strcmp(options.overwrite_data,'off') && ~isfield(meta,'segment'))
-    
+
     fprintf(' Coregister and segment \n')
     if exist('matlabbatch','var')
         clear matlabbatch
     end
-    
+
     % coregister and reslice other anatomical data to T1
     % --------------------------------------------------
     if size(subject.anat,1) > 1
@@ -821,7 +831,7 @@ if strcmp(options.overwrite_data,'on') || ...
             others = spm_jobman('run',matlabbatch); clear matlabbatch;
         end
     end
-    
+
     % coregister anatomical data to mean EPI
     % ---------------------------------
     matlabbatch{1}.spm.spatial.coreg.estimate.ref                 = {mean_realigned_file};
@@ -836,7 +846,7 @@ if strcmp(options.overwrite_data,'on') || ...
     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.tol      = ...
         [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.fwhm     = [7 7];
-    
+
     % reslice anatomical to mean EPI
     % not used in normalization but good for visualization
     matlabbatch{2}.spm.spatial.coreg.write.ref               = {mean_realigned_file};
@@ -846,7 +856,7 @@ if strcmp(options.overwrite_data,'on') || ...
     matlabbatch{end}.spm.spatial.coreg.write.roptions.mask   = 0;
     matlabbatch{end}.spm.spatial.coreg.write.roptions.prefix = 'space-EPI';
     spm_jobman('run',matlabbatch); clear matlabbatch;
-    
+
     anatinfo.coregistration.ref    = mean_realigned_file;
     if exist('others','var')
         anatinfo.coregistration.source = {subject.anat(1) others{1}.rfiles};
@@ -907,18 +917,18 @@ norm_res                     = all_res(p,:);
 
 if strcmp(options.overwrite_data,'on') || ...
         (strcmp(options.overwrite_data,'off') && ~isfield(meta,'normalise'))
-    
+
     fprintf(' running normalize \n')
     if exist('matlabbatch','var')
         clear matlabbatch
     end
-    
+
     bounding_box = [-78 -112 -70 ; 78 76 85];
     if strcmpi(options.norm,'EPInorm') && ~rem(norm_res(3),2)
         % anat likely complains but run as before but old EPI now matches
         bounding_box = [-78 -112 -70 ; 78 76 86];
     end
-    
+
     % segment the coregistered T1 (not resliced) and possibly other
     % modality (T2 or FLAIR most likely bit not checking)
     % --------------------------------------------------------
@@ -967,7 +977,7 @@ if strcmp(options.overwrite_data,'on') || ...
     else
         matlabbatch{end}.spm.spatial.preproc.warp.write   = [0 1];
     end
-    
+
     % normalize EPI using T1 info
     % ----------------------------
     % normalize space-EPI_T1
@@ -976,13 +986,13 @@ if strcmp(options.overwrite_data,'on') || ...
         substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
         substruct('.','fordef', '()',{':'}));
     matlabbatch{end}.spm.spatial.normalise.write.subj(1).resample(1) = {spaceEPI_T1w};
-    
+
     % normalize bias corrected T1 and tissue classes
     matlabbatch{end}.spm.spatial.normalise.write.subj(2).def(1) = ...
         cfg_dep('Segment: Forward Deformations', ...
         substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), ...
         substruct('.','fordef', '()',{':'}));
-    
+
     for channel = 1:size(subject.anat,1)
         matlabbatch{end}.spm.spatial.normalise.write.subj(2).resample(channel) = cfg_dep(['Segment: Bias Corrected (' num2str(channel) ')'], substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','channel', '()',{1}, '.','biascorr', '()',{':'}));
     end
@@ -993,7 +1003,7 @@ if strcmp(options.overwrite_data,'on') || ...
     matlabbatch{end}.spm.spatial.normalise.write.woptions.vox                = norm_res;
     matlabbatch{end}.spm.spatial.normalise.write.woptions.interp             = 4;
     matlabbatch{end}.spm.spatial.normalise.write.woptions.prefix             = 'w';
-    
+
     % if field maps, normalize EPI from T1
     % -------------------------------------
     if strcmpi(options.norm,'T1norm')
@@ -1006,7 +1016,7 @@ if strcmp(options.overwrite_data,'on') || ...
             matlabbatch{end}.spm.spatial.normalise.write.subj(3).resample(frun,:) = {realigned_files{frun}}; %#ok<CCAT1>
         end
         matlabbatch{end}.spm.spatial.normalise.write.subj(3).resample(end+1,:)    = {mean_realigned_file}; % adding mean image
-        
+
     else  % normalize EPI on EPI template (old routine)
         % -------------------------------------------
         matlabbatch{end+1}.spm.tools.oldnorm.estwrite.subj.source(1)                  = {mean_realigned_file};
@@ -1031,7 +1041,7 @@ if strcmp(options.overwrite_data,'on') || ...
         matlabbatch{end}.spm.tools.oldnorm.estwrite.roptions.prefix               = 'w';
     end
     spm_jobman('run',matlabbatch);
-    
+
     % update json files
     for frun = 1:size(subject.func,1)
         [filepath,filename] = fileparts(subject.func{frun});
@@ -1042,7 +1052,7 @@ if strcmp(options.overwrite_data,'on') || ...
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
-        
+
         meta.segment = matlabbatch{1}.spm.spatial.preproc.channel.vols;
         if strcmpi(options.norm,'T1norm')
             meta.normalise.from = 'segment';
@@ -1076,10 +1086,10 @@ end
 for frun = 1:size(Normalized_files,1)
     [filepath,filename,ext] = fileparts(Normalized_files{frun});
     stats_ready{frun,1}     = [filepath filesep 's' filename ext];
-    
+
     if strcmp(options.overwrite_data,'on') || ...
             (strcmp(options.overwrite_data,'off') && ~isfield(meta,'smoothingkernel'))
-        
+
         fprintf(' smoothing run %g \n',frun);
         V                       = spm_vol(Normalized_files{frun});
         skernel                 = abs(diag(V(1).mat)); clear V
@@ -1093,7 +1103,7 @@ for frun = 1:size(Normalized_files,1)
         elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
             meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
         end
-        
+
         if strcmp(options.derivatives,'off') || ...
                 contains(stats_ready{frun,1},'task-rest','IgnoreCase',true)
             % user left derivatives default but it's resting state
@@ -1105,7 +1115,7 @@ for frun = 1:size(Normalized_files,1)
             spm_smooth(Normalized_files{frun},stats_ready{frun},options.skernel);
             meta.smoothingkernel = skernel(1:3).*options.skernel;
         else % tiny kernel just to take closest neighbourghs
-            
+
             % if skernel not specified, smooth by one voxel
             if isempty(options.skernel)
                 options.skernel = 1;
@@ -1152,7 +1162,7 @@ if contains(subject.anat{1},'_T1w.nii')
     elseif exist(newname,'file')
         subject.anat{1} = newname;
     end
-    
+
     % also rename the json file
     json = dir(fullfile(filepath,[partA '*desc-preprocessed_anat.json']));
     if size(json,1)>1 % repeated stuff, take last one
@@ -1184,7 +1194,7 @@ for tissue = 1:3
         partB = ['label-' labels{tissue} '_probseg' ext];
         movefile(class{tissue},fullfile(filepath,[partA partB]));
     end
-    
+
     [filepath,filename,ext] = fileparts(Normalized_class{tissue});
     partA = get_fileparts(filename);
     partB = ['space-IXI549_label-' labels{tissue} '_probseg' ext];
@@ -1303,7 +1313,7 @@ for frun = 1:size(subject.func,1)
         end
         movefile(stats_ready{frun},newname);
         subject.func{frun} = newname;
-        
+
         if strcmp(options.QC,'on')
             if exist(fullfile(filepath,[filename '.json']),'file')
                 meta = spm_jsonread(fullfile(filepath,[filename '.json']));
@@ -1314,7 +1324,7 @@ for frun = 1:size(subject.func,1)
             elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json']),'file')
                 meta = spm_jsonread(fullfile(filepath,[subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json']));
             end
-            
+
             if ~isfield(subject.func_qa{frun},'preproc_outliers')
                 [~,subject.func_qa{frun}.preproc_outliers] = spmup_volumecorr(newname);
                 meta.QA.correlation_outliers = subject.func_qa{frun}.preproc_outliers;
@@ -1323,7 +1333,7 @@ for frun = 1:size(subject.func,1)
                 subject.func_qa{frun}.preproc_tSNR = spmup_temporalSNR(newname,subject.tissues);
                 meta.QA.tSNR = subject.func_qa{frun}.preproc_tSNR;
             end
-            
+
             spm_jsonwrite([subject.func{frun}(1:end-4) '.json'],meta,opts)
             oldjson = dir(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
             if ~isempty(oldjson)
@@ -1340,9 +1350,9 @@ for frun = 1:size(subject.func,1)
                 movefile(fullfile(json.folder,json.name),newname);
             end
         end
-        
+
     else % it could be it was done and just need updated
-        
+
         [filepath,filename,ext] = fileparts(subject.func{frun});
         if strcmpi(options.norm,'EPInorm')
             newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold' ext]);
@@ -1351,13 +1361,13 @@ for frun = 1:size(subject.func,1)
         end
         if exist(newname,'file')
             subject.func{frun} = newname;
-            
+
             if ~isfield(subject,'func_qa')
                 subject.func_qa = cell(size(subject.func,1),1);
             end
-            
+
             if strcmp(options.QC,'on') && isempty(subject.func_qa{frun})
-                
+
                 if exist(fullfile(filepath,[filename '.json']),'file')
                     meta = spm_jsonread(fullfile(filepath,[filename '.json']));
                 elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
@@ -1367,7 +1377,7 @@ for frun = 1:size(subject.func,1)
                 else
                     meta.QA = [];
                 end
-                
+
                 if ~isfield(subject.func_qa{frun},'preproc_outliers')
                     if isfield(meta.QA,'correlation_outliers')
                         subject.func_qa{frun}.preproc_outliers  = meta.QA.correlation_outliers;
@@ -1375,7 +1385,7 @@ for frun = 1:size(subject.func,1)
                         [~,subject.func_qa{frun}.preproc_outliers] = spmup_volumecorr(newname);
                     end
                 end
-                
+
                 if ~isfield(subject.func_qa{frun},'preproc_tSNR')
                     if isfield(meta.QA,'tSNR')
                         subject.func_qa{frun}.preproc_tSNR = meta.QA.tSNR;
