@@ -346,7 +346,7 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                 if iscell(file_to_parse)
                     file_to_parse = file_to_parse{1};
                 end
-                [~, filename]                                      = spm_fileparts(file_to_parse);
+                [~, filename]                                  = spm_fileparts(file_to_parse);
                 which_func_file                                = contains(subject.func, filename);
                 subject.fieldmap(ifmap).metadata.which_func    = find(which_func_file);
                 subject.which_fmap(find(which_func_file))      = ifmap;
@@ -384,9 +384,23 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                 case 'fieldmap'
                     warning('Fieldmap type of fielmaps not implemented')
                 case 'epi'
-                    fslfiles = spmup_FSLtopup(subject);
-                    [filepath,name,ext]  = fileparts(subject.fieldmap(ifmap).phasediff);
-                    options.VDM{ifmap,1} = [filepath filesep 'vdm5_sc' name ext];
+                    vol1 = fileparts(subject.fieldmap(ifmap).img1; % path to first image (blip up)
+                    vol2 = fileparts(subject.fieldmap(ifmap).img2; % path to first image (blip up)
+                    % fwhm       - Gaussian kernel spatial scales (default: [8 4 2 1 0.1])
+                    reg        - regularisation settings (default: [0 10 100])
+                    %            See spm_field for details:
+                    %               - [1] Penalty on absolute values.
+                    %               - [2] Penalty on the `membrane energy'. This penalises
+                    %                  the sum of squares of the gradients of the values.
+                    %               - [3] Penalty on the `bending energy'. This penalises
+                    %                  the sum of squares of the 2nd derivatives.
+                    % rinterp    - Degree of B-spline
+                    % rt         - Option to apply a supplementary refine over topup to include in the
+                    %              process the changes of intensities due to stretching and compression.
+                    % pref       - string to be prepended to the VDM files.
+                    % outdir     - output directory.
+                    options.VDM{ifmap,1} = spm_topup(vol1, vol2, FWHM, reg, rinterp, rt, pref, outdir);
+
                 otherwise
                     warning('%s is an unsupported type of fieldmap', subject.fieldmap(ifmap).type)
             end
@@ -475,6 +489,8 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                             {subject.fieldmap(ifmap).phase2};
                         matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.data.phasemag.longmag    = ...
                             {subject.fieldmap(ifmap).mag2};
+                    elseif strcmp(subject.fieldmap(ifmap).type, 'epi')
+                        error('to do my friend');                                           
                     end
                     
                     % fieldmap metadata

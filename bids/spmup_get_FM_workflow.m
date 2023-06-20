@@ -20,6 +20,8 @@ elseif strcmpi(type,'phase&mag')
     matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).data.phasemag.shortmag        = '';
     matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).data.phasemag.longphase       = '';
     matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj(1).data.phasemag.longmag         = '';
+elseif strcmpi(type,'epi')
+    error('to do')
 else
     error('unkmown input type for field map workflow')
 end

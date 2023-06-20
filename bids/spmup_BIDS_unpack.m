@@ -626,7 +626,7 @@ for s=1:nb_sub
                                 
                             case 'epi'
                                 subjects{s}.fieldmap(session,fmap_run_count).type = 'epi';
-                                warning(' EPI type of fielmaps are not SPM supported ...')
+                                warning(' EPI type of fielmaps are supported in the dev. SPM version...')
                                 if contains(name,{'AP','PA','LR','RL'})
                                     subjects{s}.fieldmap(session,fmap_run_count).epi = ...
                                         fullfile(target_dir, [name ext]);
