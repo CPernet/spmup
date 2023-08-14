@@ -18,7 +18,7 @@ function [volume_outliers, slice_outliers] = spmup_spatialcorr(varargin)
 % --------------------------
 %  Copyright (C) SPMUP Team 
 
-if exist('nansum','file') ~= 2
+if exist('nanmean','file') == 0
     error('you do not have stats toolbox to perform this operation, sorry')
 end
 
