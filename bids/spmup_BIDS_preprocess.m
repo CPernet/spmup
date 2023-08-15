@@ -394,23 +394,8 @@ else
                     case 'fieldmap'
                         warning('Fieldmap type of fielmaps not implemented')
                     case 'epi'
-                        vol1 = fileparts(subject.fieldmap(ifmap).img1); % path to first image (blip up)
-                        vol2 = fileparts(subject.fieldmap(ifmap).img2); % path to first image (blip up)
-                        % fwhm       - Gaussian kernel spatial scales (default: [8 4 2 1 0.1])
-                        % reg        - regularisation settings (default: [0 10 100])
-                        %            See spm_field for details:
-                        %               - [1] Penalty on absolute values.
-                        %               - [2] Penalty on the `membrane energy'. This penalises
-                        %                  the sum of squares of the gradients of the values.
-                        %               - [3] Penalty on the `bending energy'. This penalises
-                        %                  the sum of squares of the 2nd derivatives.
-                        % rinterp    - Degree of B-spline
-                        % rt         - Option to apply a supplementary refine over topup to include in the
-                        %              process the changes of intensities due to stretching and compression.
-                        % pref       - string to be prepended to the VDM files.
-                        % outdir     - output directory.
-                        options.VDM{ifmap,1} = spm_topup(vol1, vol2, FWHM, reg, rinterp, rt, pref, outdir);
-
+                        [filepath,name,ext]  = fileparts(subject.fieldmap(ifmap).epi);
+                        options.VDM{ifmap,1} = [filepath filesep 'vdm5_sc_pos_' name ext];
                     otherwise
                         warning('%s is an unsupported type of fieldmap', subject.fieldmap(ifmap).type)
                 end
@@ -557,18 +542,60 @@ else
                         else
                             error('No phase encoding direction found')
                         end
-
+                        
                         matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.session.epi = {avg}; % use the mean despiked / slice timed image
-
+                        
                         fprintf(' computing voxel displacement map %g\n',ifmap)
                         out = spm_jobman('run',matlabbatch); clear matlabbatch;
+                    end
+                    
+                elseif strcmp(subject.fieldmap(ifmap).type, 'epi')
+                    
+                    if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
+                            && ~exist(options.VDM{ifmap},'file'))
+                        
+                        % coregister epi to func
+                        clear matlabbatch
+                        matlabbatch{1}.spm.spatial.coreg.estimate.ref{1}                = avg;
+                        matlabbatch{1}.spm.spatial.coreg.estimate.source{1}             = subject.fieldmap(subject.which_fmap).epi;
+                        matlabbatch{1}.spm.spatial.coreg.estimate.others{1}             = '';
+                        matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.cost_fun     = 'nmi';
+                        matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.sep          = [16 8 4 2 1] % default spm option: [4 2]
+                        matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.tol          = ...
+                            [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
+                        matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.fwhm         = [7 7];
+                        matlabbatch{2} = matlabbatch{1};
+                        matlabbatch{2}.spm.spatial.coreg.estimate.source{1}             = subject.fieldmap(subject.which_fmap).epi2;
+                        fprintf(' coregistering fmap %g to its reference run\n',ifmap)
+                        spm_jobman('run',matlabbatch); clear matlabbatch;
+                        
+                        % run topup
+                        
+                        % run only if .epi has same pe dir as func
+                        if ~strcmp(subject.fieldmap(subject.which_fmap).metadata.PhaseEncodingDirection,...
+                                subject.func_metadata{which_func_file}.PhaseEncodingDirection)
+                            continue
+                        end
+                        [fielmap_pn,~,~] = fileparts(subject.fieldmap(ifmap).epi); % output dir for topup
+                        clear matlabbatch
+                        matlabbatch{1}.spm.tools.spatial.topup.data.volbup{1}   = subject.fieldmap(subject.which_fmap).epi;
+                        matlabbatch{1}.spm.tools.spatial.topup.data.volbdown{1} = subject.fieldmap(subject.which_fmap).epi2;
+                        matlabbatch{1}.spm.tools.spatial.topup.fwhm             = [8 4 2 1 0.1];
+                        matlabbatch{1}.spm.tools.spatial.topup.reg              = [0 10 100];
+                        matlabbatch{1}.spm.tools.spatial.topup.rinterp          = [1 1 1]; % 7th-degree spline
+                        matlabbatch{1}.spm.tools.spatial.topup.rt               = 1;
+                        matlabbatch{1}.spm.tools.spatial.topup.prefix           = 'vdm5_sc'; % valid bc enforced that volbup has same pe dir as func
+                        matlabbatch{1}.spm.tools.spatial.topup.outdir{1}        = fielmap_pn;
+                        fprintf(' running spm topup on fmap %g \n',ifmap)
+                        spm_jobman('run',matlabbatch); clear matlabbatch;
+                        
                     end
                 end
             end
         end
     end
-
-    % ------------------------
+        
+        % ------------------------
     %% Realignment across runs
     % ------------------------
 
