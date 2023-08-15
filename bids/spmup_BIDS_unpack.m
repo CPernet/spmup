@@ -148,9 +148,13 @@ for s=1:size(BIDS.subjects,2)
                         end
                     end
                     
+                    fname = strsplit(name,'/');
+                    
                     BIDS.subjects(s).fmap(fmap_index).type          = type;
-                    BIDS.subjects(s).fmap(fmap_index).filename      =  name;
-                    BIDS.subjects(s).fmap(fmap_index).ses           =  BIDS.subjects(s).session;
+                    BIDS.subjects(s).fmap(fmap_index).filename      =  fname{end};
+                    %BIDS.subjects(s).fmap(fmap_index).filename      =  name;
+                    BIDS.subjects(s).fmap(fmap_index).ses           =  BIDS.subjects(s).session(strfind(BIDS.subjects(s).session,'ses-')+4:end);
+                    %BIDS.subjects(s).fmap(fmap_index).ses           =  BIDS.subjects(s).session;
                     BIDS.subjects(s).fmap(fmap_index).acq           =  acquisition;
                     BIDS.subjects(s).fmap(fmap_index).dir           =  direction;
                     BIDS.subjects(s).fmap(fmap_index).run           =  run_number;
@@ -626,13 +630,24 @@ for s=1:nb_sub
                                 
                             case 'epi'
                                 subjects{s}.fieldmap(session,fmap_run_count).type = 'epi';
-                                warning(' EPI type of fielmaps are supported in the dev. SPM version...')
+                                warning(' EPI type of fielmaps are not SPM supported ...')
                                 if contains(name,{'AP','PA','LR','RL'})
                                     subjects{s}.fieldmap(session,fmap_run_count).epi = ...
                                         fullfile(target_dir, [name ext]);
                                     file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).epi,'file');
                                 end
-                                
+                                % include other epi with same run as epi2
+                                [~,fn,~] = fileparts(subjects{s}.fieldmap(session,fmap_run_count).epi);
+                                fparts = strsplit(fn, '_');
+                                runidx = cellfun(@(x) contains(x,'run-'),fparts,'UniformOutput',true);
+                                runmatches = find(arrayfun(@(x) strcmp(x.type,'epi') & strcmp(['run-' x.run],fparts{runidx}) & ~contains(x.filename,fn), BIDS.subjects(s).fmap, 'UniformOutput', true));
+                                epi2 = fullfile(BIDS.subjects(s).path, 'fmap', BIDS.subjects(s).fmap(runmatches).filename);
+                                [~,epi2_fn,epi2_ext] = spm_fileparts(epi2);
+                                if strcmp(epi2_ext,'.gz')
+                                    subjects{s}.fieldmap(session,fmap_run_count).epi2 = fullfile(target_dir,epi2_fn);
+                                else
+                                    subjects{s}.fieldmap(session,fmap_run_count).epi2 = fullfile(target_dir,[epi2_fn epi2_ext]);
+                                end                                
                             otherwise
                                 subjects{s}.fieldmap(session,fmap_run_count).type = 'unknown';
                                 warning(' %s is an unsupported type of fieldmap', fmap_type_ls(ifmap_type_ls))
