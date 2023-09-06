@@ -18,8 +18,8 @@ function [volume_outliers, slice_outliers] = spmup_spatialcorr(varargin)
 % --------------------------
 %  Copyright (C) SPMUP Team 
 
-if exist('nanmean','file') == 0
-    error('you do not have stats toolbox to perform this operation, sorry')
+if exist('nansum','file') ~= 2
+%     error('you do not have stats toolbox to perform this operation, sorry')
 end
 
 %% check inputs
@@ -97,6 +97,7 @@ n = size(Y,3);
 parfor i = 1:size(Y,4)
     S      = squeeze(Y(:,:,:,i));                % take one volume  
     vols   = reshape(S,[size(Y,1)*size(Y,2),n]); % reshape each slice as vectors
+    vols(isnan(vols)) = 0;                       % handle images with NaNs (e.g., tedana output) 
     all_r  = corr(vols);                         % all correlations between slices
     idx    = 2:n+1:numel(all_r);                 % take only one above diag (12,23,34,..) 
     r(i,:) = all_r(idx);
@@ -138,6 +139,7 @@ n = size(Y,4);
 parfor i = 1:size(Y,3)
     S      = squeeze(Y(:,:,i,:));                % take one slice all volumes
     vols   = reshape(S,[size(Y,1)*size(Y,2),n]); % reshape slices as vectors
+    vols(isnan(vols)) = 0;                       % handle images with NaNs (e.g., tedana output)
     all_r  = corr(vols);                         % all correlations between volumes
     idx    = 2:n+1:numel(all_r);                 % take only one above diag (12,23,34,..) 
     r(i,:) = all_r(idx);

@@ -19,8 +19,8 @@ function [r_course,r_outliers] = spmup_volumecorr(varargin)
 % --------------------------
 %  Copyright (C) SPMUP Team 
 
-if exist('nanmean','file') == 0
-    error('you do not have stats toolbox to perform this operation, sorry')
+if exist('nansum','file') ~= 2
+%     error('you do not have stats toolbox to perform this operation, sorry')
 end
 
 %% check inputs
