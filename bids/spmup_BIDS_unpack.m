@@ -558,137 +558,146 @@ for s=1:nb_sub
         end
         
         %% field maps
-        if ismember('fmap', spm_BIDS(BIDS,'modalities', 'sub', subjs_ls{s}, ...
-                'ses', sess_ls{session}))
-            
-            file_exists = 0;
-            fprintf(' subject %g - session %i: checking field maps \n',s, session)
-            if isempty(sess_folder)
-                target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                    'fieldmaps');
-            else
-                target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                    sess_folder, 'fieldmaps');
-            end
-            
-            % check which types of fieldmaps we are dealing with
-            fmap_type_ls = spm_BIDS(BIDS, 'types', 'sub', subjs_ls{s}, ...
-                'ses', sess_ls{session}, 'modality', 'fmap');
-            
-            % goes through each type in case we have several fieldmap types in that
-            % data set
-            if ~isempty(fmap_type_ls)
-                for ifmap_type_ls = 1:size(fmap_type_ls,2)
-                    
-                    % lists all the fieldmap files of that type as there might
-                    % be several runs / acq / rec ...
-                    fmap_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
-                        'ses', sess_ls{session}, 'modality', 'fmap', ...
-                        'type', fmap_type_ls{ifmap_type_ls});
-                    
-                    metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
-                        'ses', sess_ls{session}, 'modality', 'fmap', ...
-                        'type', fmap_type_ls{ifmap_type_ls});
-                    
-                    % for all the fieldmaps of that type
-                    for ifmap = 1:size(fmap_ls,1)
+        
+        % unpack fieldmaps only if being used
+        if ~strcmp(options.fmap,'off')
+            if ismember('fmap', spm_BIDS(BIDS,'modalities', 'sub', subjs_ls{s}, ...
+                    'ses', sess_ls{session}))
+                
+                file_exists = 0;
+                fprintf(' subject %g - session %i: checking field maps \n',s, session)
+                if isempty(sess_folder)
+                    target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                        'fieldmaps');
+                else
+                    target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
+                        sess_folder, 'fieldmaps');
+                end
+                
+                % check which types of fieldmaps we are dealing with
+                fmap_type_ls = spm_BIDS(BIDS, 'types', 'sub', subjs_ls{s}, ...
+                    'ses', sess_ls{session}, 'modality', 'fmap');
+                
+                % goes through each type in case we have several fieldmap types in that
+                % data set
+                if ~isempty(fmap_type_ls)
+                    for ifmap_type_ls = 1:size(fmap_type_ls,2)
                         
-                        in                    = fmap_ls{ifmap,1};
-                        [path,name,ext]       = spm_fileparts(in);
-                        [ext,name,compressed] = iscompressed(ext,name);
-                        if iscell(metadata)
-                            subjects{s}.fieldmap(session,fmap_run_count).metadata = ...
-                                metadata{ifmap};
-                        else
-                            subjects{s}.fieldmap(session,fmap_run_count).metadata = metadata;
-                        end
+                        % lists all the fieldmap files of that type as there might
+                        % be several runs / acq / rec ...
+                        fmap_ls = spm_BIDS(BIDS, 'data', 'sub', subjs_ls{s}, ...
+                            'ses', sess_ls{session}, 'modality', 'fmap', ...
+                            'type', fmap_type_ls{ifmap_type_ls});
                         
-                        % different behavior depending on fielpmap type
-                        switch fmap_type_ls{ifmap_type_ls}
+                        metadata = spm_BIDS(BIDS, 'metadata', 'sub', subjs_ls{s}, ...
+                            'ses', sess_ls{session}, 'modality', 'fmap', ...
+                            'type', fmap_type_ls{ifmap_type_ls});
+                        
+                        % for all the fieldmaps of that type
+                        for ifmap = 1:size(fmap_ls,1)
                             
-                            case 'phasediff'
-                                subjects{s}.fieldmap(session,fmap_run_count).phasediff = ...
-                                    fullfile(target_dir, [name ext]);
-                                subjects{s}.fieldmap(session,fmap_run_count).type = 'phasediff';
-                                file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phasediff,'file');
-                                
-                            case 'phase12'
-                                subjects{s}.fieldmap(session,fmap_run_count).type = 'phase12';
-                                if contains(name,'phase1')
-                                    subjects{s}.fieldmap(session,fmap_run_count).phase1 = ...
-                                        fullfile(target_dir, [name ext]);
-                                    file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phase1,'file');
-                                elseif contains(name,'phase2')
-                                    subjects{s}.fieldmap(fmap_run_count,1).phase2 = ...
-                                        fullfile(target_dir, [name ext]);
-                                    file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phase2,'file');
-                                end
-                                
-                            case 'fieldmap'
-                                subjects{s}.fieldmap(session,fmap_run_count).type = 'fieldmap';
-                                warning(' Fieldmap type of fielmaps not implemented')
-                                
-                            case 'epi'
-                                subjects{s}.fieldmap(session,fmap_run_count).type = 'epi';
-                                warning(' EPI type of fielmaps are not SPM supported ...')
-                                if contains(name,{'AP','PA','LR','RL'})
-                                    subjects{s}.fieldmap(session,fmap_run_count).epi = ...
-                                        fullfile(target_dir, [name ext]);
-                                    file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).epi,'file');
-                                end
-                                % include other epi with same run as epi2
-                                [~,fn,~] = fileparts(subjects{s}.fieldmap(session,fmap_run_count).epi);
-                                fparts = strsplit(fn, '_');
-                                runidx = cellfun(@(x) contains(x,'run-'),fparts,'UniformOutput',true);
-                                runmatches = find(arrayfun(@(x) strcmp(x.type,'epi') & strcmp(['run-' x.run],fparts{runidx}) & ~contains(x.filename,fn), BIDS.subjects(s).fmap, 'UniformOutput', true));
-                                epi2 = fullfile(BIDS.subjects(s).path, 'fmap', BIDS.subjects(s).fmap(runmatches).filename);
-                                [~,epi2_fn,epi2_ext] = spm_fileparts(epi2);
-                                if strcmp(epi2_ext,'.gz')
-                                    subjects{s}.fieldmap(session,fmap_run_count).epi2 = fullfile(target_dir,epi2_fn);
-                                else
-                                    subjects{s}.fieldmap(session,fmap_run_count).epi2 = fullfile(target_dir,[epi2_fn epi2_ext]);
-                                end                                
-                            otherwise
-                                subjects{s}.fieldmap(session,fmap_run_count).type = 'unknown';
-                                warning(' %s is an unsupported type of fieldmap', fmap_type_ls(ifmap_type_ls))
-                        end
-                        unzip_or_copy(compressed, options, file_exists, in, target_dir)
-                        
-                        % taking care of magnitude images
-                        if strcmp(fmap_type_ls(ifmap_type_ls), 'phasediff') ...
-                                || strcmp(fmap_type_ls(ifmap_type_ls), 'phase12')
+                            in                    = fmap_ls{ifmap,1};
+                            [path,name,ext]       = spm_fileparts(in);
+                            [ext,name,compressed] = iscompressed(ext,name);
+                            if iscell(metadata)
+                                subjects{s}.fieldmap(session,fmap_run_count).metadata = ...
+                                    metadata{ifmap};
+                            else
+                                subjects{s}.fieldmap(session,fmap_run_count).metadata = metadata;
+                            end
                             
-                            diff_name = name;
-                            % there might be 2 magnitude images
-                            for imag = 1:2
-                                loof_for = strrep(diff_name, fmap_type_ls{ifmap_type_ls}, ...
-                                    sprintf('magnitude%i', imag) );
-                                [~,name,ext] = spm_fileparts(spm_select('List',path,...
-                                    [loof_for '.nii';loof_for '.*gz']));
-                                in = fullfile(path, [name ext]);
+                            % different behavior depending on fielpmap type
+                            switch fmap_type_ls{ifmap_type_ls}
                                 
-                                % mostly in case there is only one
-                                if ~isempty(name)
+                                case 'phasediff'
+                                    subjects{s}.fieldmap(session,fmap_run_count).phasediff = ...
+                                        fullfile(target_dir, [name ext]);
+                                    subjects{s}.fieldmap(session,fmap_run_count).type = 'phasediff';
+                                    file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phasediff,'file');
                                     
-                                    [ext,name,compressed] = iscompressed(ext,name);
-                                    if imag==1
-                                        subjects{s}.fieldmap(session,fmap_run_count).mag1 = ...
+                                case 'phase12'
+                                    subjects{s}.fieldmap(session,fmap_run_count).type = 'phase12';
+                                    if contains(name,'phase1')
+                                        subjects{s}.fieldmap(session,fmap_run_count).phase1 = ...
                                             fullfile(target_dir, [name ext]);
-                                        file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).mag1,'file');
-                                    elseif imag==2
-                                        subjects{s}.fieldmap(session,fmap_run_count).mag2 = ...
+                                        file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phase1,'file');
+                                    elseif contains(name,'phase2')
+                                        subjects{s}.fieldmap(fmap_run_count,1).phase2 = ...
                                             fullfile(target_dir, [name ext]);
-                                        file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).mag2,'file');
+                                        file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).phase2,'file');
                                     end
-                                    unzip_or_copy(compressed, options, file_exists, in, target_dir)
+                                    
+                                case 'fieldmap'
+                                    subjects{s}.fieldmap(session,fmap_run_count).type = 'fieldmap';
+                                    warning(' Fieldmap type of fielmaps not implemented')
+                                    
+                                case 'epi'
+                                    subjects{s}.fieldmap(session,fmap_run_count).type = 'epi';
+                                    warning(' EPI type of fielmaps are not SPM supported ...')
+                                    if contains(name,{'AP','PA','LR','RL'})
+                                        subjects{s}.fieldmap(session,fmap_run_count).epi = ...
+                                            fullfile(target_dir, [name ext]);
+                                        file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).epi,'file');
+                                    end
+                                    % include other epi with same run as epi2
+                                    [~,fn,~] = fileparts(subjects{s}.fieldmap(session,fmap_run_count).epi);
+                                    fparts = strsplit(fn, '_');
+                                    runidx = cellfun(@(x) contains(x,'run-'),fparts,'UniformOutput',true);
+                                    runmatches = find(arrayfun(@(x) strcmp(x.type,'epi') & strcmp(['run-' x.run],fparts{runidx}) & ~contains(x.filename,fn), BIDS.subjects(s).fmap, 'UniformOutput', true));
+                                    if ~isempty(runmatches)
+                                        epi2 = fullfile(BIDS.subjects(s).path, 'fmap', BIDS.subjects(s).fmap(runmatches).filename);
+                                        [~,epi2_fn,epi2_ext] = spm_fileparts(epi2);
+                                        if strcmp(epi2_ext,'.gz')
+                                            subjects{s}.fieldmap(session,fmap_run_count).epi2 = fullfile(target_dir,epi2_fn);
+                                        else
+                                            subjects{s}.fieldmap(session,fmap_run_count).epi2 = fullfile(target_dir,[epi2_fn epi2_ext]);
+                                        end
+                                    else
+                                    end
+                                    
+                                otherwise
+                                    subjects{s}.fieldmap(session,fmap_run_count).type = 'unknown';
+                                    warning(' %s is an unsupported type of fieldmap', fmap_type_ls(ifmap_type_ls))
+                            end
+                            unzip_or_copy(compressed, options, file_exists, in, target_dir)
+                            
+                            % taking care of magnitude images
+                            if strcmp(fmap_type_ls(ifmap_type_ls), 'phasediff') ...
+                                    || strcmp(fmap_type_ls(ifmap_type_ls), 'phase12')
+                                
+                                diff_name = name;
+                                % there might be 2 magnitude images
+                                for imag = 1:2
+                                    loof_for = strrep(diff_name, fmap_type_ls{ifmap_type_ls}, ...
+                                        sprintf('magnitude%i', imag) );
+                                    [~,name,ext] = spm_fileparts(spm_select('List',path,...
+                                        [loof_for '.nii';loof_for '.*gz']));
+                                    in = fullfile(path, [name ext]);
+                                    
+                                    % mostly in case there is only one
+                                    if ~isempty(name)
+                                        
+                                        [ext,name,compressed] = iscompressed(ext,name);
+                                        if imag==1
+                                            subjects{s}.fieldmap(session,fmap_run_count).mag1 = ...
+                                                fullfile(target_dir, [name ext]);
+                                            file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).mag1,'file');
+                                        elseif imag==2
+                                            subjects{s}.fieldmap(session,fmap_run_count).mag2 = ...
+                                                fullfile(target_dir, [name ext]);
+                                            file_exists = exist(subjects{s}.fieldmap(session,fmap_run_count).mag2,'file');
+                                        end
+                                        unzip_or_copy(compressed, options, file_exists, in, target_dir)
+                                    end
                                 end
                             end
+                            fmap_run_count = fmap_run_count + 1;
                         end
-                        fmap_run_count = fmap_run_count + 1;
                     end
                 end
             end
         end
+        
     end
 end
 
