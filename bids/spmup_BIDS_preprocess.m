@@ -747,32 +747,71 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                 if strcmp(options.overwrite_data,'on') || (strcmp(options.overwrite_data,'off') ...
                         && ~exist(options.VDM{ifmap},'file'))
                     
+                    % for example: bold acquired and brief acquisition with opposite pe dir
+                    if ~isfield(subject.fieldmap(subject.which_fmap), 'epi2')
+                        
+                        % check bold and epi have same pe axis and opposite pe dir
+                        epi_pedir = subject.fieldmap(subject.which_fmap).metadata.PhaseEncodingDirection;
+                        bold_pedir = subject.func_metadata{1}.PhaseEncodingDirection;
+                        % same axis
+                        axis_check = strcmpi(epi_pedir(1),bold_pedir(1));
+                        % opposite dir
+                        dir_check = xor(strcmpi([epi_pedir(1) '-'],epi_pedir),strcmpi([bold_pedir(1) '-'],bold_pedir));
+                        
+                        % if same pe axis and oppo pe dir, peel first bold volume for topup
+                        if all(axis_check, dir_check)
+                            [pn,~,~] = fileparts(subject.fieldmap(subject.which_fmap).epi);
+                            [~,fn,ext] = fileparts(subject.func{1});
+                            copyfile(subject.func{1},pn)
+                            newfn = strrep(fn,'bold','epi');
+                            system(['fslroi ' fullfile(pn,[fn ext]) ' ' fullfile(pn,[newfn ext]) ' ' num2str(0) ' ' num2str(1)]);
+                            system(['gunzip -f ' fullfile(pn,[newfn ext '.gz'])]);
+                            delete(fullfile(pn,[fn ext]));
+                            subject.fieldmap(subject.which_fmap).epi2 = fullfile(pn,[newfn ext]);
+                        else
+                            % no same pe, oppo pe dir pair available, skip topup
+                            continue
+                        end
+                    end
+                    
                     % coregister epi to func
                     clear matlabbatch
                     matlabbatch{1}.spm.spatial.coreg.estimate.ref{1}                = avg;
-                    matlabbatch{1}.spm.spatial.coreg.estimate.source{1}             = subject.fieldmap(subject.which_fmap).epi;
+                    matlabbatch{1}.spm.spatial.coreg.estimate.source{1}             = [subject.fieldmap(subject.which_fmap).epi ',1'];
                     matlabbatch{1}.spm.spatial.coreg.estimate.others{1}             = '';
                     matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.cost_fun     = 'nmi';
-                    matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.sep          = [16 8 4 2 1] % default spm option: [4 2]
+                    matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.sep          = [16 8 4 2 1]; % default spm option: [4 2]
                     matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.tol          = ...
                         [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
                     matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.fwhm         = [7 7];
                     matlabbatch{2} = matlabbatch{1};
-                    matlabbatch{2}.spm.spatial.coreg.estimate.source{1}             = subject.fieldmap(subject.which_fmap).epi2;
+                    matlabbatch{2}.spm.spatial.coreg.estimate.source{1}             = [subject.fieldmap(subject.which_fmap).epi2, ',1'];
                     fprintf(' coregistering fmap %g to its reference run\n',ifmap)
                     spm_jobman('run',matlabbatch); clear matlabbatch;
                     
                     % run topup
                     
-                    % run only if .epi has same pe dir as func
-                    if ~strcmp(subject.fieldmap(subject.which_fmap).metadata.PhaseEncodingDirection, ...
-                            subject.func_metadata{which_func_file}.PhaseEncodingDirection)
+                    % if epi2 not assigned, cannot run topup
+                    if ~isfield(subject.fieldmap(subject.which_fmap), 'epi2')
                         continue
                     end
+                    
+                    % ensure that volbup has same pedir as bold
+                    if strcmp(subject.fieldmap(subject.which_fmap).metadata.PhaseEncodingDirection, ...
+                            subject.func_metadata{which_func_file}.PhaseEncodingDirection)
+                        volbup      = subject.fieldmap(subject.which_fmap).epi;
+                        volbdown    = subject.fieldmap(subject.which_fmap).epi2;
+                    else
+                        volbup      = subject.fieldmap(subject.which_fmap).epi2;
+                        volbdown    = subject.fieldmap(subject.which_fmap).epi;
+                        [pn,fn,ext] = fileparts(subject.fieldmap(subject.which_fmap).epi2);
+                        options.VDM{ifmap,1} = fullfile(pn, ['vdm5_sc_pos_' fn ext]); % update VDM file
+                    end
+                    
                     [fielmap_pn,~,~] = fileparts(subject.fieldmap(ifmap).epi); % output dir for topup
                     clear matlabbatch
-                    matlabbatch{1}.spm.tools.spatial.topup.data.volbup{1}   = subject.fieldmap(subject.which_fmap).epi;
-                    matlabbatch{1}.spm.tools.spatial.topup.data.volbdown{1} = subject.fieldmap(subject.which_fmap).epi2;
+                    matlabbatch{1}.spm.tools.spatial.topup.data.volbup{1}   = volbup;
+                    matlabbatch{1}.spm.tools.spatial.topup.data.volbdown{1} = volbdown;
                     matlabbatch{1}.spm.tools.spatial.topup.fwhm             = [8 4 2 1 0.1];
                     matlabbatch{1}.spm.tools.spatial.topup.reg              = [0 10 100];
                     matlabbatch{1}.spm.tools.spatial.topup.rinterp          = [1 1 1]; % 7th-degree spline
@@ -780,8 +819,7 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                     matlabbatch{1}.spm.tools.spatial.topup.prefix           = 'vdm5_sc'; % valid bc enforced that volbup has same pe dir as func
                     matlabbatch{1}.spm.tools.spatial.topup.outdir{1}        = fielmap_pn;
                     fprintf(' running spm topup on fmap %g \n',ifmap)
-                    spm_jobman('run',matlabbatch); clear matlabbatch;
-                    
+                    spm_jobman('run',matlabbatch); clear matlabbatch;                    
                 end
             end
         end
