@@ -7,9 +7,9 @@ function [subject,options] = spmup_BIDS_preprocess(subject, options)
 % If anat is not available, or other options are not here, just use the
 % regular spm batch and call spmup_QA functions, rather than forcing
 % spmup_BIDS_preprocess to do somehting is was not designed for.
-
-% FORMAT spmup_BIDS_preprocess(subject, s)
-%        spmup_BIDS_preprocess(subjects s, options)
+%
+% FORMAT spmup_BIDS_preprocess(subject)
+%        spmup_BIDS_preprocess(subjects, options)
 %
 % INPUT - subject: a structure containing the fullpath of the unpacked anat,
 %           fmap and func files for a given subject (see spmup_BIDS_unpack)
@@ -647,8 +647,6 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                             subject.fieldmap(ifmap).mag2;...
                             subject.fieldmap(ifmap).phase1;...
                             subject.fieldmap(ifmap).phase2};
-                    elseif strcmp(subject.fieldmap(ifmap).type, 'e')
-                        
                     end
                     
                     fprintf(' coregistering fmap %g to its reference run\n',ifmap)
@@ -1428,48 +1426,58 @@ end
 %% Smoothing
 % ----------
 
-for frun = 1:size(Normalized_files,1)
-    [filepath,filename,ext] = fileparts(Normalized_files{frun});
-    stats_ready{frun,1}     = [filepath filesep 's' filename ext];
+if ischar(options.skernel) % case where it's 'off' because [] or numeric 
+    if strcmpi(options.skernel,'on')
+        options.skernel = []; % really should not happen, JIC
+    end
+end
 
-    if strcmp(options.overwrite_data,'on') || ...
-            (strcmp(options.overwrite_data,'off') && ~isfield(meta,'smoothingkernel'))
+if ischar(options.skernel) 
+    stats_ready = Normalized_files;
+else % do the smooting
+    for frun = 1:size(Normalized_files,1)
+        [filepath,filename,ext] = fileparts(Normalized_files{frun});
+        stats_ready{frun,1}     = [filepath filesep 's' filename ext];
 
-        fprintf(' smoothing run %g \n',frun);
-        V                       = spm_vol(Normalized_files{frun});
-        skernel                 = abs(diag(V(1).mat)); clear V
-        [filepath,filename,ext] = fileparts(subject.func{frun});
-        if exist(fullfile(filepath,[filename '.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']));
-        elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
-            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
-        end
+        if strcmp(options.overwrite_data,'on') || ...
+                (strcmp(options.overwrite_data,'off') && ~isfield(meta,'smoothingkernel'))
 
-        if strcmp(options.derivatives,'off') || ...
-                contains(stats_ready{frun,1},'task-rest','IgnoreCase',true)
-            % user left derivatives default but it's resting state
-            % (makes no sense to do the other case)
-            if isempty(options.skernel)
-                options.skernel      = 3;
-                meta.smoothingkernel = 3;
+            fprintf(' smoothing run %g \n',frun);
+            V                       = spm_vol(Normalized_files{frun});
+            skernel                 = abs(diag(V(1).mat)); clear V
+            [filepath,filename,ext] = fileparts(subject.func{frun});
+            if exist(fullfile(filepath,[filename '.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+            elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
+            elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']));
+            elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
             end
-            spm_smooth(Normalized_files{frun},stats_ready{frun},options.skernel);
-            meta.smoothingkernel = skernel(1:3).*options.skernel;
-        else % tiny kernel just to take closest neighbourghs
 
-            % if skernel not specified, smooth by one voxel
-            if isempty(options.skernel)
-                options.skernel = 1;
+            if strcmp(options.derivatives,'off') || ...
+                    contains(stats_ready{frun,1},'task-rest','IgnoreCase',true)
+                % user left derivatives default but it's resting state
+                % (makes no sense to do the other case)
+                if isempty(options.skernel)
+                    options.skernel      = 3;
+                    meta.smoothingkernel = 3;
+                end
+                spm_smooth(Normalized_files{frun},stats_ready{frun},options.skernel);
+                meta.smoothingkernel = skernel(1:3).*options.skernel;
+            else % tiny kernel just to take closest neighbourghs
+
+                % if skernel not specified, smooth by one voxel
+                if isempty(options.skernel)
+                    options.skernel = 1;
+                end
+                skernel = skernel.*options.skernel;
+                spm_smooth(Normalized_files{frun},stats_ready{frun},skernel(1:3));
+                meta.smoothingkernel = skernel(1:3);
             end
-            skernel = skernel.*options.skernel;
-            spm_smooth(Normalized_files{frun},stats_ready{frun},skernel(1:3));
-            meta.smoothingkernel = skernel(1:3);
+            spm_jsonwrite(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),meta,opts)
         end
-        spm_jsonwrite(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),meta,opts)
     end
 end
 
@@ -1590,60 +1598,6 @@ if ~isempty(spaceT1)
     end
 end
 
-% clean-up intermediate fmri files
-if strcmpi(options.keep_data,'off')
-    
-    % clean-up intermediate tedana-related anat files
-    if strcmp(options.multiecho,'yes')
-        [anatpath,~,~] = fileparts(subject.anat{1});
-        
-        % empty struct matching dir output
-        toDelete = struct('name','','folder','','date','','bytes','','isdir','','datenum','');
-        % list of prefixes to delete
-        prefixList = {'bmask*', 'rbmask*'};
-        for nprefix = 1:numel(prefixList)
-            tmp  = dir(fullfile(anatpath,prefixList{nprefix}));
-            toDelete = [toDelete; tmp]; % add to list
-        end
-        
-        % delete files
-        if numel(toDelete)>1
-            arrayfun(@(x) delete(fullfile(x.folder, x.name)), toDelete(2:end), 'UniformOutput', false);
-        end
-        
-    end
-    
-    % clean-up intermediate func files
-    for frun = 1:size(subject.func, 1)
-        if bold_include(frun)
-            [filepath,filename,ext] = fileparts(subject.func{frun});
-            
-            % empty struct matching dir output
-            toDelete = struct('name','','folder','','date','','bytes','','isdir','','datenum','');
-            
-            tmp = dir(fullfile(filepath,[filename(1:end-5) '_skip-' num2str(options.removeNvol) '_bold*'])); % volume edited
-            toDelete = [toDelete; tmp]; % add to list
-            tmp = dir(fullfile(filepath,[filename(1:end-5) '*_rec-despiked_bold' ext])); % despiked
-            toDelete = [toDelete; tmp]; % add to list
-            
-            % list of prefixes to delete
-            prefixList = {'st_*', 'rst_*', 'ur*', 'usub*', 'rst_*', 'ur*', 'usub*', 'wusub*', 'ust*', 'wst*', 'wur*', 'wfmag*', 'mean*', 'wmean*'};
-            for nprefix = 1:numel(prefixList)
-                tmp  = dir(fullfile(filepath,[prefixList{nprefix} ext]));
-                toDelete = [toDelete; tmp]; % add to list
-            end
-            tmp = dir(fullfile(filepath,'st_*.mat'));
-            toDelete = [toDelete; tmp]; % add to list
-            
-            % delete files
-            if numel(toDelete)>1
-                arrayfun(@(x) delete(fullfile(x.folder, x.name)), toDelete(2:end), 'UniformOutput', false);
-            end
-            
-        end
-    end
-end
-
 % rename files and last QC
 for frun = 1:size(subject.func,1)
     if exist(stats_ready{frun},'file')
@@ -1739,6 +1693,61 @@ for frun = 1:size(subject.func,1)
         end
     end
 end
+
+% clean-up intermediate fmri files
+if strcmpi(options.keep_data,'off')
+    
+    % clean-up intermediate tedana-related anat files
+    if strcmp(options.multiecho,'yes')
+        [anatpath,~,~] = fileparts(subject.anat{1});
+        
+        % empty struct matching dir output
+        toDelete = struct('name','','folder','','date','','bytes','','isdir','','datenum','');
+        % list of prefixes to delete
+        prefixList = {'bmask*', 'rbmask*'};
+        for nprefix = 1:numel(prefixList)
+            tmp  = dir(fullfile(anatpath,prefixList{nprefix}));
+            toDelete = [toDelete; tmp]; % add to list
+        end
+        
+        % delete files
+        if numel(toDelete)>1
+            arrayfun(@(x) delete(fullfile(x.folder, x.name)), toDelete(2:end), 'UniformOutput', false);
+        end
+        
+    end
+    
+    % clean-up intermediate func files
+    for frun = 1:size(subject.func, 1)
+        if bold_include(frun)
+            [filepath,filename,ext] = fileparts(subject.func{frun});
+            
+            % empty struct matching dir output
+            toDelete = struct('name','','folder','','date','','bytes','','isdir','','datenum','');
+            
+            tmp = dir(fullfile(filepath,[filename(1:end-5) '_skip-' num2str(options.removeNvol) '_bold*'])); % volume edited
+            toDelete = [toDelete; tmp]; % add to list
+            tmp = dir(fullfile(filepath,[filename(1:end-5) '*_rec-despiked_bold' ext])); % despiked
+            toDelete = [toDelete; tmp]; % add to list
+            
+            % list of prefixes to delete
+            prefixList = {'st_*', 'rst_*', 'ur*', 'usub*', 'rst_*', 'ur*', 'usub*', 'wusub*', 'ust*', 'wst*', 'wur*', 'wfmag*', 'mean*', 'wmean*'};
+            for nprefix = 1:numel(prefixList)
+                tmp  = dir(fullfile(filepath,[prefixList{nprefix} ext]));
+                toDelete = [toDelete; tmp]; % add to list
+            end
+            tmp = dir(fullfile(filepath,'st_*.mat'));
+            toDelete = [toDelete; tmp]; % add to list
+            
+            % delete files
+            if numel(toDelete)>1
+                arrayfun(@(x) delete(fullfile(x.folder, x.name)), toDelete(2:end), 'UniformOutput', false);
+            end
+            
+        end
+    end
+end
+
 end
 
 %% sub-routine

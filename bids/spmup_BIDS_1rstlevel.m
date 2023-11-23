@@ -229,7 +229,7 @@ if strcmp(options.overwrite_data,'on') || ...
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).regress       = struct('name', {}, 'val', {});
             matlabbatch{1}.spm.stats.fmri_spec.sess(frun).multi_reg     = {QAjobs{frun}.design};
             if isempty(options.highpass)
-                matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf       = 1000;
+                matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf       = 1000; % 0.001 Hz
             else
                 matlabbatch{1}.spm.stats.fmri_spec.sess(frun).hpf       = options.highpass;
             end
