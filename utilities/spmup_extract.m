@@ -9,7 +9,7 @@ function timeseries = spmup_extract(fmridata,graymatter,atlas,varargin)
 %       gaymatter file name of a graymatter mask to use (must be same dimension as fMRI)
 %       atlas filenale of an atlas to use (will be resampled if different size)
 %       Optional LowPass: the bandpass boundary,FreqSampling = 1/TR 
-%                if those parameters are guven, the matlab 'lowpass'
+%                if those parameters are given, the matlab 'lowpass'
 %                function is applied on extracted time series
 %
 % OUTPUT timeseries is a cell array of voxels for each ROI of the atlas intersecting
