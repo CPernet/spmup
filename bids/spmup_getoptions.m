@@ -21,7 +21,7 @@ function options = spmup_getoptions(BIDS_dir)
 %               'task' [] (default) to specificy which bold task to analyze.
 %               'acq'  [] (default) to specificy which bold acquisition to analyze.
 %               'rec'  [] (default) to specificy which bold reconstruction to analyze.
-%               'despike' can be 'before' (default), 'after' or 'off' runs median despiking after or before realignment 
+%               'despike' can be 'before', 'after' or 'off' (default) runs median despiking after or before realignment 
 %               'fmap' is 'on' (default) to indicate to use field maps (can be set to 'off')
 %                      this can also be set to one of BIDS valid field when
 %                      multiple types maps are available e.g. 'phasediff' or 'epi'
@@ -32,8 +32,9 @@ function options = spmup_getoptions(BIDS_dir)
 %               'norm_res' can be any voxel size, 'EPI' or 'EPI-iso' (default - round to nearest isotropic voxel size)
 %               'norm_inv_save', is you want to save the 'big' inverse transform file 'off' by default
 %               'skernel' is the smoothing kernel as how many times the voxel size
-%                         [] as default because 'derivatives' default is 1 (and hrf re-estimation needs re-smoothing) 
-%                         using [] means smooth by norm_res, GLM, correct, and re-smooth 3*norm_res
+%                         [] is the default because 'derivatives' default is 1 (and hrf re-estimation needs re-smoothing) 
+%                         using [] implies smooth by norm_res, GLM, correct, and re-smooth 3*norm_res (task fmri)
+%                         this can also be set to 'off' to skip smoothing altogether
 %               'motionexp' 'off' (default) or 'on' compute voltera motion expansion
 %               'scrubbing' 'on' (default) or 'off' find outliers in motion derivatives and in globals
 %               'nuisance' 'WMCSF' (default) or 'compcor' for cleaning resting state data
@@ -71,7 +72,7 @@ options = struct(...
     'acq',[], ...
     'rec',[], ...
     'removeNvol', 0, ...
-    'despike', 'before', ...
+    'despike', [], ...
     'fmap','on',...
     'VDM', [], ...
     'multiecho', 'no', ...
