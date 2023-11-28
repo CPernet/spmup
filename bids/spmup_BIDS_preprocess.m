@@ -1745,7 +1745,11 @@ if strcmpi(options.keep_data,'off')
         prefixList = {'bmask*', 'rbmask*'};
         for nprefix = 1:numel(prefixList)
             tmp  = dir(fullfile(anatpath,prefixList{nprefix}));
-            toDelete = [toDelete; tmp]; % add to list
+            if ~isempty(tmp)
+                if exist(tmp(1).name,'file')
+                    toDelete = [toDelete; tmp]; % add to list
+                end
+            end
         end
         
         % delete files
@@ -1764,19 +1768,37 @@ if strcmpi(options.keep_data,'off')
             toDelete = struct('name','','folder','','date','','bytes','','isdir','','datenum','');
             
             tmp = dir(fullfile(filepath,[filename(1:end-5) '_skip-' num2str(options.removeNvol) '_bold*'])); % volume edited
-            toDelete = [toDelete; tmp]; % add to list
+            if ~isempty(tmp)
+                if exist(tmp(1).name,'file')
+                    toDelete = [toDelete; tmp]; % add to list
+                end
+            end
+
             tmp = dir(fullfile(filepath,[filename(1:end-5) '*_rec-despiked_bold' ext])); % despiked
-            toDelete = [toDelete; tmp]; % add to list
+            if ~isempty(tmp)
+                if exist(tmp(1).name,'file')
+                    toDelete = [toDelete; tmp]; % add to list
+                end
+            end
             
             % list of prefixes to delete
             prefixList = {'st_*', 'rst_*', 'ur*', 'usub*', 'rst_*', 'ur*', 'usub*', 'wusub*', 'ust*', 'wst*', 'wur*', 'wfmag*', 'mean*', 'wmean*'};
             for nprefix = 1:numel(prefixList)
                 tmp  = dir(fullfile(filepath,[prefixList{nprefix} ext]));
-                toDelete = [toDelete; tmp]; % add to list
+                if ~isempty(tmp)
+                    if exist(tmp(1).name,'file')
+                        toDelete = [toDelete; tmp]; % add to list
+                    end
+                end
             end
+
             tmp = dir(fullfile(filepath,'st_*.mat'));
-            toDelete = [toDelete; tmp]; % add to list
-            
+            if ~isempty(tmp)
+                if exist(tmp(1).name,'file')
+                    toDelete = [toDelete; tmp]; % add to list
+                end
+            end
+
             % delete files
             if numel(toDelete)>1
                 arrayfun(@(x) delete(fullfile(x.folder, x.name)), toDelete(2:end), 'UniformOutput', false);
