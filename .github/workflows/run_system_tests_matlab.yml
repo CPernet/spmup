@@ -62,11 +62,11 @@ jobs:
           submodules: true
           fetch-depth: 0
 
-      - name: Install SPM abd bids-matlab
+      - name: Install SPM and bids-matlab
         run: |
           git clone --depth 1 https://github.com/spm/spm12.git 
           cd system_test
-          git clone --branch dev --depth 1 https://github.com/bids-standard/bids-matlab.git
+          git clone --branch main --depth 1 https://github.com/bids-standard/bids-matlab.git
 
       - name: Run facerep
         uses: matlab-actions/run-command@v1.1.0
