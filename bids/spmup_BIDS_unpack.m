@@ -521,10 +521,10 @@ for s=1:nb_sub
             else
                 if isempty(sess_folder)
                     target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                        'func', ['run' num2str(frun)]);
+                        'func', 'run1');
                 else
                     target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                        sess_folder, 'func', ['run' num2str(frun)]);
+                        sess_folder, 'func', 'run1');
                 end
             end
             subjects{s}.func{session,bold_run_count}  = fullfile(target_dir, [name ext]);
