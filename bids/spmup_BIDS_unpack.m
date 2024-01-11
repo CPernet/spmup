@@ -425,7 +425,7 @@ for s = nb_sub:-1:1 % for each subject
                 [ext,name,compressed] = iscompressed(deblank(ext),name);
                 if ~isempty(compressed)
                     subjects{s}.anat{session,anat_count,1} = fullfile(target_dir, [name deblank(ext)]); % keep track of where the file is
-                    unzip_or_copy(compressed, options, exist(subjects{s}.anat{file},'file'), in{file}, target_dir)
+                    unzip_or_copy(compressed, options, exist(subjects{s}.anat{session,file},'file'), in{file}, target_dir)
                     anat_count = anat_count + 1;
                 end
             end % for each in files
