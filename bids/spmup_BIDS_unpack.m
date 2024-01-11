@@ -568,10 +568,10 @@ for s=1:nb_sub
                 fprintf(' subject %g - session %i: checking field maps \n',s, session)
                 if isempty(sess_folder)
                     target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                        'fieldmaps');
+                        'fmap');
                 else
                     target_dir = fullfile(options.outdir, ['sub-' subjs_ls{s}], ...
-                        sess_folder, 'fieldmaps');
+                        sess_folder, 'fmap');
                 end
                 
                 % check which types of fieldmaps we are dealing with
