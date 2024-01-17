@@ -606,7 +606,7 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                             strcmp(subject.fieldmap(ifmap).type, 'phasediff') && isempty(subject.fieldmap(ifmap).mag1)
                         clear matlabbatch
                         t1index                                                = find(cellfun(@(x) contains(x,'T1w'),subject.anat));
-                        if length(t1index>1)
+                        if length(t1index)>1
                             t1index = t1index(ifmap); % this should match session order as spm_BIDS
                         end
                         matlabbatch{1}.spm.spatial.coreg.write.ref             = {subject.fieldmap(ifmap).phasediff};
