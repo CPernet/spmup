@@ -479,8 +479,8 @@ if strcmpi(options.multiecho,'yes')
         spm_jsonwrite(new_json,meta,opts);        
         
         % add path to tedana output file
-        new_func{i}             = new_tedana_file;
-        new_func_metadata{i}    = subject.func_metadata{idx};
+        new_func{i,1}             = new_tedana_file;
+        new_func_metadata{i,1}    = subject.func_metadata{idx};
         
         spmup_basics(new_tedana_file,'mean') % make a mean image for each task
         
@@ -1021,13 +1021,14 @@ else % options.multiecho == 'yes'
         % actually do it
         if strcmp(options.overwrite_data,'on') || ...
                 (strcmp(options.overwrite_data,'off') && sum(realign_done)==0)
-        
+            
+            clear matlabbatch
             for frun = size(subject.func,1):-1:1
                 
                 % index of first echo image belonging current echoset
                 func_idx = find(arrayfun(@(x) x==frun, [echoinfo(:).echoset], 'UniformOutput', true),1);
                 
-                clear matlabbatch
+                
                 matlabbatch{1}.spm.tools.fieldmap.applyvdm.data(frun).scans         = subject.func(frun);
                 if length(which_fmap)==1
                     matlabbatch{1}.spm.tools.fieldmap.applyvdm.data(frun).vdmfile   = options.VDM(which_fmap);
@@ -1047,8 +1048,8 @@ else % options.multiecho == 'yes'
                 matlabbatch{1}.spm.tools.fieldmap.applyvdm.roptions.wrap        = [0 0 0];
                 matlabbatch{1}.spm.tools.fieldmap.applyvdm.roptions.mask        = 1;
                 matlabbatch{1}.spm.tools.fieldmap.applyvdm.roptions.prefix      = 'u';
-                spm_jobman('run', matlabbatch); clear matlabbatch
             end
+            spm_jobman('run', matlabbatch); clear matlabbatch
         end
     end
 end
@@ -1476,6 +1477,17 @@ else % do the smooting
     for frun = 1:size(Normalized_files,1)
         [filepath,filename,ext] = fileparts(Normalized_files{frun});
         stats_ready{frun,1}     = [filepath filesep 's' filename ext];
+        
+        [filepath,filename,ext] = fileparts(subject.func{frun});
+        if exist(fullfile(filepath,[filename '.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename '.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']));
+        elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+        end
 
         if strcmp(options.overwrite_data,'on') || ...
                 (strcmp(options.overwrite_data,'off') && ~isfield(meta,'smoothingkernel'))
@@ -1483,16 +1495,6 @@ else % do the smooting
             fprintf(' smoothing run %g \n',frun);
             V                       = spm_vol(Normalized_files{frun});
             skernel                 = abs(diag(V(1).mat)); clear V
-            [filepath,filename,ext] = fileparts(subject.func{frun});
-            if exist(fullfile(filepath,[filename '.json']),'file')
-                meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-            elseif exist(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']),'file')
-                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
-            elseif exist(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']),'file')
-                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']));
-            elseif exist(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']),'file')
-                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
-            end
 
             if strcmp(options.derivatives,'off') || ...
                     contains(stats_ready{frun,1},'task-rest','IgnoreCase',true)
@@ -1640,6 +1642,7 @@ end
 for frun = 1:size(subject.func,1)
     if exist(stats_ready{frun},'file')
         [filepath,filename,ext] = fileparts(subject.func{frun});
+        
         if strcmpi(options.norm,'EPInorm')
             newname = fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold' ext]);
         else
@@ -1649,16 +1652,9 @@ for frun = 1:size(subject.func,1)
         subject.func{frun} = newname;
 
         if strcmp(options.QC,'on')
-            if exist(fullfile(filepath,[filename '.json']),'file')
-                meta = spm_jsonread(fullfile(filepath,[filename '.json']));
-            elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_space-IXI549_desc-preprocessed_bold.json']),'file')
-                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-IXI549_desc-preprocessed_bold.json']));
-            elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_space-MNI152Lin_desc-preprocessed_bold.json']),'file')
-                meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_space-MNI152Lin_desc-preprocessed_bold.json']));
-            elseif exist(fullfile(filepath,[subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json']),'file')
-                meta = spm_jsonread(fullfile(filepath,[subject.func{frun}(1:end-9) '_desc-preprocessed_bold.json']));
-            end
-
+            
+            meta = spm_jsonread(fullfile(filepath,[filename(1:end-5) '_desc-preprocessed_bold.json']));
+            
             if ~isfield(subject.func_qa{frun},'preproc_outliers')
                 [~,subject.func_qa{frun}.preproc_outliers] = spmup_volumecorr(newname);
                 meta.QA.correlation_outliers = subject.func_qa{frun}.preproc_outliers;
@@ -1782,11 +1778,11 @@ if strcmpi(options.keep_data,'off')
             end
             
             % list of prefixes to delete
-            prefixList = {'st_*', 'rst_*', 'ur*', 'usub*', 'rst_*', 'ur*', 'usub*', 'wusub*', 'ust*', 'wst*', 'wur*', 'wfmag*', 'mean*', 'wmean*'};
+            prefixList = {'st_*', 'rst_*', 'ur*', 'usub*', 'wusub*', 'ust*', 'wst*', 'wur*', 'wfmag*', 'mean*', 'wmean*'};
             for nprefix = 1:numel(prefixList)
                 tmp  = dir(fullfile(filepath,[prefixList{nprefix} ext]));
                 if ~isempty(tmp)
-                    if exist(tmp(1).name,'file')
+                    if exist(fullfile(tmp(1).folder,tmp(1).name),'file')
                         toDelete = [toDelete; tmp]; % add to list
                     end
                 end
@@ -1794,7 +1790,7 @@ if strcmpi(options.keep_data,'off')
 
             tmp = dir(fullfile(filepath,'st_*.mat'));
             if ~isempty(tmp)
-                if exist(tmp(1).name,'file')
+                if exist(fullfile(tmp(1).folder,tmp(1).name),'file')
                     toDelete = [toDelete; tmp]; % add to list
                 end
             end
