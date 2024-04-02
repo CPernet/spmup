@@ -289,7 +289,7 @@ for frun = 1:size(subject.func, 1) % each run
         % timing     - [0 TR]
         
         if exist('SliceTiming', 'var')
-            sliceorder  = SliceTiming; % time
+            sliceorder  = SliceTiming*1000; % time in ms
             refslice    = sliceorder(round(length(SliceTiming)/2));
             timing      = [0 RepetitionTime];
             
