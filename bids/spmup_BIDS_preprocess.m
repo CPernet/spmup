@@ -311,130 +311,143 @@ for frun = 1:size(subject.func, 1) % each run
 end % end processing per run
 
 % ------------------------
-%% Multi-echo
+%% Multi-echo: realign (first echo) & tedana
 % -------------------------
 
 if strcmpi(options.multiecho,'yes')
     
+    % check that tedana can be called
+    returnval = system('which tedana');
+    if returnval
+        error('tedana not found!')
+    end    
+    
     % sort bold into echo sets (based on task/run/echo)
-    echoinfo = {};
+    subject.func_echoinfo = {};
     for frun = 1:size(subject.func, 1)
+        
         % get file elements
-        fparts              = strsplit(subject.func{frun}, '_');
-        taskidx             = find(cellfun(@(x) startsWith(x, 'task-'), fparts, 'UniformOutput', true));
-        runidx              = find(cellfun(@(x) startsWith(x, 'run-'), fparts, 'UniformOutput', true));
-        echoinfo(frun).task = fparts{taskidx};
-        echoinfo(frun).run  = fparts{runidx};
-        echoinfo(frun).et   = subject.func_metadata{frun}.EchoTime*1000;
-        if isfield(subject.func_metadata{frun}, 'EchoNumber')
-            echoinfo(frun).echo         = subject.func_metadata{frun}.EchoNumber;
-        else
-            error('Echo Number field not found in metadata.')
+        [~,fn,~] = fileparts(subject.func{frun});
+        if endsWith(fn,'.nii'); fn = fn(1:end-4); end
+        fn_parts = strsplit(fn,'_');
+        for j = 1:numel(fn_parts)
+            currsplit = strsplit(fn_parts{j},'-');
+            if numel(currsplit)==2
+                subject.func_echoinfo{frun}.(currsplit{1}) = currsplit{2};
+            elseif numel(currsplit)==1 && j==numel(fn_parts)
+                subject.func_echoinfo{frun}.suffix = currsplit{1};
+            end
+        end
+        subject.func_echoinfo{frun}.et = subject.func_metadata{frun}.EchoTime*1000;
+        if ~isfield(subject.func_echoinfo{frun}, 'echo')
+            error('echo entity must be defined')
         end
     end
-    echoset = 0;
+    subject.func_echoinfo = subject.func_echoinfo';
+    
+    % assign echoset
     for frun = 1:size(subject.func, 1)
-        if ~isfield(echoinfo(frun), 'echoset')
-            echoset = echoset + 1;
-            echoinfo(frun).echoset = echoset;
-            echofamily = find(arrayfun(@(x) strcmp(x.task, echoinfo(frun).task) && strcmp(x.run, echoinfo(frun).run), echoinfo, 'UniformOutput', true));
-            [echoinfo(echofamily).echoset] = deal(echoset);
+        if frun == 1
+            subject.func_echoinfo{frun}.echoset = 1;
         end
-        if ~isempty(echoinfo(frun).echoset)
-            continue
-        else
-            echoset = echoset + 1;
-            echoinfo(frun).echoset = echoset;
-            echofamily = find(arrayfun(@(x) strcmp(x.task, echoinfo(frun).task) && strcmp(x.run, echoinfo(frun).run), echoinfo, 'UniformOutput', true));
-            [echoinfo(echofamily).echoset] = deal(echoset);
+        for j = (frun-1):-1:1
+            prevfields = fields(subject.func_echoinfo{j});
+            currfields = fields(subject.func_echoinfo{frun});
+            prevfields(ismember(prevfields, {'echo','et','echoset'})) = [];
+            currfields(ismember(currfields, {'echo','et','echoset'})) = [];
+            if all(cellfun(@(x) strcmp(subject.func_echoinfo{frun}.(x), subject.func_echoinfo{j}.(x)), currfields, 'Uni', 1))
+                subject.func_echoinfo{frun}.echoset = subject.func_echoinfo{j}.echoset;
+                break
+            end
+        end
+        if ~isfield(subject.func_echoinfo{frun}, 'echoset')
+            newval = max(cellfun(@(x) x.echoset, subject.func_echoinfo(1:frun-1), 'Uni', 1)) + 1;
+            subject.func_echoinfo{frun}.echoset = newval;
         end
     end
-    nechoset = echoset;
     
-    % move original func and func_metadata
-    subject.func_orig           = subject.func;
-    subject.func_metadata_orig  = subject.func_metadata;
+    % indexes of echo-1 scans
+    idx1 = find(cellfun(@(x) str2double(x.echo)==1, subject.func_echoinfo, 'Uni', 1));
+    fecho1 = {};
+    for i = 1:numel(idx1)
+        [pn,fn,ext] = fileparts(subject.func{idx1(i)});
+        fecho1{i} = fullfile(pn,['st_' fn ext]); % echo-1 files with st_ prefix
+    end
     
-    % process echo sets
-    for i = 1:nechoset
+    % realign (estimate) using echo-1 scans
+    clear matlabbatch
+    matlabbatch{1}.spm.spatial.realign.estwrite.data                = cellfun(@(x) {x}, fecho1, 'Uni', 0);
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.quality    = 1;
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.sep        = 4;
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.fwhm       = 5;
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.rtm        = 1;
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.interp     = 4;
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.wrap       = [0 0 0];
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.weight     = '';
+    matlabbatch{1}.spm.spatial.realign.estwrite.roptions.which      = [0 1]; %only reslice the mean
+    matlabbatch{1}.spm.spatial.realign.estwrite.roptions.interp     = 4;
+    matlabbatch{1}.spm.spatial.realign.estwrite.roptions.wrap       = [0 0 0];
+    matlabbatch{1}.spm.spatial.realign.estwrite.roptions.mask       = 1;
+    matlabbatch{1}.spm.spatial.realign.estwrite.roptions.prefix     = 'r';
+    spm_jobman('run',matlabbatch); clear matlabbatch;
+    
+    % calculate brain mask from T1w
+    if isempty(which('pm_brain_mask.m'))
+        error('pm_brain_mask.m file not found.')
+    end
+    pm_brain_mask(spm_vol(subject.anat{1}));
+    
+    % brain mask file
+    [pn_anat, fn_anat, ext_anat] = fileparts(subject.anat{1});    
+    % mean func name is from echo-1 of first series 
+    [pn_func,fn_func,ext_func] = fileparts(fecho1{1}); 
+    
+    % coreg to reslice bmask into bold voxels
+    clear matlabbatch
+    matlabbatch{1}.spm.spatial.coreg.estwrite.ref{1}                = fullfile(pn_func, ['mean' fn_func ext_func]); % mean image from realign
+    matlabbatch{1}.spm.spatial.coreg.estwrite.source{1}             = subject.anat{1};
+    matlabbatch{1}.spm.spatial.coreg.estwrite.other{1}              = fullfile(pn_anat, ['bmask' fn_anat ext_anat]);
+    matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.cost_fun     = 'nmi';
+    matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.sep          = [16 8 4 2 1];
+    matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.tol          = [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
+    matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.fwhm         = [7 7];
+    matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.interp       = 0; % nearest neighbor bc binary mask
+    matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.wrap         = [0 0 0];
+    matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.mask         = 0;
+    matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.prefix       = 'r';
+    spm_jobman('run', matlabbatch); clear matlabbatch
+    
+    rbmask = fullfile(pn_anat, ['rbmask' fn_anat ext_anat]); % brain mask resliced into bold dimensions
+    
+    for i = 1:numel(idx1)
         
-        % first echo in echoset (used for realignment)
-        idx     = find(arrayfun(@(x) x.echoset==i && x.echo==1, echoinfo, 'UniformOutput', true));
-        % all echoes in echoset
-        idxall  = find(arrayfun(@(x) x.echoset==i, echoinfo, 'UniformOutput', true));
+        [pn1, fn1, ~]   = fileparts(subject.func{idx1(i)}); % echo-1 fileparts
+        idxall          = find(cellfun(@(x) x.echoset==subject.func_echoinfo{idx1(i)}.echoset, subject.func_echoinfo, 'Uni', 1)); % all echoes for i-th func
         
-        % first echo file
-        [pn1,fn1,ext1] = fileparts(subject.func{idx});
-        
-        % presume slice timing is always performed (true?)
-        f1_st = fullfile(pn1, ['st_' fn1 ext1]);
-        if ~exist(f1_st, 'file')
-            error('cannot find st_ for realignment') % probably not here often
-        end
-        
-        % realign (estimate) first echo
-        clear matlabbatch
-        matlabbatch{1}.spm.spatial.realign.estimate.data{1}             = {f1_st};
-        matlabbatch{1}.spm.spatial.realign.estimate.eoptions.quality    = 1;
-        matlabbatch{1}.spm.spatial.realign.estimate.eoptions.sep        = 4;
-        matlabbatch{1}.spm.spatial.realign.estimate.eoptions.fwhm       = 5;
-        matlabbatch{1}.spm.spatial.realign.estimate.eoptions.rtm        = 1;
-        matlabbatch{1}.spm.spatial.realign.estimate.eoptions.interp     = 4;
-        matlabbatch{1}.spm.spatial.realign.estimate.eoptions.wrap       = [0 0 0];
-        matlabbatch{1}.spm.spatial.realign.estimate.eoptions.weight     = '';
-        spm_jobman('run',matlabbatch); clear matlabbatch;
-        
-        % copy rotation matrices for all other echoes
+        tedana_files = {}; % echo files to pass to tedana
         for j = 1:numel(idxall)
-            if idxall(j)==idx; continue; end
-            [pn_j,fn_j,~] = fileparts(subject.func{idxall(j)});
-            copyfile(fullfile(pn1, ['st_' fn1 '.mat']), fullfile(pn_j, ['st_' fn_j '.mat']))
-        end
-        
-        % calculate brain mask from T1w
-        if isempty(which('pm_brain_mask.m'))
-            error('pm_brain_mask.m file not found.')
-        end
-        pm_brain_mask(spm_vol(subject.anat{1}));
-        
-        % coreg to reslice bmask into bold voxels
-        
-        % brain mask file
-        [pn_anat, fn_anat, ext_anat] = fileparts(subject.anat{1});
-        bmask = fullfile(pn_anat, ['bmask' fn_anat ext_anat]);
-        
-        clear matlabbatch
-        matlabbatch{1}.spm.spatial.coreg.estwrite.ref{1}                = fullfile(pn1, ['st_' fn1 ext1]);
-        matlabbatch{1}.spm.spatial.coreg.estwrite.source{1}             = subject.anat{1};
-        matlabbatch{1}.spm.spatial.coreg.estwrite.other{1}              = bmask;
-        matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.cost_fun     = 'nmi';
-        matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.sep          = [16 8 4 2 1];
-        matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.tol          = [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
-        matlabbatch{1}.spm.spatial.coreg.estwrite.eoptions.fwhm         = [7 7];
-        matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.interp       = 0; % nearest neighbor bc binary mask
-        matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.wrap         = [0 0 0];
-        matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.mask         = 0;
-        matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.prefix       = 'r';
-        spm_jobman('run', matlabbatch); clear matlabbatch
-        
-        rbmask = fullfile(pn_anat, ['rbmask' fn_anat ext_anat]); % brain mask resliced into bold dimensions
-        
-        % echo files to pass to tedana
-        tedana_files = {};
-        for j = 1:numel(idxall)
-            [pn_j, fn_j, ext_j] = fileparts(subject.func{idxall(j)});
+            
+            [pn_j,fn_j,ext_j] = fileparts(subject.func{idxall(j)});
+            
+            % copy rotation matrices from echo-1 to all other echoes for each func
+            if str2double(subject.func_echoinfo{idxall(j)}.echo)>1
+                copyfile(fullfile(pn1, ['st_' fn1 '.mat']), fullfile(pn_j, ['st_' fn_j '.mat'])) % assign rot mat from echo-1 to echo-j for i-th func
+            end
+            
             tedana_files{j} = fullfile(pn_j, ['st_' fn_j ext_j]);
+            
         end
         
         % place to store tedana outputs
-        tedana_folder = fullfile(pn1, ['tedana_' echoinfo(idx).task]);
+        tedana_folder = fullfile(pn1, ['tedana_task-' subject.func_echoinfo{idx1(i)}.task]);
         mkdir(tedana_folder)
         
         % tedana command
+        et_vals = cellfun(@(x) x.et, subject.func_echoinfo(idxall), 'Uni', 1)';        
         fprintf(' running tedana \n')
         tedana_cmd = ['tedana ' ...
             '-d ' strjoin(tedana_files, ' ') ' ' ...
-            '-e ' num2str([echoinfo(idxall).et]) ' ' ...
+            '-e ' num2str(et_vals) ' ' ...
             '--out-dir ' tedana_folder ' ' ...
             '--mask ' rbmask
             ];
@@ -453,22 +466,21 @@ if strcmpi(options.multiecho,'yes')
         if ~exist(old_tedana_file, 'file')
             error(['Tedana file not found: ' old_tedana_file])
         end
-        fn1_split = strsplit(fn1, '_');
-        fn1_split_noecho = fn1_split(~cellfun(@(x) startsWith(x, 'echo-'), fn1_split, 'UniformOutput', true));
-        new_tedana_file = fullfile(pn1, [strjoin(fn1_split_noecho, '_') '.nii.gz']);
-        copyfile(old_tedana_file, new_tedana_file)
-        [pn,fn,ext] = fileparts(new_tedana_file);
-        if strcmp(ext, '.gz')
-            gunzip(new_tedana_file)
-            delete(new_tedana_file)
-            new_tedana_file = fullfile(pn, fn);
-        end
         
+        idxfields = fields(subject.func_echoinfo{idx1(i)});
+        idxfields(ismember(idxfields,{'echo','et','echoset','suffix'})) = [];
+        newfn = strjoin([cellfun(@(x) [x '-' subject.func_echoinfo{idx1(i)}.(x)], idxfields, 'Uni', 0); subject.func_echoinfo{idx1(i)}.suffix], '_');
+        new_tedana_file = fullfile(pn1, [newfn '.nii.gz']);
+        copyfile(old_tedana_file, new_tedana_file);
+        gunzip(new_tedana_file); delete(new_tedana_file);
+        new_tedana_file = fullfile(pn1, [newfn '.nii']);
+        for j = 1:numel(idxall); subject.func_echoinfo{idxall(j)}.newfile = new_tedana_file; end
+            
         if exist(fullfile(pn1, [fn1(1:end-4) 'desc-preprocessed_bold.json']), 'file')
             [pn,fn,~] = fileparts(new_tedana_file);
             old_json = fullfile(pn1, [fn1(1:end-4) 'desc-preprocessed_bold.json']);
             new_json = fullfile(pn, [fn(1:end-4) 'desc-preprocessed_bold.json']);
-            copyfile(old_json, new_json)
+            copyfile(old_json, new_json);
         else
             error('cannot find .json to assign to tedana output file')
         end
@@ -479,8 +491,9 @@ if strcmpi(options.multiecho,'yes')
         spm_jsonwrite(new_json,meta,opts);        
         
         % add path to tedana output file
-        new_func{i,1}             = new_tedana_file;
-        new_func_metadata{i,1}    = subject.func_metadata{idx};
+        new_func{i,1}                       = new_tedana_file;
+        new_func_metadata{i,1}              = subject.func_metadata{idx1(i)};
+        new_func_metadata{i,1}.tedanainfo   = tedana_cmd;
         
         spmup_basics(new_tedana_file,'mean') % make a mean image for each task
         
@@ -488,10 +501,24 @@ if strcmpi(options.multiecho,'yes')
     
     % replace func with tedana processed files
     % use func_metadata from first echo
-    subject.func            = new_func;
-    subject.func_metadata   = new_func_metadata;
+    subject.func_orig           = subject.func;
+    subject.func_metadata_orig  = subject.func_metadata;
+    subject.func                = new_func;
+    subject.func_metadata       = new_func_metadata;
+    
+    % update bold_include
+    new_bold_include = [];
+    for i = 1:numel(subject.func)
+        if all(bold_include(cellfun(@(x) strcmp(subject.func{i}, x.newfile), subject.func_echoinfo, 'Uni', 1)))
+            new_bold_include(i) = 1;
+        else
+            new_bold_include(i) = 0;
+        end
+    end
+    bold_include = new_bold_include;
     
 end
+
 
 
 % ------------------------
@@ -510,59 +537,62 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
     
     for ifmap = 1:numel(subject.fieldmap)
         
-        if strcmp(options.multiecho,'yes')
-            warning('If using IntendedFor, which_func_file assignment may be incorrect with multiecho data.')
-            warning('If using IntendedFor, subject.which_fmap assignment may be incorrect with multiecho data.')
-        end
+        % which_func_file:                              bool array of length func files, which to include in current ("ifmap-th") field map processing
+        % subject.fieldmap(ifmap).metadata.which_func:  indexes which func files assigned to current ("ifmap-th") field map
+        % subject.which_fmap:                           array of length func files, value denotes subject.fieldmap assigned to respective func file
         
         % index which fieldmap goes to which bold run and vice versa
-        if length(subject.fieldmap) == 1 % 1 field map for all
-            if isfield(subject.fieldmap(ifmap).metadata,'IntendedFor')
-                file_to_parse = subject.fieldmap(ifmap).metadata.IntendedFor(ifmap);
-                if iscell(file_to_parse)
-                    file_to_parse = file_to_parse{1};
-                end
-                [~, filename]                                      = spm_fileparts(file_to_parse);
-                which_func_file                                    = contains(subject.func, filename);
-                subject.fieldmap(ifmap).metadata.which_func(ifmap) = find(which_func_file); % to know which func files needs this fmap
-                subject.which_fmap(find(which_func_file))          = ifmap; % to know which fmap is needed by which func files
+        if isfield(subject.fieldmap(ifmap).metadata,'IntendedFor')
+            if strcmp(options.multiecho,'no')
+                [~,fn_func,~] = fileparts(subject.func);
+                if endsWith(fn_func, '.nii'); fn_func = cellfun(@(x) x(1:end-4), fn_func, 'Uni', 0); end
+                [~,fn_if,~] = fileparts(subject.fieldmap(ifmap).metadata.IntendedFor);
+                if endsWith(fn_if, '.nii'); fn_if = cellfun(@(x) x(1:end-4), fn_if, 'Uni', 0); end
+                
+                which_func_file                                                 = ismember(fn_func, fn_if);      
+                subject.fieldmap(ifmap).metadata.which_func                     = find(which_func_file);
+                subject.which_fmap(subject.fieldmap(ifmap).metadata.which_func) = ifmap;
             else
-                which_func_file                                    = ifmap;
-                subject.fieldmap(ifmap).metadata.which_func        = ifmap;
-                subject.which_fmap(ifmap)                          = ifmap;
+                for i = 1:numel(subject.func)
+                    idx = find(cellfun(@(x) strcmp(x.newfile, subject.func{i}), subject.func_echoinfo, 'Uni', 1));
+                    echofiles = subject.func_orig(idx);
+                    [~,fn_echo,~] = fileparts(echofiles);
+                    if endsWith(fn_echo, '.nii'); fn_echo = cellfun(@(x) x(1:end-4), fn_echo, 'Uni', 0); end
+                    [~,fn_if,~] = fileparts(subject.fieldmap(ifmap).metadata.IntendedFor);
+                    if endsWith(fn_if, '.nii'); fn_if = cellfun(@(x) x(1:end-4), fn_if, 'Uni', 0); end
+                    if all(ismember(fn_echo, fn_if))
+                        subject.fieldmap(ifmap).metadata.which_func = i;
+                        subject.which_fmap(i) = ifmap;
+                    end
+                end
+                which_func_file = find(subject.which_fmap==ifmap);
             end
+        elseif ~isfield(subject.fieldmap(ifmap).metadata,'IntendedFor') && ifmap == 1
+            which_func_file = ones(1,numel(subject.func));
+            subject.fieldmap(ifmap).metadata.which_func = find(which_func_file);
+            subject.which_fmap(subject.fieldmap(ifmap).metadata.which_func) = ifmap;
+        elseif ~isfield(subject.fieldmap(ifmap).metadata,'IntendedFor') && ifmap > 1
+            warning('Multiple fmaps and IntendedFor not defined, first fmap used.')
         else
-            if isfield(subject.fieldmap(ifmap).metadata,'IntendedFor')
-                file_to_parse = subject.fieldmap(ifmap).metadata.IntendedFor(ifmap);
-                if iscell(file_to_parse)
-                    file_to_parse = file_to_parse{1};
-                end
-                [~, filename]                                  = spm_fileparts(file_to_parse);
-                which_func_file                                = contains(subject.func, filename);
-                subject.fieldmap(ifmap).metadata.which_func    = find(which_func_file);
-                subject.which_fmap(find(which_func_file))      = ifmap;
-            else
-                which_func_file                                = ifmap;
-                subject.fieldmap(ifmap).metadata.which_func    = ifmap;
-                subject.which_fmap(ifmap)                      = ifmap;
-            end
+            continue
         end
         
         % only continue if this fmap is needed for any of the bold run for
         % this task / acq / rec
-        if any(bold_include(which_func_file))
+        if any(bold_include(subject.which_fmap==ifmap))
             
             % computes average of that run
             % finding bold reference run to which the fielmap will be coregistered
             if strcmp(options.multiecho, 'yes')
-                func_idx = find(arrayfun(@(x) x==find(bold_include, 1), [echoinfo(:).echoset], 'UniformOutput', true),1);
+                ref_func = subject.func{find(subject.which_fmap==ifmap,1)}; % first func image assigned this fmap
+                [pn,fn,ext] = fileparts(ref_func);
+                fn_parts = strsplit(fn, '_');
+                avgfile = fullfile(pn, [strjoin(fn_parts(1:end-1), '_') '-mean_' fn_parts{end} ext]); % mean image name
                 if strcmp(options.overwrite_data,'on') || ...
-                        (strcmp(options.overwrite_data,'off') && ~exist(avg,'file'))
-                    avg = spmup_basics(subject.func{func_idx},'mean'); % let spmup_basics define the avg file name
+                        (strcmp(options.overwrite_data,'off') && ~exist(avgfile, 'file'))
+                    avg = spmup_basics(subject.func{find(subject.which_fmap==ifmap,1)},'mean'); % let spmup_basics define the avg file name
                 else
-                    [pn,fn,ext] = fileparts(subject.func{func_idx});
-                    fn_parts = strsplit(fn, '_');
-                    avg = fullfile(pn, [strjoin(fn_parts(1:end-1), '_'), '-mean_', fn_parts{end} ext]); % define the file name ourselves
+                    avg = avgfile;
                 end
             else
                 [filepath,filename,ext]  = fileparts(st_files{find(bold_include, 1)});
@@ -572,7 +602,6 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                     spmup_basics(st_files{find(bold_include, 1)},'mean'); % use the mean slice timed EPI for QC
                 end
             end
-            
             
             % VDM creation: output images
             % check which types of fieldmaps we are dealing with
@@ -609,8 +638,8 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                         if length(t1index)>1
                             t1index = t1index(ifmap); % this should match session order as spm_BIDS
                         end
-                        matlabbatch{1}.spm.spatial.coreg.write.ref             = {subject.fieldmap(ifmap).phasediff};
-                        matlabbatch{1}.spm.spatial.coreg.write.source          = {subject.anat{t1index}}; %#ok<FNDSB>
+                        matlabbatch{1}.spm.spatial.coreg.write.ref{1}          = subject.fieldmap(ifmap).phasediff;
+                        matlabbatch{1}.spm.spatial.coreg.write.source          = subject.anat(t1index); %#ok<FNDSB>
                         matlabbatch{1}.spm.spatial.coreg.write.roptions.interp = 1;
                         matlabbatch{1}.spm.spatial.coreg.write.roptions.wrap   = [0 0 0];
                         matlabbatch{1}.spm.spatial.coreg.write.roptions.mask   = 0;
@@ -624,7 +653,7 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                     end
                     
                     % coregister fmap to bold reference
-                    matlabbatch{1}.spm.spatial.coreg.estimate.ref                 = {avg};
+                    matlabbatch{1}.spm.spatial.coreg.estimate.ref{1}              = avg;
                     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.cost_fun = 'nmi';
                     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.sep      = [16 8 4 2 1];
                     matlabbatch{end}.spm.spatial.coreg.estimate.eoptions.tol      = ...
@@ -695,13 +724,12 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                         func_metadata = func_metadata{1};
                     end
                     
+                    % func_metadata.TotalReadoutTime has units secs, fieldmap toolbox wants units ms
                     if isfield(func_metadata,'TotalReadoutTime')
-                        TotalReadoutTime = func_metadata.TotalReadoutTime;
-                    elseif isfield(func_metadata,'RepetitionTime')
-                        TotalReadoutTime = func_metadata.RepetitionTime;
+                        TotalReadoutTime = func_metadata.TotalReadoutTime*1000; 
                     elseif isfield(func_metadata,'EffectiveEchoSpacing')
                         TotalReadoutTime = (func_metadata.NumberOfEchos-1)...
-                            *func_metadata.EffectiveEchoSpacing;
+                            *func_metadata.EffectiveEchoSpacing*1000;
                     end
                     
                     matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsval.tert = TotalReadoutTime;
@@ -716,29 +744,20 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                         disp('Field maps is using default sequence! assuming non-EPI acquisition')
                     end
                     
-                    if isfield(fmap_metadata,'PhaseEncodingDirection')
-                        if strcmp(fmap_metadata.PhaseEncodingDirection,'j') ...
-                                || strcmp(fmap_metadata.PhaseEncodingDirection,'y')
+                    if isfield(func_metadata,'PhaseEncodingDirection')
+                        if any(strcmp(func_metadata.PhaseEncodingDirection, {'j','y'}))
                             matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = 1;
-                        elseif strcmp(fmap_metadata.PhaseEncodingDirection,'-j') ...
-                                || strcmp(fmap_metadata.PhaseEncodingDirection,'-y')
+                        elseif any(strcmp(func_metadata.PhaseEncodingDirection, {'j-','y-','-j','-y'}))
                             matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = -1;
-                        end
-                    elseif isfield(func_metadata,'PhaseEncodingDirection')
-                        if strcmp(func_metadata.PhaseEncodingDirection,'j') ...
-                                || strcmp(func_metadata.PhaseEncodingDirection,'y')
-                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = 1;
-                        elseif strcmp(func_metadata.PhaseEncodingDirection,'-j') ...
-                                || strcmp(func_metadata.PhaseEncodingDirection,'-y')
-                            matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj(1).defaults.defaultsval.blipdir = -1;
+                        else
+                            error('Unexpected phase encoding direction %s', func_metadata.PhaseEncodingDirection)
                         end
                     else
                         error('No phase encoding direction found')
                     end
                     
-                    matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.session.epi = {avg}; % use the mean despiked / slice timed image
-                    
-                    fprintf(' computing voxel displacement map %g\n',ifmap)
+                    matlabbatch{end}.spm.tools.fieldmap.calculatevdm.subj.session.epi{1} = avg; % use the mean despiked / slice timed image
+                    fprintf(' computing voxel displacement map %g\n',ifmap)                    
                     out = spm_jobman('run',matlabbatch); clear matlabbatch;
                 end
                 
@@ -770,6 +789,7 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                             subject.fieldmap(subject.which_fmap).epi2 = fullfile(pn,[newfn ext]);
                         else
                             % no same pe, oppo pe dir pair available, skip topup
+                            warning('Cannot resolve two epis with opposite phase encoding directions.')
                             continue
                         end
                     end
@@ -859,7 +879,7 @@ if strcmp(options.multiecho,'no')
             fprintf('Starting realignment \n')
             
             for frun = size(st_files,1):-1:1
-                matlabbatch{1}.spm.spatial.realign.estwrite.data{frun} = {st_files{frun}}; %#ok<CCAT1>
+                matlabbatch{1}.spm.spatial.realign.estwrite.data{frun} = st_files(frun);
             end
             matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.quality = 1;
             matlabbatch{end}.spm.spatial.realign.estwrite.eoptions.sep     = 4;
@@ -910,17 +930,25 @@ if strcmp(options.multiecho,'no')
             
             fprintf(' starting realignment and unwarping \n')
             for frun = size(st_files,1):-1:1
-                matlabbatch{1}.spm.spatial.realignunwarp.data(frun).scans = {st_files{frun}}; %#ok<CCAT1>
+                matlabbatch{1}.spm.spatial.realignunwarp.data(frun).scans = st_files(frun);
                 if ~isempty(options.VDM)
                     if length(which_fmap)==1
-                        matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {options.VDM{which_fmap}}; %#ok<CCAT1>
+                        matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = options.VDM(which_fmap);
                     else
-                        matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {options.VDM{which_fmap(frun)}}; %#ok<CCAT1>
+                        matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = options.VDM(which_fmap(frun));
                     end
                 else
                     matlabbatch{end}.spm.spatial.realignunwarp.data(frun).pmscan = {''};
                 end
+                % polarity field exists only for spm dev (as of 20240318)
+                if any(strcmp(subject.func_metadata{frun}.PhaseEncodingDirection, {'j','y'}))
+                    matlabbatch{end}.spm.spatial.realignunwarp.data(frun).polarity = 0; % PA EPI pedir
+                elseif any(strcmp(subject.func_metadata{frun}.PhaseEncodingDirection, {'j-','y-', '-j', '-y'}))
+                    matlabbatch{end}.spm.spatial.realignunwarp.data(frun).polarity = 1; % AP EPI pedir
+                end
             end
+            
+            
             matlabbatch{end}.spm.spatial.realignunwarp.eoptions.quality    = 1;
             matlabbatch{end}.spm.spatial.realignunwarp.eoptions.sep        = 4;
             matlabbatch{end}.spm.spatial.realignunwarp.eoptions.fwhm       = 5;
@@ -956,7 +984,8 @@ else % options.multiecho == 'yes'
         realign_done            = zeros(size(subject.func,1),1);
         for frun = size(subject.func,1):-1:1
             realigned_files{frun,1}    = subject.func{frun}; % because we don't reslice, simple encode the linear transform in the header
-            func_idx                   = find(arrayfun(@(x) x.echoset==i && x.echo==1, echoinfo, 'UniformOutput', true));
+            %func_idx                   = find(arrayfun(@(x) x.echoset==i && x.echo==1, echoinfo, 'UniformOutput', true));
+            func_idx                    = find(cellfun(@(x) strcmp(subject.func{frun}, x.newfile) && strcmp(x.echo, '1'), subject.func_echoinfo, 'Uni', 1));
             [filepath,filename]        = fileparts(st_files{func_idx}); % motion estimated on first st file
             subject.motionfile{frun,1} = fullfile(filepath, ['rp_' filename '.txt']);
             
@@ -1005,7 +1034,8 @@ else % options.multiecho == 'yes'
                 mean_realigned_file     = [filepath filesep 'meanu' filename ext];
             end
             % motion file has name of original first echo image
-            func_idx                    = find(arrayfun(@(x) x==frun, [echoinfo(:).echoset], 'UniformOutput', true),1);
+            % func_idx                    = find(arrayfun(@(x) x==frun, [echoinfo(:).echoset], 'UniformOutput', true),1);
+            func_idx                    = find(cellfun(@(x) strcmp(subject.func{frun}, x.newfile) && strcmp(x.echo, '1'), subject.func_echoinfo, 'Uni', 1));
             [rp_pn,rp_fn,~]             = fileparts(st_files{func_idx});
             subject.motionfile{frun,1}  = fullfile(rp_pn, ['rp_' rp_fn '.txt']);
             if exist(fullfile(filepath,[filename '.json']),'file')
@@ -1022,13 +1052,8 @@ else % options.multiecho == 'yes'
         if strcmp(options.overwrite_data,'on') || ...
                 (strcmp(options.overwrite_data,'off') && sum(realign_done)==0)
             
-            clear matlabbatch
+            clear matlabbatch            
             for frun = size(subject.func,1):-1:1
-                
-                % index of first echo image belonging current echoset
-                func_idx = find(arrayfun(@(x) x==frun, [echoinfo(:).echoset], 'UniformOutput', true),1);
-                
-                
                 matlabbatch{1}.spm.tools.fieldmap.applyvdm.data(frun).scans         = subject.func(frun);
                 if length(which_fmap)==1
                     matlabbatch{1}.spm.tools.fieldmap.applyvdm.data(frun).vdmfile   = options.VDM(which_fmap);
@@ -1036,9 +1061,9 @@ else % options.multiecho == 'yes'
                     matlabbatch{1}.spm.tools.fieldmap.applyvdm.data(frun).vdmfile   = options.VDM(which_fmap(frun)); %#ok<CCAT1>
                 end
                 
-                if ismember(subject.func_metadata{frun}.PhaseEncodingDirection, {'j-','j', 'j+'})
+                if contains(subject.func_metadata{frun}.PhaseEncodingDirection, 'j')
                     matlabbatch{1}.spm.tools.fieldmap.applyvdm.roptions.pedir   = 2;
-                elseif ismember(subject.func_metadata{frun}.PhaseEncodingDirection, {'i-','i', 'i+'})
+                elseif contains(subject.func_metadata{frun}.PhaseEncodingDirection, 'i')
                     matlabbatch{1}.spm.tools.fieldmap.applyvdm.roptions.pedir   = 1;
                 else
                     error(['Unexpected pe dir: ' subject.func_metadata_orig{frun}.PhaseEncodingDirection])
@@ -1316,9 +1341,9 @@ if strcmp(options.overwrite_data,'on') || ...
     % --------------------------------------------------------
     for channel = 1:size(subject.anat,1)
         if channel == 1
-            matlabbatch{1}.spm.spatial.preproc.channel(channel).vols   = {subject.anat{channel}};
+            matlabbatch{1}.spm.spatial.preproc.channel(channel).vols   = subject.anat(channel);
         else
-            matlabbatch{1}.spm.spatial.preproc.channel(channel).vols   = {others{1}.rfiles{channel-1}};
+            matlabbatch{1}.spm.spatial.preproc.channel(channel).vols   = others{1}.rfiles(channel-1);
         end
         matlabbatch{end}.spm.spatial.preproc.channel(channel).biasreg  = 0.001;
         matlabbatch{end}.spm.spatial.preproc.channel(channel).biasfwhm = 60;
@@ -1830,7 +1855,7 @@ task     = strfind(filename,'task-');
 if ~isempty(task)
     task = filename(task:min(values(values>task))+1);
 end
-partA = [sub ses acq rec task];
+partA = [sub ses task acq rec];
 end
 
 
