@@ -22,7 +22,12 @@ function [subject,GMV] = spmup_BIDS_1rstlevel(subject, options)
 %
 %         usage after preprocesing is done, i.e. just run stats modelling
 % 
-%
+% Usage note: for resting state data the design matrix includes motion, typically with a voltera expansion, and some 'nuisance' either WM/CSF or compcorr-like outputs.
+% We recommend no scrubbing as recent work shows this is deleterious. The SPM machinery is used to high-pass the data simultaneously at 0.001 Hz. 
+% References: (1) Martin A. Lindquist, Stephan Geuter, Tor D. Wager, Brian S. Caffo (2019). Modular preprocessing pipelines can reintroduce artifacts into fMRI data. 
+% Hum Brain Mapp. 40.  doi: 10.1002/hbm.24528 (2) Damon Đ Phạm, Daniel J. McDonald, Lei Ding, Mary Beth Nebel, Amanda F. Mejia (2023) .Less is more: balancing noise
+% reduction and data retention in fMRI with data-driven scrubbing. NeuroImage, 270, https://doi.org/10.1016/j.neuroimage.2023.119972
+% 
 % Cyril Pernet 
 % --------------------------
 %  Copyright (C) SPMUP Team 
