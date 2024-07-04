@@ -130,6 +130,10 @@ if strcmp(options.reorient,'on')
             end
         end
 
+        % remove potential empty cells
+        idx = find(cellfun(@isempty, Data));
+        Data(idx) = [];
+
         if ~RMexist
             RM = spmup_auto_reorient(Data,1);
             disp(' Data reoriented');
