@@ -100,16 +100,11 @@ if strcmp(options.reorient,'on')
                     end
                 end
 
-                if size(subject.fieldmap,1) == 1
-                    FMindex = structfun(@(x) ischar(x), subject.fieldmap);
-                    FN      = fieldnames(subject.fieldmap);
-                    FN      = FN(FMindex);
-                    for f= 1:size(FN,1)
-                        if exist(subject.fieldmap.(FN{f}),'file')
-                            Data = [Data ; subject.fieldmap.(FN{f})];
-                        end
-                    end
-                else % 1 field map per run
+                % subject.fieldmap can be inconsistent in size when mixing
+                % different ypes of field maps - trying to overcome this
+                % issue by comparing func and fieldmap array sizes
+                if any(size(subject.func,1) == size(subject.fieldmap))
+                    % match func and FM
                     for f= 1:size(subject.fieldmap,1)
                         FMindex = structfun(@(x) ischar(x), subject.fieldmap(f));
                         FN      = fieldnames(subject.fieldmap(f));
@@ -120,6 +115,17 @@ if strcmp(options.reorient,'on')
                             end
                         end
                     end
+                elseif all(size(subject.fieldmap) == [1 1])  % assume 1 field map 
+                    FMindex = structfun(@(x) ischar(x), subject.fieldmap);
+                    FN      = fieldnames(subject.fieldmap);
+                    FN      = FN(FMindex);
+                    for f= 1:size(FN,1)
+                        if exist(subject.fieldmap.(FN{f}),'file')
+                            Data = [Data ; subject.fieldmap.(FN{f})];
+                        end
+                    end
+                else
+                    error('FM must be either a single structure array (same FM applied to all run) or the same size as the number of run (copy FM to match func as needed)')
                 end
             end
         end
