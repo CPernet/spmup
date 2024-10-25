@@ -10,9 +10,10 @@ function [subjects,opt] = run_spmup_bids(BIDS, subjects, varargin)
 % might not be suitable, although using contrasts any other combinations
 % can, in theory, be obtained.
 %
-% FORMAT run_spmup_bids(BIDS_dir, options)
+% FORMAT run_spmup_bids(BIDS, subjects, options)
 %
-% INPUT subjects is the structure coming out of spmup_BIDS_unpack
+% INPUT BIDS the dataset properties
+%       subjects is the structure coming out of spmup_BIDS_unpack
 %       options is either a set of key/value pairs matching fields from
 %               spmup_getoptions or direction the options structure
 %
@@ -36,6 +37,10 @@ function [subjects,opt] = run_spmup_bids(BIDS, subjects, varargin)
 
 % make sure all folders are in the path
 addpath(genpath(fullfile(fileparts(which('spm.m')),['toolbox' filesep 'spmup'])));
+if nargin == 0
+    help run_spmup_bids
+    return
+end
 
 % check inputs
 if nargin >= 3

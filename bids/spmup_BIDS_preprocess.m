@@ -14,8 +14,12 @@ function [subject,options] = spmup_BIDS_preprocess(subject, options)
 % INPUT - subject: a structure containing the fullpath of the unpacked anat,
 %           fmap and func files for a given subject (see spmup_BIDS_unpack)
 %           if multiple tasks and sesions, filter the subject structure to
-%           data appears the dimension 1 indicating scans, runs, etc (see e.g. run_spmup_bids)
-%       - options the structure of SPMUP options (see spmup_getoptions)
+%           data appears the dimension 1 indicating scans, runs, etc 
+%         NOTE: the function reads array row wise as runs
+%               a full spmup subject array have runs in columns and
+%               sessions as rows, run_spmup_bids attempts to deal with that, 
+%               if calling this current function, you need to transpose
+%        - options the structure of SPMUP options (see spmup_getoptions)
 %
 % OUTPUT subject is the same structure updated
 %        - with the preprocessed data information
@@ -26,7 +30,12 @@ function [subject,options] = spmup_BIDS_preprocess(subject, options)
 %                options           = spmup_getoptions(BIDS_dir);
 %                options.overwrite_data = 'off';
 %                [BIDS,subjects]   = spmup_BIDS_unpack(BIDS_dir,options);
-%                [subject,options] = spmup_BIDS_preprocess(subjects{7}, options)
+%                % assume sessions and runs for a subject and a session, do
+%                tmpsubject        = subjects{sub}.anat(session,:)';
+%                tmpsubject        = subjects{sub}.func(session,:)';
+%                tmpsubject        = subjects{sub}.func_metadata(session,:)';
+%                tmpsubject        = subjects{sub}.fieldmap(session,:)';
+%                [processed{sub,session},options] = spmup_BIDS_preprocess(tmpsubject, options)
 %
 % Cyril Pernet, Remi Gau & Patrick Fisher
 % ---------------------------------------
@@ -503,10 +512,8 @@ if strcmpi(options.multiecho,'yes')
         % add path to tedana output file
         new_func{i,1}                       = new_tedana_file;
         new_func_metadata{i,1}              = subject.func_metadata{idx1(i)};
-        new_func_metadata{i,1}.tedanainfo   = tedana_cmd;
-        
-        spmup_basics(new_tedana_file,'mean') % make a mean image for each task
-        
+        new_func_metadata{i,1}.tedanainfo   = tedana_cmd;       
+        spmup_basics(new_tedana_file,'mean') % make a mean image for each task        
     end
     
     % replace func with tedana processed files
@@ -525,11 +532,8 @@ if strcmpi(options.multiecho,'yes')
             new_bold_include(i) = 0;
         end
     end
-    bold_include = new_bold_include;
-    
+    bold_include = new_bold_include;    
 end
-
-
 
 % ------------------------
 %% Field Map - compute VDM
@@ -577,14 +581,17 @@ if isfield(subject, 'fieldmap') && ~strcmpi(options.fmap,'off')
                 end
                 which_func_file = find(subject.which_fmap==ifmap);
             end
-        elseif ~isfield(subject.fieldmap(ifmap).metadata,'IntendedFor') && ifmap == 1
-            which_func_file = ones(1,numel(subject.func));
-            subject.fieldmap(ifmap).metadata.which_func = find(which_func_file);
-            subject.which_fmap(subject.fieldmap(ifmap).metadata.which_func) = ifmap;
-        elseif ~isfield(subject.fieldmap(ifmap).metadata,'IntendedFor') && ifmap > 1
-            warning('Multiple fmaps and IntendedFor not defined, first fmap used.')
-        else
-            continue
+        else % ~isfield(subject.fieldmap(ifmap).metadata,'IntendedFor')
+            if numel(subject.fieldmap) == numel(subject.func)
+                which_func_file = ones(1,numel(subject.func));
+                subject.fieldmap(ifmap).metadata.which_func = find(which_func_file);
+                subject.which_fmap(subject.fieldmap(ifmap).metadata.which_func) = ifmap;
+            else
+                warning('Multiple fmaps and IntendedFor not defined, first fmap used.')
+                which_func_file = ones(1,numel(subject.func));
+                subject.fieldmap(ifmap).metadata.which_func = find(which_func_file);
+                subject.which_fmap(subject.fieldmap(ifmap).metadata.which_func) = 1;                
+            end
         end
         
         % only continue if this fmap is needed for any of the bold run for
