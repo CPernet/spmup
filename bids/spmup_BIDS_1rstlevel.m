@@ -148,7 +148,7 @@ if strcmp(options.overwrite_data,'on') || ...
            delete(fullfile(check_mat.folder,check_mat.name)) 
         end
     end
-    N                                                 = length(subject.func_metadata{1}.SliceTiming);
+    N                                                 = length(unique(subject.func_metadata{1}.SliceTiming));
     matlabbatch{1}.spm.stats.fmri_spec.dir            = {Statspath};
     matlabbatch{1}.spm.stats.fmri_spec.timing.units   = 'secs';
     matlabbatch{1}.spm.stats.fmri_spec.timing.RT      = subject.func_metadata{1}.RepetitionTime;
